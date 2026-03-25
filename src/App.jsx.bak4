@@ -12,7 +12,6 @@ import { MeshEditorPanel } from "./components/MeshEditorPanel.jsx";
 import { Outliner } from "./components/Outliner.jsx";
 import { getSculptHit, applySculptStroke } from "./mesh/SculptEngine.js";
 import { initVertexColors, paintVertexColor, fillVertexColor, gradientFillVertexColor } from "./mesh/VertexColorPainter.js";
-import { createShapeKey, applyShapeKeys, updateBasis, buildMorphTargets } from "./mesh/ShapeKeys.js";
 import {
 
   createSceneObject,
@@ -248,9 +247,6 @@ export default function App() {
   const [vcStrength,     setVcStrength]     = useState(0.8);
   const [vcFalloff,      setVcFalloff]      = useState("smooth");
   const vcPaintingRef    = useRef(false);
-  // ── Sessions 9-10: Shape Keys state ──────────────────────────────────────
-  const [shapeKeys,      setShapeKeys]      = useState([]);
-  const shapeKeysRef     = useRef([]);
   const [selectMode,   setSelectMode]   = useState("vert");
   const [stats,        setStats]        = useState({vertices:0,edges:0,faces:0,halfEdges:0});
   const [status,       setStatus]       = useState("Add a primitive to start");
@@ -751,10 +747,6 @@ export default function App() {
   // ── Export GLB ─────────────────────────────────────────────────────────────
   const exportGLB = async () => {
     const mesh = meshRef.current; if (!mesh) return;
-    // Session 9-10: build morph targets before export
-    if (shapeKeysRef.current.length > 1) {
-      try { buildMorphTargets(mesh, shapeKeysRef.current); } catch(e) { console.warn(e); }
-    }
     // Session 7: triangulate n-gons before export
     if (heMeshRef.current) {
       try {
@@ -1258,55 +1250,6 @@ export default function App() {
   }, [matProps]);
 
 
-  // ── Sessions 9-10: Shape Key handlers ───────────────────────────────────
-  const addBasisKey = useCallback(() => {
-    const mesh = meshRef.current; if (!mesh) { setStatus("Add a primitive first"); return; }
-    if (shapeKeysRef.current.length > 0) { setStatus("Basis already exists"); return; }
-    const basis = createShapeKey("Basis", mesh);
-    basis.value = 1.0;
-    const next = [basis];
-    shapeKeysRef.current = next;
-    setShapeKeys([...next]);
-    setStatus("Basis key created");
-  }, []);
-
-  const addShapeKey = useCallback(() => {
-    const mesh = meshRef.current; if (!mesh) return;
-    if (shapeKeysRef.current.length === 0) { setStatus("Create Basis first"); return; }
-    const key  = createShapeKey("Key_" + shapeKeysRef.current.length, mesh);
-    const next = [...shapeKeysRef.current, key];
-    shapeKeysRef.current = next;
-    setShapeKeys([...next]);
-    setStatus("Shape key added: " + key.name);
-  }, []);
-
-  const removeShapeKey = useCallback((id) => {
-    if (shapeKeysRef.current[0]?.id === id) { setStatus("Cannot delete Basis"); return; }
-    const next = shapeKeysRef.current.filter(k => k.id !== id);
-    shapeKeysRef.current = next;
-    setShapeKeys([...next]);
-    const mesh = meshRef.current; if (mesh) applyShapeKeys(mesh, next);
-    setStatus("Shape key deleted");
-  }, []);
-
-  const setShapeKeyValue = useCallback((id, value) => {
-    const keys = shapeKeysRef.current;
-    const key  = keys.find(k => k.id === id); if (!key) return;
-    key.value  = value;
-    shapeKeysRef.current = [...keys];
-    setShapeKeys([...keys]);
-    const mesh = meshRef.current; if (mesh) applyShapeKeys(mesh, keys);
-  }, []);
-
-  const resetAllShapeKeys = useCallback(() => {
-    const keys = shapeKeysRef.current;
-    keys.forEach((k, i) => { if (i > 0) k.value = 0; });
-    shapeKeysRef.current = [...keys];
-    setShapeKeys([...keys]);
-    const mesh = meshRef.current; if (mesh) applyShapeKeys(mesh, keys);
-    setStatus("All shape keys reset");
-  }, []);
-
   return (
     <div style={{display:"flex",height:"100vh",background:COLORS.bg,color:"#dde6ef",
       fontFamily:"JetBrains Mono,monospace",fontSize:12,overflow:"hidden"}}>
@@ -1604,56 +1547,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Shape Keys panel — Sessions 9-10 */}
-      {shapeKeys.length > 0 && (
-        <div style={{width:220,background:"#0d1117",borderLeft:"1px solid #21262d",
-          display:"flex",flexDirection:"column",flexShrink:0,
-          fontFamily:"JetBrains Mono,monospace",fontSize:11,overflow:"hidden"}}>
-          <div style={{padding:"6px 10px",borderBottom:"1px solid #21262d",
-            display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span style={{color:"#00ffc8",fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>
-              Shape Keys ({shapeKeys.length})
-            </span>
-            <div style={{display:"flex",gap:4}}>
-              <button onClick={addShapeKey}
-                style={{background:"#00ffc8",border:"none",color:"#06060f",borderRadius:3,
-                  padding:"2px 6px",cursor:"pointer",fontSize:9,fontWeight:700}}>+ Key</button>
-              <button onClick={resetAllShapeKeys}
-                style={{background:"#1a1f2e",border:"1px solid #21262d",color:"#888",borderRadius:3,
-                  padding:"2px 6px",cursor:"pointer",fontSize:9}}>Reset</button>
-            </div>
-          </div>
-          <div style={{flex:1,overflowY:"auto"}}>
-            {shapeKeys.map((key, idx) => (
-              <div key={key.id} style={{padding:"6px 10px",borderBottom:"1px solid #21262d"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
-                  <span style={{color:idx===0?"#888":"#dde6ef",fontSize:10,fontWeight:700}}>
-                    {key.name}
-                  </span>
-                  {idx > 0 && (
-                    <button onClick={()=>removeShapeKey(key.id)}
-                      style={{background:"none",border:"none",color:"#444",cursor:"pointer",fontSize:11}}>✕</button>
-                  )}
-                </div>
-                {idx > 0 && (
-                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                    <input type="range" min={0} max={1} step={0.01} value={key.value}
-                      onChange={e=>setShapeKeyValue(key.id, Number(e.target.value))}
-                      style={{flex:1}}/>
-                    <span style={{color:"#00ffc8",fontSize:9,width:28,textAlign:"right"}}>
-                      {key.value.toFixed(2)}
-                    </span>
-                  </div>
-                )}
-                {idx === 0 && (
-                  <div style={{color:"#444",fontSize:9}}>Rest pose</div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Right panel — MeshEditorPanel */}
       <MeshEditorPanel
         stats={stats}
@@ -1706,9 +1599,6 @@ export default function App() {
         setInsetAmt={setInsetAmt}
         mirrorAxis={mirrorAxis}
         setMirrorAxis={setMirrorAxis}
-        shapeKeyCount={shapeKeys.length}
-        onAddBasis={addBasisKey}
-        onAddShapeKey={addShapeKey}
       />
 
     </div>
