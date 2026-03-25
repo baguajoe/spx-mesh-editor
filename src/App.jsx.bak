@@ -10,9 +10,7 @@ import { UVEditor } from "./components/UVEditor.jsx";
 import { TransformGizmo } from "./components/TransformGizmo.js";
 import { MeshEditorPanel } from "./components/MeshEditorPanel.jsx";
 import { Outliner } from "./components/Outliner.jsx";
-import { getSculptHit, applySculptStroke } from "./mesh/SculptEngine.js";
 import {
-
   createSceneObject,
   buildPrimitiveMesh,
   saveScene,
@@ -232,13 +230,6 @@ export default function App() {
 
   const [activeTool,   setActiveTool]   = useState("select");
   const [editMode,     setEditMode]     = useState("object");
-  // ── Sessions 4-5: Sculpt state ────────────────────────────────────────────
-  const [sculptBrush,    setSculptBrush]    = useState("push");
-  const [sculptRadius,   setSculptRadius]   = useState(0.8);
-  const [sculptStrength, setSculptStrength] = useState(0.02);
-  const [sculptFalloff,  setSculptFalloff]  = useState("smooth");
-  const [sculptSymX,     setSculptSymX]     = useState(false);
-  const sculptingRef     = useRef(false);
   const [selectMode,   setSelectMode]   = useState("vert");
   const [stats,        setStats]        = useState({vertices:0,edges:0,faces:0,halfEdges:0});
   const [status,       setStatus]       = useState("Add a primitive to start");
@@ -256,7 +247,7 @@ export default function App() {
 
   // Keep refs in sync
   useEffect(()=>{ activeToolRef.current = activeTool; }, [activeTool]);
-  useEffect(()=>{ editModeRef.current = editMode; }, [editMode]);
+  useEffect(()=>{ editModeRef.current   = editMode;   }, [editMode]);
   useEffect(()=>{ selectModeRef.current = selectMode; }, [selectMode]);
 
   // ── Init Three.js ──────────────────────────────────────────────────────────
@@ -597,10 +588,6 @@ export default function App() {
 
   // ── Knife tool ─────────────────────────────────────────────────────────────
   const onKnifeClick = useCallback((e) => {
-    if (sculptingRef.current && editModeRef.current === "sculpt") {
-      applySculpt(e);
-      return;
-    }
     if (activeToolRef.current !== "knife" || editModeRef.current !== "edit") return;
     const canvas = canvasRef.current; if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -748,13 +735,6 @@ export default function App() {
         polyCount: heMeshRef.current?.stats()?.faces || 0,
         objectCount: sceneObjects.length || 1,
       }));
-      // Session 1: write bridge metadata
-      localStorage.setItem("spx_mesh_export", JSON.stringify({
-        timestamp: Date.now(),
-        name: "spx_mesh.glb",
-        polyCount: heMeshRef.current?.stats()?.faces || 0,
-        objectCount: sceneObjects.length || 1,
-      }));
       URL.revokeObjectURL(url);
     }, (err)=>console.error(err), {binary:true});
   };
@@ -780,31 +760,10 @@ export default function App() {
     });
   }, [buildVertexOverlay]);
 
-  // ── Sessions 4-5: Sculpt stroke ───────────────────────────────────────────
-  const applySculpt = useCallback((e) => {
-    const mesh   = meshRef.current;   if (!mesh)   return;
-    const camera = cameraRef.current; if (!camera) return;
-    const canvas = canvasRef.current; if (!canvas) return;
-    const hit    = getSculptHit(e, canvas, camera, mesh);
-    if (!hit) return;
-    applySculptStroke(mesh, hit, {
-      type:        sculptBrush,
-      radius:      sculptRadius,
-      strength:    sculptStrength,
-      falloffType: sculptFalloff,
-      symmetryX:   sculptSymX,
-    });
-  }, [sculptBrush, sculptRadius, sculptStrength, sculptFalloff, sculptSymX]);
-
   // ── Orbit controls ─────────────────────────────────────────────────────────
   const onMouseDown = useCallback((e) => {
     // Check gizmo first
     if (e.button === 0 && gizmoActive && onGizmoMouseDown(e)) return;
-    if (e.button === 0 && editMode === "sculpt") {
-      sculptingRef.current = true;
-      applySculpt(e);
-      return;
-    }
     if (activeToolRef.current === "knife" && editModeRef.current === "edit") {
       onKnifeClick(e); return;
     }
@@ -840,7 +799,6 @@ export default function App() {
   }, [onSlideMouse]);
 
   const onMouseUp = useCallback((e) => {
-    sculptingRef.current = false;
     onGizmoMouseUp();
     orbitRef.current = null;
     if (slideRef.current?.active) confirmEdgeSlide();
@@ -1251,8 +1209,6 @@ export default function App() {
         onExportScene={handleExportScene}
       />
 
-
-
       {/* Viewport */}
       <div style={{flex:1,position:"relative",overflow:"hidden"}}>
         <canvas ref={canvasRef} width={1200} height={800}
@@ -1312,7 +1268,7 @@ export default function App() {
         {/* Mode bar */}
         <div style={{position:"absolute",top:10,left:"50%",transform:"translateX(-50%)",
           display:"flex",gap:4,background:"rgba(13,17,23,0.85)",borderRadius:6,padding:"4px"}}>
-          {["object","edit","sculpt"].map(m=>(
+          {["object","edit"].map(m=>(
             <button key={m} onClick={()=>m==="edit"?toggleEditMode():setEditMode("object")}
               style={{padding:"4px 16px",border:"none",borderRadius:3,cursor:"pointer",
                 fontSize:11,fontWeight:700,textTransform:"uppercase",
@@ -1381,63 +1337,6 @@ export default function App() {
           </span>
         </div>
       </div>
-
-      {/* Sculpt panel — Sessions 4-5 */}
-      {editMode === "sculpt" && (
-        <div style={{width:200,background:"#0d1117",borderLeft:"1px solid #21262d",
-          display:"flex",flexDirection:"column",padding:10,gap:8,flexShrink:0,
-          fontFamily:"JetBrains Mono,monospace",fontSize:11,overflowY:"auto"}}>
-          <div style={{color:"#00ffc8",fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>
-            Sculpt Brushes
-          </div>
-          {[["push","Push"],["pull","Pull"],["smooth","Smooth"],["clay","Clay"],
-            ["inflate","Inflate"],["pinch","Pinch"],["crease","Crease"]].map(([id,label])=>(
-            <button key={id} onClick={()=>setSculptBrush(id)}
-              style={{padding:"5px 8px",border:"none",borderRadius:4,cursor:"pointer",
-                fontSize:10,fontWeight:700,textAlign:"left",
-                background:sculptBrush===id?"#00ffc8":"#1a1f2e",
-                color:sculptBrush===id?"#06060f":"#888"}}>
-              {label}
-            </button>
-          ))}
-          <div style={{borderTop:"1px solid #21262d",paddingTop:8,marginTop:4}}>
-            <div style={{color:"#666",fontSize:9,marginBottom:4}}>Radius</div>
-            <input type="range" min={0.1} max={3} step={0.05} value={sculptRadius}
-              onChange={e=>setSculptRadius(Number(e.target.value))} style={{width:"100%"}}/>
-            <div style={{color:"#00ffc8",fontSize:9,textAlign:"right"}}>{sculptRadius.toFixed(2)}</div>
-          </div>
-          <div>
-            <div style={{color:"#666",fontSize:9,marginBottom:4}}>Strength</div>
-            <input type="range" min={0.001} max={0.1} step={0.001} value={sculptStrength}
-              onChange={e=>setSculptStrength(Number(e.target.value))} style={{width:"100%"}}/>
-            <div style={{color:"#00ffc8",fontSize:9,textAlign:"right"}}>{sculptStrength.toFixed(3)}</div>
-          </div>
-          <div>
-            <div style={{color:"#666",fontSize:9,marginBottom:4}}>Falloff</div>
-            <div style={{display:"flex",gap:3}}>
-              {["smooth","linear","sharp"].map(f=>(
-                <button key={f} onClick={()=>setSculptFalloff(f)}
-                  style={{flex:1,padding:"3px",border:"none",borderRadius:3,cursor:"pointer",
-                    fontSize:9,fontWeight:700,
-                    background:sculptFalloff===f?"#FF6600":"#1a1f2e",
-                    color:sculptFalloff===f?"#fff":"#666"}}>
-                  {f}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <div style={{color:"#666",fontSize:9,marginBottom:4}}>Symmetry</div>
-            <label style={{display:"flex",gap:6,alignItems:"center",cursor:"pointer"}}>
-              <input type="checkbox" checked={sculptSymX} onChange={e=>setSculptSymX(e.target.checked)}/>
-              <span style={{color:"#aaa",fontSize:10}}>X Mirror</span>
-            </label>
-          </div>
-          <div style={{marginTop:"auto",color:"#333",fontSize:9,lineHeight:1.5}}>
-            Click + drag to sculpt.<br/>Switch to Object/Edit mode to model.
-          </div>
-        </div>
-      )}
 
       {/* Right panel — MeshEditorPanel */}
       <MeshEditorPanel
