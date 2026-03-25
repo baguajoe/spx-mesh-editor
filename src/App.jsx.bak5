@@ -13,8 +13,6 @@ import { Outliner } from "./components/Outliner.jsx";
 import { getSculptHit, applySculptStroke } from "./mesh/SculptEngine.js";
 import { initVertexColors, paintVertexColor, fillVertexColor, gradientFillVertexColor } from "./mesh/VertexColorPainter.js";
 import { createShapeKey, applyShapeKeys, updateBasis, buildMorphTargets } from "./mesh/ShapeKeys.js";
-import { createPipe, createStaircase, createArch, createGear, createHelix, createLathe, buildProceduralMesh } from "./mesh/ProceduralMesh.js";
-import { fixNormals, removeDoubles, removeDegenerates, fillHoles, fullRepair } from "./mesh/MeshRepair.js";
 import {
 
   createSceneObject,
@@ -253,16 +251,6 @@ export default function App() {
   // ── Sessions 9-10: Shape Keys state ──────────────────────────────────────
   const [shapeKeys,      setShapeKeys]      = useState([]);
   const shapeKeysRef     = useRef([]);
-  // ── Sessions 11-13: Procedural + Repair state ─────────────────────────────
-  const [procType,       setProcType]       = useState("pipe");
-  const [procParams,     setProcParams]     = useState({
-    radius:0.3, innerRadius:0.2, height:2, segments:32,
-    steps:8, width:2, stepHeight:0.2, stepDepth:0.3,
-    thickness:0.3, depth:0.4,
-    teeth:12, toothHeight:0.2,
-    turns:3, tubeRadius:0.1,
-  });
-  const [repairStatus,   setRepairStatus]   = useState(null);
   const [selectMode,   setSelectMode]   = useState("vert");
   const [stats,        setStats]        = useState({vertices:0,edges:0,faces:0,halfEdges:0});
   const [status,       setStatus]       = useState("Add a primitive to start");
@@ -1270,68 +1258,6 @@ export default function App() {
   }, [matProps]);
 
 
-  // ── Sessions 11-12: Procedural mesh handlers ────────────────────────────
-  const addProceduralMesh = useCallback(() => {
-    const p = procParams;
-    let geo;
-    switch (procType) {
-      case "pipe":      geo = createPipe(p); break;
-      case "staircase": geo = createStaircase(p); break;
-      case "arch":      geo = createArch(p); break;
-      case "gear":      geo = createGear(p); break;
-      case "helix":     geo = createHelix(p); break;
-      case "lathe":     geo = createLathe(p); break;
-      default:          geo = createPipe(p);
-    }
-    const mesh = buildProceduralMesh(geo);
-    sceneRef.current?.add(mesh);
-    const { createSceneObject: cso } = require ? { createSceneObject: null } : {};
-    setSceneObjects(prev => {
-      const obj = { id: crypto.randomUUID(), name: procType + "_" + Date.now(), type: procType, visible: true, parentId: null, mesh };
-      meshRef.current = mesh;
-      heMeshRef.current = null;
-      setActiveObjId(obj.id);
-      return [...prev, obj];
-    });
-    setStatus("Added procedural: " + procType);
-  }, [procType, procParams]);
-
-  // ── Session 13: Mesh repair handlers ─────────────────────────────────────
-  const handleFixNormals = useCallback(() => {
-    const mesh = meshRef.current; if (!mesh) { setStatus("No mesh selected"); return; }
-    fixNormals(mesh);
-    setStatus("Normals fixed");
-  }, []);
-
-  const handleRemoveDoubles = useCallback(() => {
-    const mesh = meshRef.current; if (!mesh) { setStatus("No mesh selected"); return; }
-    const removed = removeDoubles(mesh, 0.001);
-    setRepairStatus(removed + " vertices merged");
-    setStatus(removed + " doubles removed");
-  }, []);
-
-  const handleRemoveDegenerates = useCallback(() => {
-    const mesh = meshRef.current; if (!mesh) { setStatus("No mesh selected"); return; }
-    const removed = removeDegenerates(mesh);
-    setRepairStatus(removed + " degenerate faces removed");
-    setStatus(removed + " degenerate faces removed");
-  }, []);
-
-  const handleFillHoles = useCallback(() => {
-    const mesh = meshRef.current; if (!mesh) { setStatus("No mesh selected"); return; }
-    const filled = fillHoles(mesh);
-    setRepairStatus(filled + " holes filled");
-    setStatus(filled + " holes filled");
-  }, []);
-
-  const handleFullRepair = useCallback(() => {
-    const mesh = meshRef.current; if (!mesh) { setStatus("No mesh selected"); return; }
-    const result = fullRepair(mesh);
-    const msg = "Repair: " + result.doubles + " merged, " + result.degenerates + " degens, " + result.holes + " holes";
-    setRepairStatus(msg);
-    setStatus(msg);
-  }, []);
-
   // ── Sessions 9-10: Shape Key handlers ───────────────────────────────────
   const addBasisKey = useCallback(() => {
     const mesh = meshRef.current; if (!mesh) { setStatus("Add a primitive first"); return; }
@@ -1677,70 +1603,6 @@ export default function App() {
           </div>
         </div>
       )}
-
-      {/* Procedural Mesh panel — Sessions 11-12 */}
-      <div style={{width:200,background:"#0d1117",borderLeft:"1px solid #21262d",
-        display:"flex",flexDirection:"column",flexShrink:0,
-        fontFamily:"JetBrains Mono,monospace",fontSize:11,overflow:"hidden"}}>
-        <div style={{padding:"6px 10px",borderBottom:"1px solid #21262d"}}>
-          <span style={{color:"#00ffc8",fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>
-            Procedural
-          </span>
-        </div>
-        <div style={{flex:1,overflowY:"auto",padding:"8px 10px"}}>
-          <div style={{color:"#666",fontSize:9,marginBottom:4}}>Type</div>
-          <select value={procType} onChange={e=>setProcType(e.target.value)}
-            style={{width:"100%",background:"#1a1f2e",border:"1px solid #21262d",
-              color:"#dde6ef",borderRadius:3,padding:"4px",fontSize:10,marginBottom:8}}>
-            {["pipe","staircase","arch","gear","helix","lathe"].map(t=>(
-              <option key={t} value={t}>{t.charAt(0).toUpperCase()+t.slice(1)}</option>
-            ))}
-          </select>
-          {["radius","innerRadius","height","segments","steps","width",
-            "stepHeight","stepDepth","thickness","teeth","toothHeight","turns","tubeRadius"].map(param=>(
-            <div key={param} style={{marginBottom:6}}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
-                <span style={{color:"#666",fontSize:9}}>{param}</span>
-                <span style={{color:"#00ffc8",fontSize:9}}>{procParams[param]}</span>
-              </div>
-              <input type="range"
-                min={param==="segments"||param==="steps"||param==="teeth"?3:0.05}
-                max={param==="segments"||param==="steps"||param==="teeth"?64:4}
-                step={param==="segments"||param==="steps"||param==="teeth"?1:0.05}
-                value={procParams[param]}
-                onChange={e=>setProcParams(p=>({...p,[param]:Number(e.target.value)}))}
-                style={{width:"100%"}}/>
-            </div>
-          ))}
-          <button onClick={addProceduralMesh}
-            style={{width:"100%",background:"#00ffc8",border:"none",color:"#06060f",
-              borderRadius:4,padding:"7px",cursor:"pointer",fontWeight:700,fontSize:11,marginTop:4}}>
-            + Generate {procType.charAt(0).toUpperCase()+procType.slice(1)}
-          </button>
-
-          <div style={{borderTop:"1px solid #21262d",marginTop:12,paddingTop:10}}>
-            <div style={{color:"#FF6600",fontSize:9,fontWeight:700,textTransform:"uppercase",
-              letterSpacing:1,marginBottom:6}}>Mesh Repair</div>
-            {repairStatus && (
-              <div style={{color:"#00ffc8",fontSize:9,marginBottom:6,lineHeight:1.4}}>{repairStatus}</div>
-            )}
-            {[
-              ["Fix Normals", handleFixNormals],
-              ["Remove Doubles", handleRemoveDoubles],
-              ["Remove Degenerates", handleRemoveDegenerates],
-              ["Fill Holes", handleFillHoles],
-              ["Full Repair", handleFullRepair],
-            ].map(([label, fn])=>(
-              <button key={label} onClick={fn}
-                style={{width:"100%",background:"#1a1f2e",border:"1px solid #21262d",
-                  color:"#dde6ef",borderRadius:3,padding:"5px",cursor:"pointer",
-                  fontSize:10,marginBottom:4,textAlign:"left"}}>
-                🔧 {label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
 
       {/* Shape Keys panel — Sessions 9-10 */}
       {shapeKeys.length > 0 && (
