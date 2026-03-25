@@ -209,11 +209,12 @@ export class HalfEdgeMesh {
 
     this.faces.forEach(face => {
       const verts = face.vertices();
-      if (verts.length < 3) return;
-      // Fan triangulation — works for tri, quad, and any n-gon
-      const ids = verts.map(v => vertIdMap.get(v.id));
-      for (let i = 1; i < ids.length - 1; i++) {
-        indices.push(ids[0], ids[i], ids[i+1]);
+      if (verts.length === 3) {
+        indices.push(vertIdMap.get(verts[0].id), vertIdMap.get(verts[1].id), vertIdMap.get(verts[2].id));
+      } else if (verts.length === 4) {
+        // Quad → two triangles
+        const [a,b,c,d] = verts.map(v=>vertIdMap.get(v.id));
+        indices.push(a,b,c, a,c,d);
       }
     });
 
@@ -625,49 +626,6 @@ export class HalfEdgeMesh {
       }
     });
     return [...newVerts.values()];
-  }
-
-
-  // ── Session 6: Add face from vertex array (n-gon support) ─────────────────
-  addFaceFromVertices(verts) {
-    if (verts.length < 3) return null;
-    const face  = this.addFace();
-    const edges = verts.map(() => this.addHalfEdge());
-    verts.forEach((v, i) => {
-      edges[i].vertex = v;
-      edges[i].face   = face;
-      if (!v.halfEdge) v.halfEdge = edges[i];
-    });
-    for (let i = 0; i < edges.length; i++) {
-      edges[i].next = edges[(i+1) % edges.length];
-      edges[i].prev = edges[(i+edges.length-1) % edges.length];
-    }
-    face.halfEdge = edges[0];
-    return face;
-  }
-
-  // ── Session 7: Triangulate all faces (for export) ─────────────────────────
-  triangulateAll() {
-    const tris = new HalfEdgeMesh();
-    const vmap = new Map();
-    this.vertices.forEach(v => {
-      const nv = tris.addVertex(v.x, v.y, v.z);
-      vmap.set(v.id, nv);
-    });
-    this.faces.forEach(face => {
-      const verts = face.vertices();
-      if (verts.length < 3) return;
-      const mapped = verts.map(v => vmap.get(v.id));
-      for (let i = 1; i < mapped.length - 1; i++) {
-        tris.addFaceFromVertices([mapped[0], mapped[i], mapped[i+1]]);
-      }
-    });
-    return tris;
-  }
-
-  // ── Session 7: Export as triangulated BufferGeometry arrays ──────────────
-  toTriangulatedBufferGeometry() {
-    return this.triangulateAll().toBufferGeometry();
   }
 
 

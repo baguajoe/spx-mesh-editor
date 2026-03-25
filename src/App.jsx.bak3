@@ -11,7 +11,6 @@ import { TransformGizmo } from "./components/TransformGizmo.js";
 import { MeshEditorPanel } from "./components/MeshEditorPanel.jsx";
 import { Outliner } from "./components/Outliner.jsx";
 import { getSculptHit, applySculptStroke } from "./mesh/SculptEngine.js";
-import { initVertexColors, paintVertexColor, fillVertexColor, gradientFillVertexColor } from "./mesh/VertexColorPainter.js";
 import {
 
   createSceneObject,
@@ -240,13 +239,6 @@ export default function App() {
   const [sculptFalloff,  setSculptFalloff]  = useState("smooth");
   const [sculptSymX,     setSculptSymX]     = useState(false);
   const sculptingRef     = useRef(false);
-  // ── Session 8: Vertex color paint state ──────────────────────────────────
-  const [vcPaintColor,   setVcPaintColor]   = useState("#ff6600");
-  const [vcPaintColor2,  setVcPaintColor2]  = useState("#00ffc8");
-  const [vcRadius,       setVcRadius]       = useState(0.6);
-  const [vcStrength,     setVcStrength]     = useState(0.8);
-  const [vcFalloff,      setVcFalloff]      = useState("smooth");
-  const vcPaintingRef    = useRef(false);
   const [selectMode,   setSelectMode]   = useState("vert");
   const [stats,        setStats]        = useState({vertices:0,edges:0,faces:0,halfEdges:0});
   const [status,       setStatus]       = useState("Add a primitive to start");
@@ -605,10 +597,6 @@ export default function App() {
 
   // ── Knife tool ─────────────────────────────────────────────────────────────
   const onKnifeClick = useCallback((e) => {
-    if (vcPaintingRef.current && editModeRef.current === "paint") {
-      applyVertexPaint(e);
-      return;
-    }
     if (sculptingRef.current && editModeRef.current === "sculpt") {
       applySculpt(e);
       return;
@@ -747,21 +735,6 @@ export default function App() {
   // ── Export GLB ─────────────────────────────────────────────────────────────
   const exportGLB = async () => {
     const mesh = meshRef.current; if (!mesh) return;
-    // Session 7: triangulate n-gons before export
-    if (heMeshRef.current) {
-      try {
-        const triData = heMeshRef.current.toTriangulatedBufferGeometry();
-        const triGeo  = new THREE.BufferGeometry();
-        triGeo.setAttribute("position", new THREE.BufferAttribute(triData.positions, 3));
-        triGeo.setIndex(new THREE.BufferAttribute(triData.indices, 1));
-        triGeo.computeVertexNormals();
-        if (mesh.geometry.attributes.color) {
-          triGeo.setAttribute("color", mesh.geometry.attributes.color.clone());
-        }
-        mesh.geometry.dispose();
-        mesh.geometry = triGeo;
-      } catch(e) { console.warn("Triangulate on export failed:", e); }
-    }
     const {GLTFExporter} = await import("three/examples/jsm/exporters/GLTFExporter.js");
     new GLTFExporter().parse(mesh, (glb) => {
       const blob = new Blob([glb], {type:"model/gltf-binary"});
@@ -823,31 +796,10 @@ export default function App() {
     });
   }, [sculptBrush, sculptRadius, sculptStrength, sculptFalloff, sculptSymX]);
 
-  // ── Session 8: Vertex color paint stroke ─────────────────────────────────
-  const applyVertexPaint = useCallback((e) => {
-    const mesh   = meshRef.current;   if (!mesh)   return;
-    const camera = cameraRef.current; if (!camera) return;
-    const canvas = canvasRef.current; if (!canvas) return;
-    initVertexColors(mesh);
-    const hit = getSculptHit(e, canvas, camera, mesh);
-    if (!hit) return;
-    paintVertexColor(mesh, hit, {
-      color:       vcPaintColor,
-      radius:      vcRadius,
-      strength:    vcStrength,
-      falloffType: vcFalloff,
-    });
-  }, [vcPaintColor, vcRadius, vcStrength, vcFalloff]);
-
   // ── Orbit controls ─────────────────────────────────────────────────────────
   const onMouseDown = useCallback((e) => {
     // Check gizmo first
     if (e.button === 0 && gizmoActive && onGizmoMouseDown(e)) return;
-    if (e.button === 0 && editMode === "paint") {
-      vcPaintingRef.current = true;
-      applyVertexPaint(e);
-      return;
-    }
     if (e.button === 0 && editMode === "sculpt") {
       sculptingRef.current = true;
       applySculpt(e);
@@ -888,8 +840,7 @@ export default function App() {
   }, [onSlideMouse]);
 
   const onMouseUp = useCallback((e) => {
-    sculptingRef.current  = false;
-    vcPaintingRef.current = false;
+    sculptingRef.current = false;
     onGizmoMouseUp();
     orbitRef.current = null;
     if (slideRef.current?.active) confirmEdgeSlide();
@@ -1361,7 +1312,7 @@ export default function App() {
         {/* Mode bar */}
         <div style={{position:"absolute",top:10,left:"50%",transform:"translateX(-50%)",
           display:"flex",gap:4,background:"rgba(13,17,23,0.85)",borderRadius:6,padding:"4px"}}>
-          {["object","edit","sculpt","paint"].map(m=>(
+          {["object","edit","sculpt"].map(m=>(
             <button key={m} onClick={()=>m==="edit"?toggleEditMode():setEditMode("object")}
               style={{padding:"4px 16px",border:"none",borderRadius:3,cursor:"pointer",
                 fontSize:11,fontWeight:700,textTransform:"uppercase",
@@ -1484,65 +1435,6 @@ export default function App() {
           </div>
           <div style={{marginTop:"auto",color:"#333",fontSize:9,lineHeight:1.5}}>
             Click + drag to sculpt.<br/>Switch to Object/Edit mode to model.
-          </div>
-        </div>
-      )}
-
-      {/* Vertex Color Paint panel — Session 8 */}
-      {editMode === "paint" && (
-        <div style={{width:200,background:"#0d1117",borderLeft:"1px solid #21262d",
-          display:"flex",flexDirection:"column",padding:10,gap:8,flexShrink:0,
-          fontFamily:"JetBrains Mono,monospace",fontSize:11,overflowY:"auto"}}>
-          <div style={{color:"#FF6600",fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>
-            Vertex Colors
-          </div>
-          <div>
-            <div style={{color:"#666",fontSize:9,marginBottom:4}}>Paint Color</div>
-            <input type="color" value={vcPaintColor} onChange={e=>setVcPaintColor(e.target.value)}
-              style={{width:"100%",height:32,border:"none",borderRadius:4,cursor:"pointer",background:"none"}}/>
-          </div>
-          <div>
-            <div style={{color:"#666",fontSize:9,marginBottom:4}}>Radius</div>
-            <input type="range" min={0.05} max={3} step={0.05} value={vcRadius}
-              onChange={e=>setVcRadius(Number(e.target.value))} style={{width:"100%"}}/>
-            <div style={{color:"#00ffc8",fontSize:9,textAlign:"right"}}>{vcRadius.toFixed(2)}</div>
-          </div>
-          <div>
-            <div style={{color:"#666",fontSize:9,marginBottom:4}}>Strength</div>
-            <input type="range" min={0.01} max={1} step={0.01} value={vcStrength}
-              onChange={e=>setVcStrength(Number(e.target.value))} style={{width:"100%"}}/>
-            <div style={{color:"#00ffc8",fontSize:9,textAlign:"right"}}>{vcStrength.toFixed(2)}</div>
-          </div>
-          <div>
-            <div style={{color:"#666",fontSize:9,marginBottom:4}}>Falloff</div>
-            <div style={{display:"flex",gap:3}}>
-              {["smooth","linear","sharp"].map(f=>(
-                <button key={f} onClick={()=>setVcFalloff(f)}
-                  style={{flex:1,padding:"3px",border:"none",borderRadius:3,cursor:"pointer",
-                    fontSize:9,fontWeight:700,
-                    background:vcFalloff===f?"#FF6600":"#1a1f2e",
-                    color:vcFalloff===f?"#fff":"#666"}}>
-                  {f}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div style={{borderTop:"1px solid #21262d",paddingTop:8,marginTop:4,display:"flex",flexDirection:"column",gap:4}}>
-            <div style={{color:"#666",fontSize:9,marginBottom:2}}>Fill Tools</div>
-            <button onClick={()=>{ initVertexColors(meshRef.current); fillVertexColor(meshRef.current, vcPaintColor); }}
-              style={{padding:"5px",background:"#1a1f2e",border:"1px solid #21262d",color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:10}}>
-              Fill All
-            </button>
-            <div style={{color:"#666",fontSize:9,marginTop:4,marginBottom:2}}>Gradient Color B</div>
-            <input type="color" value={vcPaintColor2} onChange={e=>setVcPaintColor2(e.target.value)}
-              style={{width:"100%",height:28,border:"none",borderRadius:4,cursor:"pointer",background:"none"}}/>
-            <button onClick={()=>{ initVertexColors(meshRef.current); gradientFillVertexColor(meshRef.current, vcPaintColor, vcPaintColor2); }}
-              style={{padding:"5px",background:"#1a1f2e",border:"1px solid #21262d",color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:10}}>
-              Gradient Fill (Y)
-            </button>
-          </div>
-          <div style={{marginTop:"auto",color:"#333",fontSize:9,lineHeight:1.5}}>
-            Click + drag to paint.<br/>Add primitive first to paint.
           </div>
         </div>
       )}
