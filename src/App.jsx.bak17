@@ -49,9 +49,6 @@ import { EMITTER_TYPES, VFX_PRESETS, createEmitter, emitParticles, stepEmitter, 
 import { createSPHParticle, createFluidSettings, FLUID_PRESETS, stepSPH, emitFluid, buildFluidMesh, updateFluidMesh, createPyroEmitter, stepPyro, getFluidStats } from "./mesh/FluidSystem.js";
 import { ASSET_TYPES, createAssetLibrary, addAsset, searchAssets, removeAsset, toggleFavorite, generateThumbnail, PROCEDURAL_ANIMATIONS, applyProceduralAnimation, createAudioAnalyzer, applyAudioToMesh, optimizeScene, getSceneStats } from "./mesh/AssetLibrary.js";
 import { createUser, createCommentPin, createVersionSnapshot, restoreVersion, createCollabSession, connectSession, broadcastOperation, broadcastComment, disconnectSession, buildCommentPinMesh, getCollabStats } from "./mesh/CollaborationSystem.js";
-import { SHADER_PRESETS, createHairShaderMaterial, createToonMaterial, createPBRShaderMaterial, createHolographicMaterial, createDissolveMaterial, createOutlineMaterial, addOutlineToMesh, applyShaderPreset, updateHolographicTime, setDissolveAmount } from "./mesh/GLSLShaders.js";
-import { createPostPassManager, createBloomPass, createSSAOPass, createDOFPass, createChromaticAberrationPass } from "./mesh/PostPassShaders.js";
-import { marchingCubes, meshToScalarField, marchingCubesRemesh, fluidSurfaceMesh, getMarchingCubesStats } from "./mesh/MarchingCubes.js";
 import { isElectron, isBrowser, openFile, saveFile, MENU_ITEMS, KEYBOARD_SHORTCUTS, registerShortcuts, checkForUpdates, isFeatureAvailable, getPlatformInfo, DESKTOP_ONLY_FEATURES } from "./mesh/ElectronBridge.js";
 import { createVolumetricSettings, applyVolumetricFog, applyHeightFog, createGodRayEffect, ATMOSPHERE_PRESETS, applyAtmospherePreset, createLightShaft } from "./mesh/VolumetricSystem.js";
 import { PASS_TYPES, createPassStack, renderAllPasses, downloadPass, compositePasses } from "./mesh/RenderPasses.js";
@@ -1342,112 +1339,6 @@ export default function App() {
     } catch(e) { setStatus("Push error: "+e.message); }
   }, [matProps]);
 
-
-  // ── Sessions 131-138: GLSL Shader handlers ───────────────────────────────
-  const handleApplyGLSLShader = useCallback(() => {
-    const mesh = meshRef.current; if (!mesh) { setStatus("Select mesh first"); return; }
-    const mat = applyShaderPreset(mesh, activeShaderPreset, shaderOptions);
-    if (!mat) { setStatus("Unknown shader preset"); return; }
-    setStatus("GLSL shader applied: " + activeShaderPreset);
-  }, [activeShaderPreset, shaderOptions]);
-
-  const handleApplyToon = useCallback(() => {
-    const mesh = meshRef.current; if (!mesh) return;
-    mesh.material = createToonMaterial({ color:"#00ffc8", shadowColor:"#006644", steps:3, edgeThreshold:0.3 });
-    setStatus("Toon shader applied");
-  }, []);
-
-  const handleApplyHolographic = useCallback(() => {
-    const mesh = meshRef.current; if (!mesh) return;
-    mesh.material = createHolographicMaterial({ color:"#00ffc8" });
-    setHoloMesh(mesh);
-    setStatus("Holographic shader applied");
-  }, []);
-
-  const handleApplyDissolve = useCallback(() => {
-    const mesh = meshRef.current; if (!mesh) return;
-    mesh.material = createDissolveMaterial({ color:"#00ffc8", edgeColor:"#FF6600" });
-    setStatus("Dissolve shader applied");
-  }, []);
-
-  const handleSetDissolveAmount = useCallback((amount) => {
-    const mesh = meshRef.current; if (!mesh?.material?.uniforms?.dissolve) return;
-    setDissolveAmount(mesh.material, amount);
-    setDissolveAmount2(amount);
-  }, []);
-
-  const handleAddOutline = useCallback(() => {
-    const mesh = meshRef.current; if (!mesh || !sceneRef.current) return;
-    const outline = addOutlineToMesh(mesh, sceneRef.current, { width:0.02, color:"#000000" });
-    setOutlineMesh(outline);
-    setStatus("Outline added");
-  }, []);
-
-  const handleApplyHairGLSL = useCallback(() => {
-    const group = hairGroup; if (!group) { setStatus("Emit hair first"); return; }
-    group.traverse(obj => {
-      if (obj.isMesh) obj.material = createHairShaderMaterial({
-        rootColor:"#2a1a0a", tipColor:"#8b6040",
-        specShift1:-0.1, specShift2:0.1,
-      });
-    });
-    setStatus("Anisotropic hair GLSL applied");
-  }, [hairGroup]);
-
-  // ── Sessions 139-140: Post Pass handlers ─────────────────────────────────
-  const handleInitPostPasses = useCallback(() => {
-    if (!rendererRef.current) return;
-    const w = rendererRef.current.domElement.width;
-    const h = rendererRef.current.domElement.height;
-    postPassManagerRef.current = createPostPassManager(rendererRef.current, w, h);
-    setStatus("Post pass manager initialized — " + w + "x" + h);
-  }, []);
-
-  const handleToggleBloom = useCallback(() => {
-    if (!postPassManagerRef.current) { handleInitPostPasses(); }
-    setBloomEnabled(b => !b);
-    setStatus(bloomEnabled ? "Bloom OFF" : "Bloom ON");
-  }, [bloomEnabled, handleInitPostPasses]);
-
-  const handleToggleSSAO = useCallback(() => {
-    if (!postPassManagerRef.current) { handleInitPostPasses(); }
-    setSsaoEnabled(s => !s);
-    setStatus(ssaoEnabled ? "SSAO OFF" : "SSAO ON");
-  }, [ssaoEnabled, handleInitPostPasses]);
-
-  const handleToggleDOF = useCallback(() => {
-    if (!postPassManagerRef.current) { handleInitPostPasses(); }
-    setDofEnabled(d => !d);
-    setStatus(dofEnabled ? "DOF OFF" : "DOF ON");
-  }, [dofEnabled, handleInitPostPasses]);
-
-  // ── Sessions 141-142: Marching Cubes handlers ─────────────────────────────
-  const handleMarchingCubesRemesh = useCallback(() => {
-    const mesh = meshRef.current; if (!mesh) { setStatus("Select mesh first"); return; }
-    setStatus("Marching cubes remesh running...");
-    try {
-      const newMesh = marchingCubesRemesh(mesh, mcResolution, mcIsolevel);
-      sceneRef.current?.remove(mesh);
-      sceneRef.current?.add(newMesh);
-      meshRef.current = newMesh;
-      setSceneObjects(prev => prev.map(o => o.mesh===mesh ? {...o, mesh:newMesh} : o));
-      const stats = getMarchingCubesStats(newMesh.geometry);
-      setMcStats(stats);
-      setStatus("MC remesh: " + stats.vertices + "v / " + stats.triangles + "t");
-    } catch(e) { setStatus("MC failed: " + e.message); }
-  }, [mcResolution, mcIsolevel]);
-
-  const handleFluidSurface = useCallback(() => {
-    const fluid = fluidSimRef.current; if (!fluid?.particles?.length) { setStatus("Run fluid first"); return; }
-    if (fluidSurface) sceneRef.current?.remove(fluidSurface);
-    const mesh2 = fluidSurfaceMesh(fluid.particles, { resolution:mcResolution, radius:0.3 });
-    if (mesh2) {
-      sceneRef.current?.add(mesh2);
-      setFluidSurface(mesh2);
-      const stats = getMarchingCubesStats(mesh2.geometry);
-      setStatus("Fluid surface: " + stats.vertices + "v / " + stats.triangles + "t");
-    }
-  }, [mcResolution, fluidSurface]);
 
   // ── Sessions 122-124: Collaboration handlers ────────────────────────────
   const handleCreateCollabSession = useCallback(() => {
@@ -2994,26 +2885,6 @@ export default function App() {
   const [updateAvailable,  setUpdateAvailable]  = useState(false);
   const [showDesktopPanel, setShowDesktopPanel] = useState(false);
   const shortcutCleanupRef = useRef(null);
-  // ── Sessions 131-142: GLSL Shaders + Post Passes + Marching Cubes ────────
-  const [activeShaderPreset, setActiveShaderPreset] = useState("toon");
-  const [shaderOptions,     setShaderOptions]      = useState({});
-  const [dissolveAmount,    setDissolveAmount2]     = useState(0.0);
-  const [outlineMesh,       setOutlineMesh]         = useState(null);
-  const [holoMesh,          setHoloMesh]            = useState(null);
-  const postPassManagerRef  = useRef(null);
-  const [bloomEnabled,      setBloomEnabled]        = useState(false);
-  const [ssaoEnabled,       setSsaoEnabled]         = useState(false);
-  const [dofEnabled,        setDofEnabled]          = useState(false);
-  const [chromaticEnabled,  setChromaticEnabled]    = useState(false);
-  const [bloomStrength,     setBloomStrength]       = useState(0.5);
-  const [bloomThreshold,    setBloomThreshold]      = useState(0.8);
-  const [showShaderPanel,   setShowShaderPanel]     = useState(false);
-  const [showPostPassPanel, setShowPostPassPanel]   = useState(false);
-  const [mcResolution,      setMcResolution]        = useState(32);
-  const [mcIsolevel,        setMcIsolevel]          = useState(0.5);
-  const [mcStats,           setMcStats]             = useState(null);
-  const [showMCPanel,       setShowMCPanel]         = useState(false);
-  const [fluidSurface,      setFluidSurface]        = useState(null);
 
   // ── Sessions 11-12: Procedural mesh handlers ────────────────────────────
   const addProceduralMesh = useCallback(() => {
@@ -3160,18 +3031,6 @@ export default function App() {
           style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:14,
             background:showTimeline?"#00ffc8":COLORS.border,
             color:showTimeline?"#06060f":"#888"}}>⏱</button>
-        <button title="GLSL Shaders" onClick={()=>setShowShaderPanel(s=>!s)}
-          style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:11,
-            background:showShaderPanel?"#00ffc8":COLORS.border,
-            color:showShaderPanel?"#06060f":"#888",fontWeight:700}}>GL</button>
-        <button title="Post Passes" onClick={()=>setShowPostPassPanel(p=>!p)}
-          style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:11,
-            background:showPostPassPanel?"#FF6600":COLORS.border,
-            color:showPostPassPanel?"#fff":"#888",fontWeight:700}}>PP</button>
-        <button title="Marching Cubes" onClick={()=>setShowMCPanel(m=>!m)}
-          style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:11,
-            background:showMCPanel?"#8844ff":COLORS.border,
-            color:showMCPanel?"#fff":"#888",fontWeight:700}}>MC</button>
         <button title="Collaboration" onClick={()=>setShowCollabPanel(c=>!c)}
           style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:14,
             background:showCollabPanel?"#00ffc8":COLORS.border,
@@ -3755,159 +3614,6 @@ export default function App() {
               )}
             </div>
 
-          </div>
-        </div>
-      )}
-
-      {/* Sessions 131-142: GLSL Shaders + Post Passes + Marching Cubes panel */}
-      {(showShaderPanel || showPostPassPanel || showMCPanel) && (
-        <div style={{width:210,background:"#0d1117",borderLeft:"1px solid #21262d",
-          display:"flex",flexDirection:"column",flexShrink:0,
-          fontFamily:"JetBrains Mono,monospace",fontSize:11,overflow:"hidden"}}>
-          <div style={{padding:"6px 10px",borderBottom:"1px solid #21262d"}}>
-            <span style={{color:"#00ffc8",fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>
-              GLSL + Marching Cubes
-            </span>
-          </div>
-          <div style={{flex:1,overflowY:"auto",padding:"8px 10px"}}>
-
-            {/* GLSL Shaders — Sessions 131-138 */}
-            {showShaderPanel && (
-              <div style={{marginBottom:10}}>
-                <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>GLSL Shaders</div>
-                <div style={{display:"flex",gap:2,flexWrap:"wrap",marginBottom:4}}>
-                  {Object.entries(SHADER_PRESETS).map(([k,v])=>(
-                    <button key={k} onClick={()=>setActiveShaderPreset(k)}
-                      style={{padding:"2px 5px",background:activeShaderPreset===k?"#00ffc8":"#1a1f2e",
-                        border:"none",color:activeShaderPreset===k?"#06060f":"#555",
-                        borderRadius:3,cursor:"pointer",fontSize:8}}>
-                      {v.icon} {v.label}
-                    </button>
-                  ))}
-                </div>
-                <button onClick={handleApplyGLSLShader}
-                  style={{width:"100%",padding:"5px",background:"#00ffc8",border:"none",color:"#06060f",
-                    borderRadius:3,cursor:"pointer",fontSize:9,fontWeight:700,marginBottom:3}}>
-                  ▶ Apply Shader
-                </button>
-                <button onClick={handleApplyToon}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
-                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:2}}>
-                  🎨 Toon/NPR
-                </button>
-                <button onClick={handleApplyHolographic}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
-                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:2}}>
-                  🔮 Holographic
-                </button>
-                <button onClick={handleApplyDissolve}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
-                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:4}}>
-                  💨 Dissolve
-                </button>
-                <div style={{marginBottom:4}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:1}}>
-                    <span style={{color:"#555",fontSize:8}}>Dissolve Amount</span>
-                    <span style={{color:"#00ffc8",fontSize:8}}>{dissolveAmount.toFixed(2)}</span>
-                  </div>
-                  <input type="range" min={0} max={1} step={0.01} value={dissolveAmount}
-                    onChange={e=>handleSetDissolveAmount(Number(e.target.value))} style={{width:"100%"}}/>
-                </div>
-                <button onClick={handleAddOutline}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
-                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:2}}>
-                  ⬡ Add Outline
-                </button>
-                <button onClick={handleApplyHairGLSL}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
-                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8}}>
-                  💇 Hair GLSL Shader
-                </button>
-              </div>
-            )}
-
-            {/* Post Passes — Sessions 139-140 */}
-            {showPostPassPanel && (
-              <div style={{borderTop:showShaderPanel?"1px solid #21262d":"none",paddingTop:showShaderPanel?8:0,marginBottom:10}}>
-                <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Post Passes</div>
-                <label style={{display:"flex",gap:6,alignItems:"center",cursor:"pointer",marginBottom:3}}>
-                  <input type="checkbox" checked={bloomEnabled} onChange={handleToggleBloom}/>
-                  <span style={{color:bloomEnabled?"#00ffc8":"#666",fontSize:9}}>Bloom</span>
-                </label>
-                {bloomEnabled && (
-                  <div style={{marginBottom:4,paddingLeft:8}}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:1}}>
-                      <span style={{color:"#555",fontSize:7}}>Strength</span>
-                      <span style={{color:"#00ffc8",fontSize:7}}>{bloomStrength.toFixed(2)}</span>
-                    </div>
-                    <input type="range" min={0} max={2} step={0.05} value={bloomStrength}
-                      onChange={e=>setBloomStrength(Number(e.target.value))} style={{width:"100%"}}/>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:1}}>
-                      <span style={{color:"#555",fontSize:7}}>Threshold</span>
-                      <span style={{color:"#00ffc8",fontSize:7}}>{bloomThreshold.toFixed(2)}</span>
-                    </div>
-                    <input type="range" min={0} max={1} step={0.05} value={bloomThreshold}
-                      onChange={e=>setBloomThreshold(Number(e.target.value))} style={{width:"100%"}}/>
-                  </div>
-                )}
-                <label style={{display:"flex",gap:6,alignItems:"center",cursor:"pointer",marginBottom:3}}>
-                  <input type="checkbox" checked={ssaoEnabled} onChange={handleToggleSSAO}/>
-                  <span style={{color:ssaoEnabled?"#00ffc8":"#666",fontSize:9}}>SSAO</span>
-                </label>
-                <label style={{display:"flex",gap:6,alignItems:"center",cursor:"pointer",marginBottom:3}}>
-                  <input type="checkbox" checked={dofEnabled} onChange={handleToggleDOF}/>
-                  <span style={{color:dofEnabled?"#00ffc8":"#666",fontSize:9}}>Depth of Field</span>
-                </label>
-                <label style={{display:"flex",gap:6,alignItems:"center",cursor:"pointer",marginBottom:4}}>
-                  <input type="checkbox" checked={chromaticEnabled} onChange={()=>setChromaticEnabled(c=>!c)}/>
-                  <span style={{color:chromaticEnabled?"#00ffc8":"#666",fontSize:9}}>Chromatic Aberration</span>
-                </label>
-                <button onClick={handleInitPostPasses}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
-                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8}}>
-                  ⚙ Init Post Manager
-                </button>
-              </div>
-            )}
-
-            {/* Marching Cubes — Sessions 141-142 */}
-            {showMCPanel && (
-              <div style={{borderTop:"1px solid #21262d",paddingTop:8}}>
-                <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Marching Cubes</div>
-                <div style={{marginBottom:4}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:1}}>
-                    <span style={{color:"#555",fontSize:8}}>Resolution</span>
-                    <span style={{color:"#00ffc8",fontSize:8}}>{mcResolution}</span>
-                  </div>
-                  <input type="range" min={8} max={64} step={4} value={mcResolution}
-                    onChange={e=>setMcResolution(Number(e.target.value))} style={{width:"100%"}}/>
-                </div>
-                <div style={{marginBottom:4}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:1}}>
-                    <span style={{color:"#555",fontSize:8}}>Isolevel</span>
-                    <span style={{color:"#00ffc8",fontSize:8}}>{mcIsolevel.toFixed(2)}</span>
-                  </div>
-                  <input type="range" min={0.1} max={0.9} step={0.05} value={mcIsolevel}
-                    onChange={e=>setMcIsolevel(Number(e.target.value))} style={{width:"100%"}}/>
-                </div>
-                <button onClick={handleMarchingCubesRemesh}
-                  style={{width:"100%",padding:"5px",background:"#00ffc8",border:"none",color:"#06060f",
-                    borderRadius:3,cursor:"pointer",fontSize:9,fontWeight:700,marginBottom:3}}>
-                  ⬡ MC Remesh
-                </button>
-                <button onClick={handleFluidSurface}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
-                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:4}}>
-                  💧 Fluid Surface Mesh
-                </button>
-                {mcStats && (
-                  <div style={{color:"#555",fontSize:8,lineHeight:1.6}}>
-                    Vertices: {mcStats.vertices}<br/>
-                    Triangles: {mcStats.triangles}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </div>
       )}
