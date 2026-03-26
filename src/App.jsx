@@ -37,6 +37,9 @@ import { createCamera, saveBookmark, restoreBookmark, animateCameraToBookmark, s
 import { EFFECT_PRESETS, LUT_PRESETS, applyColorGrade, applyLUT, applyVignette, applyFilmGrain, applyToneMap, applyChromaticAberration, applySharpen, applyPostStack } from "./mesh/PostProcessing.js";
 import { DEFAULT_BONE_MAP, retargetFrame, bakeRetargetedAnimation, fixFootSliding, autoDetectBoneMap, getRetargetStats } from "./mesh/MocapRetarget.js";
 import { createIKChain, solveFABRIK, setIKTarget, setIKPoleTarget, getChainEnd, solveTwoBoneIK } from "./mesh/IKSystem.js";
+import { createPathTracerSettings, createWebGLPathTracer, startPathTracing, stopPathTracing, stepPathTracer, resetPathTracer, exportPathTracedFrame, getPathTracerStats, detectPathTracer } from "./mesh/PathTracer.js";
+import { exportOBJ, parseOBJ, importFBXFromBackend, exportFBXToBackend, exportAlembic, exportUSD, SUPPORTED_IMPORT_FORMATS, SUPPORTED_EXPORT_FORMATS } from "./mesh/FBXPipeline.js";
+import { registerPlugin, unregisterPlugin, getPlugins, getAllPlugins, initPluginAPI, loadPluginFromURL, loadPluginFromFile, BUILTIN_BRUSH_PLUGINS, PRESET_CATEGORIES, createPresetMarketplace, COMMUNITY_PRESETS, searchPresets, installPreset, uninstallPreset, isPresetInstalled, getInstalledPresets, saveCustomPreset, loadCustomPresets, getPluginStats } from "./mesh/PluginSystem.js";
 import { GraphEditor } from "./components/GraphEditor.jsx";
 import { DRIVER_TYPES, createDriver, createVariable, evaluateDriver, resolveVariable, applyDriver, applyAllDrivers, DRIVER_PRESETS } from "./mesh/DriverSystem.js";
 import { CONSTRAINT_TYPES, createConstraint, applyConstraint, applyAllConstraints, applyLookAt, applyFloor, applyStretchTo } from "./mesh/ConstraintSystem.js";
@@ -1455,6 +1458,146 @@ export default function App() {
       setStatus("Fluid surface: " + stats.vertices + "v / " + stats.triangles + "t");
     }
   }, [mcResolution, fluidSurface]);
+
+  // ── Sessions 3-9: PathTracer + FBX + Plugin handlers ───────────────────
+  const handleDetectPathTracer = useCallback(async () => {
+    const result = await detectPathTracer();
+    setPtDetected(result);
+    setStatus(result.available ? "PathTracer available: " + result.version : "Using built-in accumulation renderer");
+  }, []);
+
+  const handleCreatePathTracer = useCallback(() => {
+    if (!rendererRef.current || !sceneRef.current || !cameraRef.current) return;
+    const settings = createPathTracerSettings({ maxSamples:128, bounces:4 });
+    const pt = createWebGLPathTracer(rendererRef.current, sceneRef.current, cameraRef.current, settings);
+    pathTracerRef.current = pt;
+    setPathTracer(pt);
+    setStatus("Path tracer created — max " + settings.maxSamples + " samples");
+  }, []);
+
+  const handleStartPathTracing = useCallback(() => {
+    const pt = pathTracerRef.current; if (!pt) { setStatus("Create path tracer first"); return; }
+    startPathTracing(pt);
+    setPtRunning(true);
+    const loop = () => {
+      const result = stepPathTracer(pt, rendererRef.current, sceneRef.current, cameraRef.current);
+      const stats  = getPathTracerStats(pt);
+      setPtStats({ ...stats });
+      if (result?.done) { setPtRunning(false); setStatus("Path tracing complete — " + stats.samples + " samples"); return; }
+      ptRafRef.current = requestAnimationFrame(loop);
+    };
+    ptRafRef.current = requestAnimationFrame(loop);
+    setStatus("Path tracing started");
+  }, []);
+
+  const handleStopPathTracing = useCallback(() => {
+    const pt = pathTracerRef.current; if (!pt) return;
+    stopPathTracing(pt);
+    if (ptRafRef.current) cancelAnimationFrame(ptRafRef.current);
+    setPtRunning(false);
+    setStatus("Path tracing stopped");
+  }, []);
+
+  const handleExportPathTracedFrame = useCallback(() => {
+    if (!rendererRef.current) return;
+    exportPathTracedFrame(rendererRef.current, "pathtraced_" + Date.now() + ".png");
+    setStatus("Frame exported");
+  }, []);
+
+  // ── Session 4-5: FBX/OBJ handlers ────────────────────────────────────────
+  const handleExportOBJ = useCallback(() => {
+    if (!sceneRef.current) return;
+    exportOBJ(sceneRef.current, { filename:"scene.obj" });
+    setStatus("OBJ exported");
+  }, []);
+
+  const handleImportOBJ = useCallback(async () => {
+    try {
+      const result = await openFile({ accept:".obj" });
+      if (!result) return;
+      const group = parseOBJ(result.data);
+      sceneRef.current?.add(group);
+      setStatus("OBJ imported: " + group.children.length + " objects");
+    } catch(e) { setStatus("OBJ import failed: " + e.message); }
+  }, []);
+
+  const handleImportFBX = useCallback(async () => {
+    try {
+      const result = await openFile({ accept:".fbx", binary:true });
+      if (!result) return;
+      setStatus("Sending FBX to backend for conversion...");
+      const file   = result.file || new File([result.data], result.name || "import.fbx");
+      const conv   = await importFBXFromBackend(file);
+      if (conv.success) {
+        const { GLTFLoader } = await import("three/addons/loaders/GLTFLoader.js");
+        const loader = new GLTFLoader();
+        loader.load(conv.url, (gltf) => {
+          sceneRef.current?.add(gltf.scene);
+          setStatus("FBX imported via backend");
+        });
+      } else {
+        setStatus("FBX import offline — backend required");
+      }
+    } catch(e) { setStatus("FBX import failed: " + e.message); }
+  }, []);
+
+  const handleExportFBX = useCallback(async () => {
+    if (!sceneRef.current) return;
+    setStatus("Exporting FBX...");
+    const result = await exportFBXToBackend(sceneRef.current, "scene.fbx");
+    setStatus(result.success ? "FBX exported" : "FBX offline — saved as GLB");
+  }, []);
+
+  // ── Session 6-7: Plugin handlers ──────────────────────────────────────────
+  const handleInitPlugins = useCallback(() => {
+    initPluginAPI();
+    BUILTIN_BRUSH_PLUGINS.forEach(registerPlugin);
+    const stats = getPluginStats();
+    setPluginStats(stats);
+    setStatus("Plugin API initialized — " + stats.total + " plugins registered");
+  }, []);
+
+  const handleLoadPlugin = useCallback(async () => {
+    try {
+      const result = await openFile({ accept:".js" });
+      if (!result) return;
+      const file   = result.file || new File([result.data], result.name || "plugin.js");
+      const loaded = await loadPluginFromFile(file);
+      const stats  = getPluginStats();
+      setPluginStats(stats);
+      setStatus(loaded.success ? "Plugin loaded: " + loaded.name : "Plugin failed: " + loaded.error);
+    } catch(e) { setStatus("Plugin load failed: " + e.message); }
+  }, []);
+
+  // ── Session 8: Preset marketplace handlers ────────────────────────────────
+  const handleInstallPreset = useCallback((presetId) => {
+    installPreset(pluginMarketplace, presetId);
+    setPluginMarketplace({ ...pluginMarketplace });
+    const p = COMMUNITY_PRESETS.find(x=>x.id===presetId);
+    setStatus("Installed: " + (p?.name||presetId));
+  }, [pluginMarketplace]);
+
+  const handleSavePreset = useCallback(() => {
+    const mesh = meshRef.current; if (!mesh) return;
+    const preset = saveCustomPreset("My Preset", "sculpt", { mesh:mesh.name });
+    setStatus("Preset saved: " + preset.name);
+  }, []);
+
+  // ── Sessions 3-9: PathTracer + FBX + Plugin handlers ───────────────────
+
+
+
+
+
+  // ── Session 4-5: FBX/OBJ handlers ────────────────────────────────────────
+
+
+
+
+  // ── Session 6-7: Plugin handlers ──────────────────────────────────────────
+
+
+  // ── Session 8: Preset marketplace handlers ────────────────────────────────
 
   // ── Sessions 157-161: Rendering upgrade handlers ────────────────────────
   const handleDetectWebGPU = useCallback(async () => {
@@ -4453,6 +4596,380 @@ export default function App() {
                     Triangles: {mcStats.triangles}
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Sessions 3-9: PathTracer + FBX + Plugin + Preset panel */}
+      {(showPathTracerPanel || showPipelinePanel || showPluginPanel || showMarketPanel) && (
+        <div style={{width:210,background:"#0d1117",borderLeft:"1px solid #21262d",
+          display:"flex",flexDirection:"column",flexShrink:0,
+          fontFamily:"JetBrains Mono,monospace",fontSize:11,overflow:"hidden"}}>
+          <div style={{padding:"6px 10px",borderBottom:"1px solid #21262d"}}>
+            <span style={{color:"#00ffc8",fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>
+              Pro Pipeline
+            </span>
+          </div>
+          <div style={{flex:1,overflowY:"auto",padding:"8px 10px"}}>
+
+            {/* Path Tracer */}
+            {showPathTracerPanel && (
+              <div style={{marginBottom:10}}>
+                <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Path Tracer</div>
+                <button onClick={handleDetectPathTracer}
+                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:3}}>
+                  🔍 Detect PathTracer
+                </button>
+                {ptDetected && (
+                  <div style={{color:ptDetected.available?"#00ffc8":"#888",fontSize:8,marginBottom:4}}>
+                    {ptDetected.available ? "✓ " + ptDetected.version : "Using built-in"}
+                  </div>
+                )}
+                <button onClick={handleCreatePathTracer}
+                  style={{width:"100%",padding:"5px",background:"#00ffc8",border:"none",color:"#06060f",
+                    borderRadius:3,cursor:"pointer",fontSize:9,fontWeight:700,marginBottom:3}}>
+                  ✦ Create Path Tracer
+                </button>
+                <div style={{display:"flex",gap:3,marginBottom:4}}>
+                  <button onClick={handleStartPathTracing} disabled={ptRunning}
+                    style={{flex:1,padding:"4px",background:ptRunning?"#555":"#FF6600",
+                      border:"none",color:"#fff",borderRadius:3,cursor:"pointer",fontSize:9}}>▶</button>
+                  <button onClick={handleStopPathTracing}
+                    style={{flex:1,padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                      color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:9}}>■</button>
+                  <button onClick={handleExportPathTracedFrame}
+                    style={{flex:1,padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                      color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:9}}>⬇</button>
+                </div>
+                {ptStats && (
+                  <div style={{color:"#555",fontSize:8,lineHeight:1.6}}>
+                    Samples: {ptStats.samples}/{ptStats.maxSamples}<br/>
+                    Progress: {Math.round(ptStats.progress*100)}%<br/>
+                    SPS: {ptStats.sps}<br/>
+                    ETA: {ptStats.eta}s<br/>
+                    Time: {ptStats.elapsed}s<br/>
+                    {ptRunning && <span style={{color:"#00ffc8"}}>● Rendering</span>}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* FBX/OBJ Pipeline */}
+            {showPipelinePanel && (
+              <div style={{borderTop:showPathTracerPanel?"1px solid #21262d":"none",
+                paddingTop:showPathTracerPanel?8:0,marginBottom:10}}>
+                <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Import / Export</div>
+                <div style={{color:"#555",fontSize:8,marginBottom:3}}>Import</div>
+                <button onClick={handleImportOBJ}
+                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:2}}>
+                  📂 Import OBJ
+                </button>
+                <button onClick={handleImportFBX}
+                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:4}}>
+                  📂 Import FBX (backend)
+                </button>
+                <div style={{color:"#555",fontSize:8,marginBottom:3}}>Export</div>
+                <button onClick={handleExportOBJ}
+                  style={{width:"100%",padding:"5px",background:"#00ffc8",border:"none",color:"#06060f",
+                    borderRadius:3,cursor:"pointer",fontSize:9,fontWeight:700,marginBottom:2}}>
+                  💾 Export OBJ + MTL
+                </button>
+                <button onClick={handleExportFBX}
+                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:2}}>
+                  💾 Export FBX (backend)
+                </button>
+                <div style={{color:"#555",fontSize:7,marginTop:4,lineHeight:1.5}}>
+                  {SUPPORTED_EXPORT_FORMATS.map(f=>(
+                    <div key={f.ext} style={{display:"flex",gap:4,marginBottom:1}}>
+                      <span style={{color:f.native?"#00ffc8":"#888",width:36}}>{f.label}</span>
+                      <span style={{color:"#333"}}>{f.native?"native":"backend"}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Plugin Manager */}
+            {showPluginPanel && (
+              <div style={{borderTop:"1px solid #21262d",paddingTop:8,marginBottom:10}}>
+                <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Plugin Manager</div>
+                <button onClick={handleInitPlugins}
+                  style={{width:"100%",padding:"5px",background:"#00ffc8",border:"none",color:"#06060f",
+                    borderRadius:3,cursor:"pointer",fontSize:9,fontWeight:700,marginBottom:3}}>
+                  ⚙ Init Plugin API
+                </button>
+                <button onClick={handleLoadPlugin}
+                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:4}}>
+                  📂 Load Plugin (.js)
+                </button>
+                {pluginStats && (
+                  <div style={{color:"#555",fontSize:8,lineHeight:1.6,marginBottom:4}}>
+                    Total: {pluginStats.total}<br/>
+                    Brushes: {pluginStats.brushes||0}<br/>
+                    Shaders: {pluginStats.shaders||0}<br/>
+                    Exporters: {pluginStats.exporters||0}
+                  </div>
+                )}
+                <div style={{color:"#555",fontSize:8,marginBottom:2}}>Built-in brushes</div>
+                {BUILTIN_BRUSH_PLUGINS.map(p=>(
+                  <div key={p.name} style={{padding:"2px 6px",background:"#1a1f2e",
+                    border:"1px solid #21262d",borderRadius:3,marginBottom:2,
+                    display:"flex",alignItems:"center",gap:4}}>
+                    <span style={{color:"#00ffc8",fontSize:9}}>{p.icon}</span>
+                    <span style={{color:"#dde6ef",fontSize:8}}>{p.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Preset Marketplace */}
+            {showMarketPanel && (
+              <div style={{borderTop:"1px solid #21262d",paddingTop:8}}>
+                <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Preset Marketplace</div>
+                <input value={presetSearch} onChange={e=>setPresetSearch(e.target.value)}
+                  placeholder="Search presets..."
+                  style={{width:"100%",background:"#1a1f2e",border:"1px solid #21262d",
+                    color:"#dde6ef",borderRadius:3,padding:"4px",fontSize:8,marginBottom:3,
+                    fontFamily:"JetBrains Mono,monospace"}}/>
+                <div style={{display:"flex",gap:2,flexWrap:"wrap",marginBottom:4}}>
+                  {Object.entries(PRESET_CATEGORIES).map(([k,v])=>(
+                    <button key={k} onClick={()=>setPresetCategory(presetCategory===k?null:k)}
+                      title={v.label}
+                      style={{padding:"2px 4px",background:presetCategory===k?v.color:"#1a1f2e",
+                        border:"none",color:presetCategory===k?"#06060f":"#555",
+                        borderRadius:3,cursor:"pointer",fontSize:9}}>
+                      {v.icon}
+                    </button>
+                  ))}
+                </div>
+                <label style={{display:"flex",gap:4,alignItems:"center",color:"#555",fontSize:8,marginBottom:4,cursor:"pointer"}}>
+                  <input type="checkbox" checked={presetFreeOnly} onChange={e=>setPresetFreeOnly(e.target.checked)}/>
+                  Free only
+                </label>
+                <div style={{maxHeight:200,overflowY:"auto"}}>
+                  {searchPresets(pluginMarketplace, presetSearch, { category:presetCategory, freeOnly:presetFreeOnly }).map(p=>(
+                    <div key={p.id} style={{padding:"4px 6px",background:"#1a1f2e",
+                      border:"1px solid #21262d",borderRadius:3,marginBottom:3}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <span style={{color:"#dde6ef",fontSize:8,fontWeight:700}}>{p.name}</span>
+                        <span style={{color:p.free?"#00ffc8":"#ffaa00",fontSize:7}}>
+                          {p.free?"FREE":"$"+p.price}
+                        </span>
+                      </div>
+                      <div style={{display:"flex",justifyContent:"space-between",marginTop:2}}>
+                        <span style={{color:"#555",fontSize:7}}>by {p.author} · ★{p.rating}</span>
+                        <button
+                          onClick={()=>isPresetInstalled(pluginMarketplace,p.id)
+                            ? uninstallPreset(pluginMarketplace,p.id)
+                            : handleInstallPreset(p.id)}
+                          style={{background:isPresetInstalled(pluginMarketplace,p.id)?"#333":"#00ffc8",
+                            border:"none",color:isPresetInstalled(pluginMarketplace,p.id)?"#888":"#06060f",
+                            borderRadius:2,padding:"1px 6px",cursor:"pointer",fontSize:7,fontWeight:700}}>
+                          {isPresetInstalled(pluginMarketplace,p.id)?"✓":"GET"}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={handleSavePreset}
+                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginTop:4}}>
+                  + Save Custom Preset
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Sessions 3-9: PathTracer + FBX + Plugin + Preset panel */}
+      {(showPathTracerPanel || showPipelinePanel || showPluginPanel || showMarketPanel) && (
+        <div style={{width:210,background:"#0d1117",borderLeft:"1px solid #21262d",
+          display:"flex",flexDirection:"column",flexShrink:0,
+          fontFamily:"JetBrains Mono,monospace",fontSize:11,overflow:"hidden"}}>
+          <div style={{padding:"6px 10px",borderBottom:"1px solid #21262d"}}>
+            <span style={{color:"#00ffc8",fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>
+              Pro Pipeline
+            </span>
+          </div>
+          <div style={{flex:1,overflowY:"auto",padding:"8px 10px"}}>
+
+            {/* Path Tracer */}
+            {showPathTracerPanel && (
+              <div style={{marginBottom:10}}>
+                <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Path Tracer</div>
+                <button onClick={handleDetectPathTracer}
+                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:3}}>
+                  🔍 Detect PathTracer
+                </button>
+                {ptDetected && (
+                  <div style={{color:ptDetected.available?"#00ffc8":"#888",fontSize:8,marginBottom:4}}>
+                    {ptDetected.available ? "✓ " + ptDetected.version : "Using built-in"}
+                  </div>
+                )}
+                <button onClick={handleCreatePathTracer}
+                  style={{width:"100%",padding:"5px",background:"#00ffc8",border:"none",color:"#06060f",
+                    borderRadius:3,cursor:"pointer",fontSize:9,fontWeight:700,marginBottom:3}}>
+                  ✦ Create Path Tracer
+                </button>
+                <div style={{display:"flex",gap:3,marginBottom:4}}>
+                  <button onClick={handleStartPathTracing} disabled={ptRunning}
+                    style={{flex:1,padding:"4px",background:ptRunning?"#555":"#FF6600",
+                      border:"none",color:"#fff",borderRadius:3,cursor:"pointer",fontSize:9}}>▶</button>
+                  <button onClick={handleStopPathTracing}
+                    style={{flex:1,padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                      color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:9}}>■</button>
+                  <button onClick={handleExportPathTracedFrame}
+                    style={{flex:1,padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                      color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:9}}>⬇</button>
+                </div>
+                {ptStats && (
+                  <div style={{color:"#555",fontSize:8,lineHeight:1.6}}>
+                    Samples: {ptStats.samples}/{ptStats.maxSamples}<br/>
+                    Progress: {Math.round(ptStats.progress*100)}%<br/>
+                    SPS: {ptStats.sps}<br/>
+                    ETA: {ptStats.eta}s<br/>
+                    Time: {ptStats.elapsed}s<br/>
+                    {ptRunning && <span style={{color:"#00ffc8"}}>● Rendering</span>}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* FBX/OBJ Pipeline */}
+            {showPipelinePanel && (
+              <div style={{borderTop:showPathTracerPanel?"1px solid #21262d":"none",
+                paddingTop:showPathTracerPanel?8:0,marginBottom:10}}>
+                <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Import / Export</div>
+                <div style={{color:"#555",fontSize:8,marginBottom:3}}>Import</div>
+                <button onClick={handleImportOBJ}
+                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:2}}>
+                  📂 Import OBJ
+                </button>
+                <button onClick={handleImportFBX}
+                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:4}}>
+                  📂 Import FBX (backend)
+                </button>
+                <div style={{color:"#555",fontSize:8,marginBottom:3}}>Export</div>
+                <button onClick={handleExportOBJ}
+                  style={{width:"100%",padding:"5px",background:"#00ffc8",border:"none",color:"#06060f",
+                    borderRadius:3,cursor:"pointer",fontSize:9,fontWeight:700,marginBottom:2}}>
+                  💾 Export OBJ + MTL
+                </button>
+                <button onClick={handleExportFBX}
+                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:2}}>
+                  💾 Export FBX (backend)
+                </button>
+                <div style={{color:"#555",fontSize:7,marginTop:4,lineHeight:1.5}}>
+                  {SUPPORTED_EXPORT_FORMATS.map(f=>(
+                    <div key={f.ext} style={{display:"flex",gap:4,marginBottom:1}}>
+                      <span style={{color:f.native?"#00ffc8":"#888",width:36}}>{f.label}</span>
+                      <span style={{color:"#333"}}>{f.native?"native":"backend"}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Plugin Manager */}
+            {showPluginPanel && (
+              <div style={{borderTop:"1px solid #21262d",paddingTop:8,marginBottom:10}}>
+                <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Plugin Manager</div>
+                <button onClick={handleInitPlugins}
+                  style={{width:"100%",padding:"5px",background:"#00ffc8",border:"none",color:"#06060f",
+                    borderRadius:3,cursor:"pointer",fontSize:9,fontWeight:700,marginBottom:3}}>
+                  ⚙ Init Plugin API
+                </button>
+                <button onClick={handleLoadPlugin}
+                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:4}}>
+                  📂 Load Plugin (.js)
+                </button>
+                {pluginStats && (
+                  <div style={{color:"#555",fontSize:8,lineHeight:1.6,marginBottom:4}}>
+                    Total: {pluginStats.total}<br/>
+                    Brushes: {pluginStats.brushes||0}<br/>
+                    Shaders: {pluginStats.shaders||0}<br/>
+                    Exporters: {pluginStats.exporters||0}
+                  </div>
+                )}
+                <div style={{color:"#555",fontSize:8,marginBottom:2}}>Built-in brushes</div>
+                {BUILTIN_BRUSH_PLUGINS.map(p=>(
+                  <div key={p.name} style={{padding:"2px 6px",background:"#1a1f2e",
+                    border:"1px solid #21262d",borderRadius:3,marginBottom:2,
+                    display:"flex",alignItems:"center",gap:4}}>
+                    <span style={{color:"#00ffc8",fontSize:9}}>{p.icon}</span>
+                    <span style={{color:"#dde6ef",fontSize:8}}>{p.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Preset Marketplace */}
+            {showMarketPanel && (
+              <div style={{borderTop:"1px solid #21262d",paddingTop:8}}>
+                <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Preset Marketplace</div>
+                <input value={presetSearch} onChange={e=>setPresetSearch(e.target.value)}
+                  placeholder="Search presets..."
+                  style={{width:"100%",background:"#1a1f2e",border:"1px solid #21262d",
+                    color:"#dde6ef",borderRadius:3,padding:"4px",fontSize:8,marginBottom:3,
+                    fontFamily:"JetBrains Mono,monospace"}}/>
+                <div style={{display:"flex",gap:2,flexWrap:"wrap",marginBottom:4}}>
+                  {Object.entries(PRESET_CATEGORIES).map(([k,v])=>(
+                    <button key={k} onClick={()=>setPresetCategory(presetCategory===k?null:k)}
+                      title={v.label}
+                      style={{padding:"2px 4px",background:presetCategory===k?v.color:"#1a1f2e",
+                        border:"none",color:presetCategory===k?"#06060f":"#555",
+                        borderRadius:3,cursor:"pointer",fontSize:9}}>
+                      {v.icon}
+                    </button>
+                  ))}
+                </div>
+                <label style={{display:"flex",gap:4,alignItems:"center",color:"#555",fontSize:8,marginBottom:4,cursor:"pointer"}}>
+                  <input type="checkbox" checked={presetFreeOnly} onChange={e=>setPresetFreeOnly(e.target.checked)}/>
+                  Free only
+                </label>
+                <div style={{maxHeight:200,overflowY:"auto"}}>
+                  {searchPresets(pluginMarketplace, presetSearch, { category:presetCategory, freeOnly:presetFreeOnly }).map(p=>(
+                    <div key={p.id} style={{padding:"4px 6px",background:"#1a1f2e",
+                      border:"1px solid #21262d",borderRadius:3,marginBottom:3}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                        <span style={{color:"#dde6ef",fontSize:8,fontWeight:700}}>{p.name}</span>
+                        <span style={{color:p.free?"#00ffc8":"#ffaa00",fontSize:7}}>
+                          {p.free?"FREE":"$"+p.price}
+                        </span>
+                      </div>
+                      <div style={{display:"flex",justifyContent:"space-between",marginTop:2}}>
+                        <span style={{color:"#555",fontSize:7}}>by {p.author} · ★{p.rating}</span>
+                        <button
+                          onClick={()=>isPresetInstalled(pluginMarketplace,p.id)
+                            ? uninstallPreset(pluginMarketplace,p.id)
+                            : handleInstallPreset(p.id)}
+                          style={{background:isPresetInstalled(pluginMarketplace,p.id)?"#333":"#00ffc8",
+                            border:"none",color:isPresetInstalled(pluginMarketplace,p.id)?"#888":"#06060f",
+                            borderRadius:2,padding:"1px 6px",cursor:"pointer",fontSize:7,fontWeight:700}}>
+                          {isPresetInstalled(pluginMarketplace,p.id)?"✓":"GET"}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={handleSavePreset}
+                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginTop:4}}>
+                  + Save Custom Preset
+                </button>
               </div>
             )}
           </div>
