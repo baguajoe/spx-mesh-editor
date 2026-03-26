@@ -14,8 +14,6 @@ import { getSculptHit, applySculptStroke } from "./mesh/SculptEngine.js";
 import { initVertexColors, paintVertexColor, fillVertexColor, gradientFillVertexColor } from "./mesh/VertexColorPainter.js";
 import { createShapeKey, applyShapeKeys, updateBasis, buildMorphTargets } from "./mesh/ShapeKeys.js";
 import { createPipe, createStaircase, createArch, createGear, createHelix, createLathe, buildProceduralMesh } from "./mesh/ProceduralMesh.js";
-import { generateLOD, getLODStats, setLODLevel, restoreAutoLOD } from "./mesh/LODSystem.js";
-import { createInstances, flattenInstances } from "./mesh/Instancing.js";
 import { fixNormals, removeDoubles, removeDegenerates, fillHoles, fullRepair } from "./mesh/MeshRepair.js";
 import {
 
@@ -265,13 +263,6 @@ export default function App() {
     turns:3, tubeRadius:0.1,
   });
   const [repairStatus,   setRepairStatus]   = useState(null);
-  // ── Sessions 14-15: LOD + Instancing state ───────────────────────────────
-  const [lodObject,      setLodObject]      = useState(null);
-  const [lodStats,       setLodStats]       = useState([]);
-  const [lodLevel,       setLodLevelState]  = useState("auto");
-  const [instanceCount,  setInstanceCount]  = useState(10);
-  const [instanceLayout, setInstanceLayout] = useState("scatter");
-  const [instanceSpread, setInstanceSpread] = useState(5);
   const [selectMode,   setSelectMode]   = useState("vert");
   const [stats,        setStats]        = useState({vertices:0,edges:0,faces:0,halfEdges:0});
   const [status,       setStatus]       = useState("Add a primitive to start");
@@ -772,18 +763,6 @@ export default function App() {
   // ── Export GLB ─────────────────────────────────────────────────────────────
   const exportGLB = async () => {
     const mesh = meshRef.current; if (!mesh) return;
-    // Session 16: apply unlit material if selected
-    if (exportUnlit && mesh.material) {
-      mesh.traverse(m => {
-        if (m.isMesh && m.material) {
-          m.material = new THREE.MeshBasicMaterial({
-            color: m.material.color || 0x888888,
-            map:   m.material.map   || null,
-            vertexColors: m.material.vertexColors,
-          });
-        }
-      });
-    }
     // Session 9-10: build morph targets before export
     if (shapeKeysRef.current.length > 1) {
       try { buildMorphTargets(mesh, shapeKeysRef.current); } catch(e) { console.warn(e); }
@@ -1291,76 +1270,6 @@ export default function App() {
   }, [matProps]);
 
 
-  // ── Session 14: LOD handlers ────────────────────────────────────────────
-  const handleGenerateLOD = useCallback(() => {
-    const mesh = meshRef.current; if (!mesh || !mesh.geometry) { setStatus("No mesh selected"); return; }
-    const lod  = generateLOD(mesh);
-    sceneRef.current?.remove(mesh);
-    sceneRef.current?.add(lod);
-    const stats = getLODStats(lod);
-    setLodObject(lod);
-    setLodStats(stats);
-    setLodLevelState("auto");
-    setStatus("LOD generated — " + stats.length + " levels");
-  }, []);
-
-  const handleSetLODLevel = useCallback((level) => {
-    if (!lodObject) return;
-    if (level === "auto") {
-      restoreAutoLOD(lodObject);
-    } else {
-      setLODLevel(lodObject, Number(level));
-    }
-    setLodLevelState(level);
-    setStatus("LOD level: " + level);
-  }, [lodObject]);
-
-  // ── Session 15: Instancing handlers ──────────────────────────────────────
-  const handleCreateInstances = useCallback(() => {
-    const mesh = meshRef.current; if (!mesh) { setStatus("No mesh selected"); return; }
-    const instanced = createInstances(mesh, instanceCount, instanceLayout, {
-      spread: instanceSpread,
-    });
-    sceneRef.current?.add(instanced);
-    setSceneObjects(prev => {
-      const obj = {
-        id: crypto.randomUUID(),
-        name: "Instances_x" + instanceCount,
-        type: "instanced",
-        visible: true,
-        parentId: null,
-        mesh: instanced,
-      };
-      return [...prev, obj];
-    });
-    setStatus("Created " + instanceCount + " instances (" + instanceLayout + ")");
-  }, [instanceCount, instanceLayout, instanceSpread]);
-
-  const handleFlattenInstances = useCallback(() => {
-    const mesh = meshRef.current;
-    if (!mesh || !mesh.isInstancedMesh) { setStatus("Select an instanced mesh first"); return; }
-    const meshes = flattenInstances(mesh);
-    sceneRef.current?.remove(mesh);
-    meshes.forEach(m => sceneRef.current?.add(m));
-    setSceneObjects(prev => {
-      const filtered = prev.filter(o => o.mesh !== mesh);
-      const newObjs  = meshes.map(m => ({
-        id: crypto.randomUUID(),
-        name: m.name,
-        type: "box",
-        visible: true,
-        parentId: null,
-        mesh: m,
-      }));
-      return [...filtered, ...newObjs];
-    });
-    setStatus("Flattened " + meshes.length + " instances to individual meshes");
-  }, []);
-
-  // ── Session 16: GLTF extension helpers (wired into exportGLB) ────────────
-  const [exportUnlit,    setExportUnlit]    = useState(false);
-  const [exportDraco,    setExportDraco]    = useState(false);
-
   // ── Sessions 11-12: Procedural mesh handlers ────────────────────────────
   const addProceduralMesh = useCallback(() => {
     const p = procParams;
@@ -1768,111 +1677,6 @@ export default function App() {
           </div>
         </div>
       )}
-
-      {/* LOD + Instancing panel — Sessions 14-15 */}
-      <div style={{width:190,background:"#0d1117",borderLeft:"1px solid #21262d",
-        display:"flex",flexDirection:"column",flexShrink:0,
-        fontFamily:"JetBrains Mono,monospace",fontSize:11,overflow:"hidden"}}>
-        <div style={{padding:"6px 10px",borderBottom:"1px solid #21262d"}}>
-          <span style={{color:"#00ffc8",fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>
-            LOD + Instances
-          </span>
-        </div>
-        <div style={{flex:1,overflowY:"auto",padding:"8px 10px"}}>
-
-          <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:6,textTransform:"uppercase"}}>
-            LOD System
-          </div>
-          <button onClick={handleGenerateLOD}
-            style={{width:"100%",background:"#00ffc8",border:"none",color:"#06060f",
-              borderRadius:4,padding:"6px",cursor:"pointer",fontWeight:700,fontSize:10,marginBottom:6}}>
-            ⬡ Generate LOD
-          </button>
-          {lodStats.length > 0 && (
-            <div style={{marginBottom:8}}>
-              <div style={{color:"#666",fontSize:9,marginBottom:4}}>Preview Level</div>
-              <select value={lodLevel} onChange={e=>handleSetLODLevel(e.target.value)}
-                style={{width:"100%",background:"#1a1f2e",border:"1px solid #21262d",
-                  color:"#dde6ef",borderRadius:3,padding:"4px",fontSize:10,marginBottom:6}}>
-                <option value="auto">Auto (distance-based)</option>
-                {lodStats.map(s=>(
-                  <option key={s.level} value={s.level}>
-                    LOD{s.level} — {s.ratio} ({s.vertices}v)
-                  </option>
-                ))}
-              </select>
-              {lodStats.map(s=>(
-                <div key={s.level} style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
-                  <span style={{color:"#555",fontSize:9}}>LOD{s.level} @{s.distance}m</span>
-                  <span style={{color:"#00ffc8",fontSize:9}}>{s.vertices}v / {s.triangles}t</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div style={{borderTop:"1px solid #21262d",paddingTop:8,marginTop:4}}>
-            <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:6,textTransform:"uppercase"}}>
-              Instancing
-            </div>
-            <div style={{marginBottom:6}}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
-                <span style={{color:"#666",fontSize:9}}>Count</span>
-                <span style={{color:"#00ffc8",fontSize:9}}>{instanceCount}</span>
-              </div>
-              <input type="range" min={1} max={500} step={1} value={instanceCount}
-                onChange={e=>setInstanceCount(Number(e.target.value))} style={{width:"100%"}}/>
-            </div>
-            <div style={{marginBottom:6}}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
-                <span style={{color:"#666",fontSize:9}}>Spread</span>
-                <span style={{color:"#00ffc8",fontSize:9}}>{instanceSpread}</span>
-              </div>
-              <input type="range" min={1} max={50} step={0.5} value={instanceSpread}
-                onChange={e=>setInstanceSpread(Number(e.target.value))} style={{width:"100%"}}/>
-            </div>
-            <div style={{display:"flex",gap:4,marginBottom:6}}>
-              {["scatter","grid"].map(l=>(
-                <button key={l} onClick={()=>setInstanceLayout(l)}
-                  style={{flex:1,padding:"4px",border:"none",borderRadius:3,cursor:"pointer",
-                    fontSize:9,fontWeight:700,
-                    background:instanceLayout===l?"#FF6600":"#1a1f2e",
-                    color:instanceLayout===l?"#fff":"#666"}}>
-                  {l}
-                </button>
-              ))}
-            </div>
-            <button onClick={handleCreateInstances}
-              style={{width:"100%",background:"#FF6600",border:"none",color:"#fff",
-                borderRadius:4,padding:"6px",cursor:"pointer",fontWeight:700,fontSize:10,marginBottom:4}}>
-              ✦ Create Instances
-            </button>
-            <button onClick={handleFlattenInstances}
-              style={{width:"100%",background:"#1a1f2e",border:"1px solid #21262d",color:"#aaa",
-                borderRadius:4,padding:"5px",cursor:"pointer",fontSize:9,marginBottom:4}}>
-              Flatten to Meshes
-            </button>
-          </div>
-
-          <div style={{borderTop:"1px solid #21262d",paddingTop:8,marginTop:4}}>
-            <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:6,textTransform:"uppercase"}}>
-              Export Options
-            </div>
-            <label style={{display:"flex",gap:6,alignItems:"center",cursor:"pointer",marginBottom:4}}>
-              <input type="checkbox" checked={exportUnlit} onChange={e=>setExportUnlit(e.target.checked)}/>
-              <span style={{color:"#dde6ef",fontSize:10}}>Unlit (KHR_materials_unlit)</span>
-            </label>
-            <label style={{display:"flex",gap:6,alignItems:"center",cursor:"pointer",marginBottom:4}}>
-              <input type="checkbox" checked={exportDraco} onChange={e=>setExportDraco(e.target.checked)}/>
-              <span style={{color:"#dde6ef",fontSize:10}}>Draco compression</span>
-            </label>
-            {exportDraco && (
-              <div style={{color:"#555",fontSize:9,lineHeight:1.4}}>
-                Note: Draco requires viewer support. Reduces file size ~80%.
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* Procedural Mesh panel — Sessions 11-12 */}
       <div style={{width:200,background:"#0d1117",borderLeft:"1px solid #21262d",
