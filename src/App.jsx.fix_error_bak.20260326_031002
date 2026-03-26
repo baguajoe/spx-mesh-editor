@@ -36,7 +36,7 @@ import { LIGHT_TYPES, TEMPERATURE_PRESETS, createLight, createThreePointLighting
 import { createCamera, saveBookmark, restoreBookmark, animateCameraToBookmark, setDOF, applyCameraShake, rackFocus, dollyZoom, createCameraManager, serializeCamera } from "./mesh/CameraSystem.js";
 import { EFFECT_PRESETS, LUT_PRESETS, applyColorGrade, applyLUT, applyVignette, applyFilmGrain, applyToneMap, applyChromaticAberration, applySharpen, applyPostStack } from "./mesh/PostProcessing.js";
 import { DEFAULT_BONE_MAP, retargetFrame, bakeRetargetedAnimation, fixFootSliding, autoDetectBoneMap, getRetargetStats } from "./mesh/MocapRetarget.js";
-// // import { createIKChain, solveFABRIK, setIKTarget, setIKPoleTarget, getChainEnd, solveTwoBoneIK } from "./mesh/IKSystem.js";
+import { createIKChain, solveFABRIK, setIKTarget, setIKPoleTarget, getChainEnd, solveTwoBoneIK } from "./mesh/IKSystem.js";
 import { GraphEditor } from "./components/GraphEditor.jsx";
 import { DRIVER_TYPES, createDriver, createVariable, evaluateDriver, resolveVariable, applyDriver, applyAllDrivers, DRIVER_PRESETS } from "./mesh/DriverSystem.js";
 import { CONSTRAINT_TYPES, createConstraint, applyConstraint, applyAllConstraints, applyLookAt, applyFloor, applyStretchTo } from "./mesh/ConstraintSystem.js";
@@ -2830,11 +2830,11 @@ export default function App() {
     setStatus("Weight paint mode — paint bone influences");
   }, []);
 
-  const applyWeightPaint = useCallback(async (e) => {
+  const applyWeightPaint = useCallback((e) => {
     const mesh = meshRef.current; if (!mesh) return;
     const camera = cameraRef.current; if (!camera) return;
     const canvas = canvasRef.current; if (!canvas) return;
-    
+    const { getSculptHit } = await import("./mesh/SculptEngine.js").catch(() => ({ getSculptHit: null }));
     if (!getSculptHit) return;
     const hit = getSculptHit(e, canvas, camera, mesh);
     if (!hit) return;
@@ -6943,175 +6943,91 @@ export default function App() {
           />
         </div>
       )}
+    </div>
 
-
-      {/* Keyboard shortcut overlay — Session 167 */}
-      {showShortcutOverlay && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.85)",
-            zIndex: 1000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center"
-          }}
-          onClick={() => setShowShortcutOverlay(false)}
-        >
-          <div
-            style={{
-              background: "#0d1117",
-              border: "1px solid #21262d",
-              borderRadius: 8,
-              padding: 24,
-              maxWidth: 700,
-              width: "90%",
-              maxHeight: "80vh",
-              overflowY: "auto",
-              fontFamily: "JetBrains Mono,monospace"
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 16
-              }}
-            >
-              <span style={{ color: "#00ffc8", fontSize: 14, fontWeight: 700 }}>
-                Keyboard Shortcuts
-              </span>
-              <button
-                onClick={() => setShowShortcutOverlay(false)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: "#aaa",
-                  cursor: "pointer",
-                  fontSize: 18
-                }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              {Object.entries(SHORTCUT_CATEGORIES).map(([key, cat]) => (
-                <div key={key}>
-                  <div
-                    style={{
-                      color: "#FF6600",
-                      fontSize: 10,
-                      fontWeight: 700,
-                      marginBottom: 6,
-                      textTransform: "uppercase"
-                    }}
-                  >
-                    {cat.label}
-                  </div>
-
-                  {cat.shortcuts.map((s, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        marginBottom: 3
-                      }}
-                    >
-                      <span style={{ color: "#555", fontSize: 10 }}>{s.desc}</span>
-                      <span style={{ display: "flex", gap: 2 }}>
-                        {s.keys.map((k, ki) => (
-                          <span
-                            key={ki}
-                            style={{
-                              background: "#1a1f2e",
-                              border: "1px solid #21262d",
-                              borderRadius: 3,
-                              padding: "1px 5px",
-                              color: "#00ffc8",
-                              fontSize: 9,
-                              fontFamily: "monospace"
-                            }}
-                          >
-                            {k}
-                          </span>
-                        ))}
-                      </span>
-                    </div>
-                  ))}
+      {/* Keyboard shortcut overlay — Session 167 */ }
+  {
+    showShortcutOverlay && (
+      <div style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 1000,
+        display: "flex", alignItems: "center", justifyContent: "center"
+      }}
+        onClick={() => setShowShortcutOverlay(false)}>
+        <div style={{
+          background: "#0d1117", border: "1px solid #21262d", borderRadius: 8,
+          padding: 24, maxWidth: 700, width: "90%", maxHeight: "80vh", overflowY: "auto",
+          fontFamily: "JetBrains Mono,monospace"
+        }}
+          onClick={e => e.stopPropagation()}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <span style={{ color: "#00ffc8", fontSize: 14, fontWeight: 700 }}>Keyboard Shortcuts</span>
+            <button onClick={() => setShowShortcutOverlay(false)}
+              style={{ background: "none", border: "none", color: "#aaa", cursor: "pointer", fontSize: 18 }}>✕</button>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            {Object.entries(SHORTCUT_CATEGORIES).map(([key, cat]) => (
+              <div key={key}>
+                <div style={{ color: "#FF6600", fontSize: 10, fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>
+                  {cat.label}
                 </div>
-              ))}
-            </div>
+                {cat.shortcuts.map((s, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                    <span style={{ color: "#555", fontSize: 10 }}>{s.desc}</span>
+                    <span style={{ display: "flex", gap: 2 }}>
+                      {s.keys.map((k, ki) => (
+                        <span key={ki} style={{
+                          background: "#1a1f2e", border: "1px solid #21262d",
+                          borderRadius: 3, padding: "1px 5px", color: "#00ffc8", fontSize: 9, fontFamily: "monospace"
+                        }}>
+                          {k}
+                        </span>
+                      ))}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ))}
           </div>
         </div>
-      )}
+      </div>
+    )
+  }
 
-      {/* Onboarding tour — Session 168 */}
-      {tourVisible && tourState.active && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 40,
-            right: 40,
-            zIndex: 999,
-            background: "#0d1117",
-            border: "1px solid #00ffc8",
-            borderRadius: 8,
-            padding: 20,
-            maxWidth: 320,
-            fontFamily: "JetBrains Mono,monospace",
-            boxShadow: "0 0 30px rgba(0,255,200,0.15)"
-          }}
-        >
-          <div style={{ color: "#555", fontSize: 8, marginBottom: 4 }}>
-            Step {tourState.step + 1} of {TOUR_STEPS.length}
-          </div>
-
-          <div style={{ color: "#00ffc8", fontSize: 12, fontWeight: 700, marginBottom: 8 }}>
-            {TOUR_STEPS[tourState.step]?.title}
-          </div>
-
-          <div style={{ color: "#8fa8bf", fontSize: 10, lineHeight: 1.6, marginBottom: 12 }}>
-            {TOUR_STEPS[tourState.step]?.body}
-          </div>
-
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <button
-              onClick={() => setTourVisible(false)}
-              style={{
-                background: "none",
-                border: "1px solid #21262d",
-                color: "#555",
-                borderRadius: 3,
-                padding: "4px 10px",
-                cursor: "pointer",
-                fontSize: 9
-              }}
-            >
-              Skip
-            </button>
-
-            <button
-              onClick={handleAdvanceTour}
-              style={{
-                background: "#00ffc8",
-                border: "none",
-                color: "#06060f",
-                borderRadius: 3,
-                padding: "4px 14px",
-                cursor: "pointer",
-                fontSize: 9,
-                fontWeight: 700
-              }}
-            >
-              {tourState.step < TOUR_STEPS.length - 1 ? "Next →" : "Finish ✓"}
-            </button>
-          </div>
+  {/* Onboarding tour — Session 168 */ }
+  {
+    tourVisible && tourState.active && (
+      <div style={{
+        position: "fixed", bottom: 40, right: 40, zIndex: 999,
+        background: "#0d1117", border: "1px solid #00ffc8", borderRadius: 8,
+        padding: 20, maxWidth: 320, fontFamily: "JetBrains Mono,monospace",
+        boxShadow: "0 0 30px rgba(0,255,200,0.15)"
+      }}>
+        <div style={{ color: "#555", fontSize: 8, marginBottom: 4 }}>
+          Step {tourState.step + 1} of {TOUR_STEPS.length}
         </div>
+        <div style={{ color: "#00ffc8", fontSize: 12, fontWeight: 700, marginBottom: 8 }}>
+          {TOUR_STEPS[tourState.step]?.title}
+        </div>
+        <div style={{ color: "#8fa8bf", fontSize: 10, lineHeight: 1.6, marginBottom: 12 }}>
+          {TOUR_STEPS[tourState.step]?.body}
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <button onClick={() => setTourVisible(false)}
+            style={{
+              background: "none", border: "1px solid #21262d", color: "#555",
+              borderRadius: 3, padding: "4px 10px", cursor: "pointer", fontSize: 9
+            }}>
+            Skip
+          </button>
+          <button onClick={handleAdvanceTour}
+            style={{
+              background: "#00ffc8", border: "none", color: "#06060f",
+              borderRadius: 3, padding: "4px 14px", cursor: "pointer", fontSize: 9, fontWeight: 700
+            }}>
+            {tourState.step < TOUR_STEPS.length - 1 ? "Next →" : "Finish ✓"}
+          </button>
+        </div>
+      </div>
       )}
     </div>
   );
