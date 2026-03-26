@@ -36,7 +36,7 @@ import { LIGHT_TYPES, TEMPERATURE_PRESETS, createLight, createThreePointLighting
 import { createCamera, saveBookmark, restoreBookmark, animateCameraToBookmark, setDOF, applyCameraShake, rackFocus, dollyZoom, createCameraManager, serializeCamera } from "./mesh/CameraSystem.js";
 import { EFFECT_PRESETS, LUT_PRESETS, applyColorGrade, applyLUT, applyVignette, applyFilmGrain, applyToneMap, applyChromaticAberration, applySharpen, applyPostStack } from "./mesh/PostProcessing.js";
 import { DEFAULT_BONE_MAP, retargetFrame, bakeRetargetedAnimation, fixFootSliding, autoDetectBoneMap, getRetargetStats } from "./mesh/MocapRetarget.js";
-// // import { createIKChain, solveFABRIK, setIKTarget, setIKPoleTarget, getChainEnd, solveTwoBoneIK } from "./mesh/IKSystem.js";
+import { createIKChain, solveFABRIK, setIKTarget, setIKPoleTarget, getChainEnd, solveTwoBoneIK } from "./mesh/IKSystem.js";
 import { GraphEditor } from "./components/GraphEditor.jsx";
 import { DRIVER_TYPES, createDriver, createVariable, evaluateDriver, resolveVariable, applyDriver, applyAllDrivers, DRIVER_PRESETS } from "./mesh/DriverSystem.js";
 import { CONSTRAINT_TYPES, createConstraint, applyConstraint, applyAllConstraints, applyLookAt, applyFloor, applyStretchTo } from "./mesh/ConstraintSystem.js";
