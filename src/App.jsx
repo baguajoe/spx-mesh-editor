@@ -3317,6 +3317,16 @@ export default function App() {
   const ikChainsRef = useRef([]);
   const [showIKPanel, setShowIKPanel] = useState(false);
   const [showGraphEditor, setShowGraphEditor] = useState(false);
+  // ── Session E: Geo Nodes + Mesh Tools + LOD ───────────────────────────
+  const [showGeoNodesPanel, setShowGeoNodesPanel] = useState(false);
+  const [geoGraph, setGeoGraph] = useState(() => createGraph());
+  const [geoNodeType, setGeoNodeType] = useState('transform');
+  const [geoSelectedNode, setGeoSelectedNode] = useState(null);
+  const [geoApplied, setGeoApplied] = useState(false);
+  const [showMeshToolsPanel, setShowMeshToolsPanel] = useState(false);
+  const [lodObj, setLodObj] = useState(null);
+  const [uvAxis, setUvAxis] = useState('z');
+  const [boolOp, setBoolOp] = useState('union');
   // ── Sessions 63-70: Drivers + Constraints + Physics + Walk Cycle ──────────
   const [drivers, setDrivers] = useState([]);
   const [activeDriverId, setActiveDriverId] = useState(null);
@@ -3464,6 +3474,52 @@ export default function App() {
     setStatus('UDIM applied to mesh');
   }, [udimLayout]);
   // ── Session D END ─────────────────────────────────────────────────────
+  // ── Session E: Geo Nodes handlers ──────────────────────────────────────
+  const handleGeoAddNode = () => {
+    const pos = { x: 20 + geoGraph.nodes.length * 140, y: 40 };
+    const node = addNode(geoGraph, geoNodeType, pos);
+    setGeoGraph({ ...geoGraph });
+    setGeoSelectedNode(node.id);
+    setStatus('Added ' + geoNodeType + ' node');
+  };
+  const handleGeoAddInput = () => {
+    const node = addNode(geoGraph, 'input', { x: 20, y: 40 });
+    setGeoGraph({ ...geoGraph }); setGeoSelectedNode(node.id);
+  };
+  const handleGeoAddOutput = () => {
+    const node = addNode(geoGraph, 'output', { x: 20 + geoGraph.nodes.length * 140, y: 40 });
+    setGeoGraph({ ...geoGraph }); setGeoSelectedNode(node.id);
+  };
+  const handleGeoConnect = () => {
+    const nodes = geoGraph.nodes;
+    if (nodes.length >= 2) {
+      const from = nodes[nodes.length - 2];
+      const to   = nodes[nodes.length - 1];
+      connectNodes(geoGraph, from.id, 'geometry', to.id, 'geometry');
+      setGeoGraph({ ...geoGraph });
+      setStatus('Connected ' + from.type + ' -> ' + to.type);
+    }
+  };
+  const handleGeoEvaluate = () => {
+    const mesh = meshRef.current;
+    if (!mesh) { setStatus('No mesh'); return; }
+    const result = evaluateGraph(geoGraph, mesh);
+    if (result && result !== mesh && sceneRef.current) {
+      result.position.copy(mesh.position);
+      sceneRef.current.add(result);
+      setGeoApplied(true);
+      setStatus('Geo nodes evaluated — result added to scene');
+    }
+  };
+  const handleGeoClear = () => {
+    setGeoGraph(createGraph()); setGeoSelectedNode(null); setGeoApplied(false);
+    setStatus('Geo nodes graph cleared');
+  };
+  const handleGeoUpdateParam = (nodeId, key, val) => {
+    const node = geoGraph.nodes.find(n => n.id === nodeId);
+    if (node) { node.params[key] = isNaN(Number(val)) ? val : Number(val); setGeoGraph({ ...geoGraph }); }
+  };
+
   // ── Sessions 108-121: VFX + Fluid + Asset + Procedural state ─────────────
   const [vfxEmitters, setVfxEmitters] = useState([]);
   const vfxEmittersRef = useRef([]);
@@ -3937,12 +3993,18 @@ export default function App() {
             background: showGraphEditor ? "#4488ff" : COLORS.border,
             color: showGraphEditor ? "#fff" : "#888", fontWeight: 700
           }}>GR</button>
-        <button title="Advanced Tools" onClick={() => setShowGN(g => !g)}
+        <button title="Geometry Nodes" onClick={() => setShowGeoNodesPanel(g => !g)}
           style={{
-            width: 38, height: 38, border: "none", borderRadius: 4, cursor: "pointer", fontSize: 10,
-            background: showGN ? "#FF6600" : COLORS.border,
-            color: showGN ? "#fff" : "#888", fontWeight: 700
-          }}>ADV</button>
+            width: 38, height: 38, border: "none", borderRadius: 4, cursor: "pointer", fontSize: 9,
+            background: showGeoNodesPanel ? "#00ffc8" : COLORS.border,
+            color: showGeoNodesPanel ? "#06060f" : "#888", fontWeight: 700
+          }}>GEO</button>
+        <button title="Mesh Tools" onClick={() => setShowMeshToolsPanel(m => !m)}
+          style={{
+            width: 38, height: 38, border: "none", borderRadius: 4, cursor: "pointer", fontSize: 9,
+            background: showMeshToolsPanel ? "#FF6600" : COLORS.border,
+            color: showMeshToolsPanel ? "#fff" : "#888", fontWeight: 700
+          }}>MSH</button>
         <button title="Weight Paint" onClick={() => { handleEnterWeightPaint(); setWeightPainting(w => !w); }}
           style={{
             width: 38, height: 38, border: "none", borderRadius: 4, cursor: "pointer", fontSize: 11,
@@ -7583,6 +7645,144 @@ export default function App() {
         onAddBasis={addBasisKey}
         onAddShapeKey={addShapeKey}
       />
+
+      {/* ── Session E: Geometry Nodes Panel ── */}
+      {showGeoNodesPanel && (
+        <div style={{position:'fixed',top:40,right:260,width:340,background:'#0d1117',
+          border:'1px solid #21262d',borderRadius:4,padding:10,zIndex:105,overflowY:'auto',maxHeight:'80vh'}}>
+          <div style={{color:'#00ffc8',fontSize:10,fontWeight:700,marginBottom:8}}>GEOMETRY NODES</div>
+          <div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:6}}>
+            {['transform','array','noise','subdivide','decimate','boolean','merge'].map(t=>(
+              <button key={t} onClick={()=>setGeoNodeType(t)}
+                style={{padding:'2px 6px',fontSize:8,borderRadius:3,cursor:'pointer',
+                  background:geoNodeType===t?NODE_TYPES[t]?.color||'#4488ff':'#1a1f2e',
+                  border:'1px solid #21262d',color:geoNodeType===t?'#06060f':'#aaa',fontWeight:700}}>
+                {t}
+              </button>
+            ))}
+          </div>
+          <div style={{display:'flex',gap:4,marginBottom:6}}>
+            <button onClick={handleGeoAddInput} style={{flex:1,padding:'3px',fontSize:8,background:'#003322',
+              border:'1px solid #00ffc8',color:'#00ffc8',borderRadius:3,cursor:'pointer'}}>+ Input</button>
+            <button onClick={handleGeoAddNode} style={{flex:1,padding:'3px',fontSize:8,background:'#1a1f2e',
+              border:'1px solid #21262d',color:'#aaa',borderRadius:3,cursor:'pointer'}}>+ Node</button>
+            <button onClick={handleGeoAddOutput} style={{flex:1,padding:'3px',fontSize:8,background:'#2a0a00',
+              border:'1px solid #FF6600',color:'#FF6600',borderRadius:3,cursor:'pointer'}}>+ Output</button>
+            <button onClick={handleGeoConnect} style={{flex:1,padding:'3px',fontSize:8,background:'#1a1f2e',
+              border:'1px solid #8844ff',color:'#8844ff',borderRadius:3,cursor:'pointer'}}>Connect</button>
+          </div>
+          {/* Node list */}
+          <div style={{marginBottom:6}}>
+            {geoGraph.nodes.map((node,i) => (
+              <div key={node.id} onClick={()=>setGeoSelectedNode(node.id)}
+                style={{padding:'4px 6px',marginBottom:3,borderRadius:3,cursor:'pointer',
+                  background:geoSelectedNode===node.id?'#1a2a3a':'#0d1117',
+                  border:'1px solid '+(geoSelectedNode===node.id?NODE_TYPES[node.type]?.color||'#4488ff':'#21262d')}}>
+                <span style={{color:NODE_TYPES[node.type]?.color||'#dde6ef',fontSize:8,fontWeight:700}}>
+                  {i+1}. {NODE_TYPES[node.type]?.label||node.type}
+                </span>
+                {/* Params */}
+                {geoSelectedNode===node.id && Object.entries(node.params).map(([k,v])=>(
+                  <div key={k} style={{display:'flex',alignItems:'center',gap:4,marginTop:2}}>
+                    <span style={{color:'#555',fontSize:7,width:50}}>{k}</span>
+                    <input type={typeof v==='number'?'number':'text'} value={v}
+                      onChange={e=>handleGeoUpdateParam(node.id,k,e.target.value)}
+                      style={{flex:1,background:'#06060f',border:'1px solid #21262d',color:'#dde6ef',
+                        fontSize:8,padding:'1px 3px',borderRadius:2}} />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+          {/* Connections */}
+          {geoGraph.connections.length>0 && (
+            <div style={{marginBottom:6}}>
+              <div style={{color:'#555',fontSize:7,marginBottom:2}}>Connections ({geoGraph.connections.length})</div>
+              {geoGraph.connections.map((c,i)=>(
+                <div key={i} style={{color:'#8fa8bf',fontSize:7,marginBottom:1}}>
+                  {geoGraph.nodes.find(n=>n.id===c.fromId)?.type||'?'} → {geoGraph.nodes.find(n=>n.id===c.toId)?.type||'?'}
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{display:'flex',gap:4}}>
+            <button onClick={handleGeoEvaluate} style={{flex:2,padding:'4px',fontSize:8,
+              background:geoApplied?'#003322':'#1a2a1a',border:'1px solid '+(geoApplied?'#00ffc8':'#44ff88'),
+              color:geoApplied?'#00ffc8':'#44ff88',borderRadius:3,cursor:'pointer',fontWeight:700}}>
+              {geoApplied?'Re-Evaluate':'Evaluate Graph'}
+            </button>
+            <button onClick={handleGeoClear} style={{flex:1,padding:'4px',fontSize:8,background:'#1a1f2e',
+              border:'1px solid #ff4444',color:'#ff4444',borderRadius:3,cursor:'pointer'}}>Clear</button>
+          </div>
+          <div style={{color:'#555',fontSize:7,marginTop:4}}>
+            Nodes: {geoGraph.nodes.length} | Connections: {geoGraph.connections.length}
+          </div>
+        </div>
+      )}
+
+      {/* ── Session E: Mesh Tools Panel ── */}
+      {showMeshToolsPanel && (
+        <div style={{position:'fixed',top:40,right:260,width:200,background:'#0d1117',
+          border:'1px solid #21262d',borderRadius:4,padding:8,zIndex:105,overflowY:'auto',maxHeight:'80vh'}}>
+          <div style={{color:'#FF6600',fontSize:9,fontWeight:700,marginBottom:6}}>MESH TOOLS</div>
+
+          <div style={{color:'#555',fontSize:7,marginBottom:3}}>REPAIR</div>
+          <button onClick={handleFullRepair} style={{width:'100%',padding:'4px',fontSize:8,background:'#1a2a1a',
+            border:'1px solid #00ffc8',color:'#00ffc8',borderRadius:3,cursor:'pointer',marginBottom:3,fontWeight:700}}>
+            Full Auto Repair
+          </button>
+          {[
+            ['Fill Holes', handleFillHoles],
+            ['Fix Normals', handleFixNormals],
+            ['Remove Doubles', handleRemoveDoubles],
+            ['Remove Degenerates', handleRemoveDegenerates],
+            ['Smooth Topology', handleSmoothTopology],
+            ['Symmetrize X', handleSymmetrize],
+          ].map(([label,fn])=>(
+            <button key={label} onClick={fn} style={{width:'100%',padding:'3px',fontSize:8,background:'#1a1f2e',
+              border:'1px solid #21262d',color:'#aaa',borderRadius:3,cursor:'pointer',marginBottom:2}}>
+              {label}
+            </button>
+          ))}
+
+          <div style={{color:'#555',fontSize:7,marginBottom:3,marginTop:6}}>UV PROJECTION</div>
+          <select value={uvAxis} onChange={e=>setUvAxis(e.target.value)}
+            style={{width:'100%',background:'#0d1117',border:'1px solid #21262d',color:'#dde6ef',fontSize:8,padding:2,marginBottom:3}}>
+            <option value='x'>X Axis</option><option value='y'>Y Axis</option><option value='z'>Z Axis</option>
+          </select>
+          {[
+            ['UV Planar', handleUVPlanar],
+            ['UV Box', handleUVBox],
+            ['UV Sphere', handleUVSphere],
+          ].map(([label,fn])=>(
+            <button key={label} onClick={fn} style={{width:'100%',padding:'3px',fontSize:8,background:'#1a1f2e',
+              border:'1px solid #21262d',color:'#aaa',borderRadius:3,cursor:'pointer',marginBottom:2}}>
+              {label}
+            </button>
+          ))}
+
+          <div style={{color:'#555',fontSize:7,marginBottom:3,marginTop:6}}>BOOLEAN</div>
+          <select value={boolOp} onChange={e=>setBoolOp(e.target.value)}
+            style={{width:'100%',background:'#0d1117',border:'1px solid #21262d',color:'#dde6ef',fontSize:8,padding:2,marginBottom:3}}>
+            <option value='union'>Union</option><option value='subtract'>Subtract</option><option value='intersect'>Intersect</option>
+          </select>
+          <button onClick={handleBooleanOp} style={{width:'100%',padding:'4px',fontSize:8,background:'#1a1f2e',
+            border:'1px solid #ffff44',color:'#ffff44',borderRadius:3,cursor:'pointer',marginBottom:3}}>Apply Boolean</button>
+
+          <div style={{color:'#555',fontSize:7,marginBottom:3,marginTop:6}}>REMESH / LOD</div>
+          {[
+            ['Voxel Remesh', handleVoxelRemesh],
+            ['Quad Remesh 2k', handleQuadRemesh],
+            ['Generate LOD', handleGenerateLOD],
+            ['Optimize Scene', handleOptimizeScene],
+          ].map(([label,fn])=>(
+            <button key={label} onClick={fn} style={{width:'100%',padding:'3px',fontSize:8,background:'#1a1f2e',
+              border:'1px solid #21262d',color:'#aaa',borderRadius:3,cursor:'pointer',marginBottom:2}}>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Graph Editor — Session 62 */}
       {showGraphEditor && (
