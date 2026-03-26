@@ -32,12 +32,6 @@ import { createSpline, getThreeCurve, meshToCurve, pipeAlongCurve, loftCurves, c
 import { MATERIAL_PRESETS, applyPreset, applyEdgeWear, applyCavityDirt, getPresetCategories } from "./mesh/SmartMaterials.js";
 import { createPaintCanvas, createPaintTexture, applyPaintTexture, paintAtUV, fillCanvas, createLayerStack, addLayer, flattenLayers, exportTexture } from "./mesh/TexturePainter.js";
 import { bakeAO, bakeNormalMap, bakeCurvature, downloadBakedMap, bakeAllMaps } from "./mesh/TextureBaker.js";
-import { LIGHT_TYPES, TEMPERATURE_PRESETS, createLight, createThreePointLighting, applyTemperature, createVolumericFog, removeFog, HDRI_PRESETS, applyHDRI, addLightHelper, getSceneLights, serializeLights } from "./mesh/LightSystem.js";
-import { createCamera, saveBookmark, restoreBookmark, animateCameraToBookmark, setDOF, applyCameraShake, rackFocus, dollyZoom, createCameraManager, serializeCamera } from "./mesh/CameraSystem.js";
-import { EFFECT_PRESETS, LUT_PRESETS, applyColorGrade, applyLUT, applyVignette, applyFilmGrain, applyToneMap, applyChromaticAberration, applySharpen, applyPostStack } from "./mesh/PostProcessing.js";
-import { DEFAULT_BONE_MAP, retargetFrame, bakeRetargetedAnimation, fixFootSliding, autoDetectBoneMap, getRetargetStats } from "./mesh/MocapRetarget.js";
-import { createIKChain, solveFABRIK, setIKTarget, setIKPoleTarget, getChainEnd, solveTwoBoneIK } from "./mesh/IKSystem.js";
-import { GraphEditor } from "./components/GraphEditor.jsx";
 import { AnimationTimeline } from "./components/AnimationTimeline.jsx";
 import { createInstances, flattenInstances } from "./mesh/Instancing.js";
 import { fixNormals, removeDoubles, removeDegenerates, fillHoles, fullRepair } from "./mesh/MeshRepair.js";
@@ -1316,121 +1310,6 @@ export default function App() {
   }, [matProps]);
 
 
-  // ── Sessions 51-52: Light handlers ──────────────────────────────────────
-  const handleAddLight = useCallback(() => {
-    if (!sceneRef.current) return;
-    const light = createLight(lightType, { color: lightColor, intensity: lightIntensity });
-    light.position.set((Math.random()-0.5)*6, 3+Math.random()*3, (Math.random()-0.5)*6);
-    sceneRef.current.add(light);
-    addLightHelper(sceneRef.current, light);
-    const lights = getSceneLights(sceneRef.current);
-    setSceneLights([...lights]);
-    setActiveLightId(light.userData.lightId);
-    setStatus("Light added: " + lightType);
-  }, [lightType, lightColor, lightIntensity]);
-
-  const handleThreePointLighting = useCallback(() => {
-    if (!sceneRef.current) return;
-    const lights = createThreePointLighting(sceneRef.current, lightIntensity);
-    setSceneLights(prev => [...prev, ...lights]);
-    setStatus("Three-point lighting created");
-  }, [lightIntensity]);
-
-  const handleApplyTemperature = useCallback((tempKey) => {
-    const light = sceneLights.find(l => l.userData.lightId === activeLightId);
-    if (!light) return;
-    const preset = applyTemperature(light, TEMPERATURE_PRESETS[tempKey]?.kelvin || 5500);
-    setLightTemp(tempKey);
-    setStatus("Temperature: " + preset.label + " (" + preset.kelvin + "K)");
-  }, [sceneLights, activeLightId]);
-
-  const handleToggleFog = useCallback(() => {
-    if (!sceneRef.current) return;
-    if (fogEnabled) { removeFog(sceneRef.current); setFogEnabled(false); setStatus("Fog removed"); }
-    else { createVolumericFog(sceneRef.current, { color: fogColor, density: fogDensity }); setFogEnabled(true); setStatus("Fog enabled"); }
-  }, [fogEnabled, fogColor, fogDensity]);
-
-  const handleApplyHDRI = useCallback((presetId) => {
-    if (!sceneRef.current) return;
-    const preset = applyHDRI(sceneRef.current, presetId);
-    setHdriPreset(presetId);
-    setStatus("HDRI: " + preset.label);
-  }, []);
-
-  // ── Session 55: Camera handlers ───────────────────────────────────────────
-  const handleAddCamera = useCallback(() => {
-    const cam = createCamera({ fov: camFOV, name: "Camera_" + cameras.length });
-    cam.position.copy(cameraRef.current?.position || new THREE.Vector3(0,2,8));
-    cam.lookAt(0,0,0);
-    camManagerRef.current.add(cam);
-    setCameras(prev => [...prev, cam]);
-    setActiveCamId(cam.userData.cameraId);
-    setStatus("Camera added: " + cam.name);
-  }, [cameras, camFOV]);
-
-  const handleSaveBookmark = useCallback(() => {
-    const cam = cameraRef.current; if (!cam) return;
-    if (!cam.userData.bookmarks) cam.userData.bookmarks = [];
-    const bm = saveBookmark(cam, "Bookmark_" + cam.userData.bookmarks.length);
-    setStatus("Bookmark saved: " + bm.name);
-  }, []);
-
-  const handleCameraShake = useCallback(() => {
-    const cam = cameraRef.current; if (!cam) return;
-    applyCameraShake(cam, { intensity: 0.05, duration: 0.5 });
-    setStatus("Camera shake applied");
-  }, []);
-
-  // ── Session 56: Post processing handlers ─────────────────────────────────
-  const handleToggleEffect = useCallback((index) => {
-    setPostEffects(prev => prev.map((e,i) => i===index ? {...e,enabled:!e.enabled} : e));
-  }, []);
-
-  const handleUpdateEffect = useCallback((index, key, value) => {
-    setPostEffects(prev => prev.map((e,i) => i===index ? {...e,[key]:value} : e));
-  }, []);
-
-  // ── Session 59: Mocap retarget handlers ───────────────────────────────────
-  const handleAutoDetectBoneMap = useCallback(() => {
-    const arm = armatureRef.current; if (!arm || !bvhData) return;
-    const map = autoDetectBoneMap(bvhData.bvh.joints, arm.userData.bones || []);
-    setBoneMap({...DEFAULT_BONE_MAP, ...map});
-    const stats = getRetargetStats(bvhData.bvh, map, arm);
-    setRetargetStats(stats);
-    setStatus("Bone map detected — " + stats.coverage + "% coverage");
-  }, [bvhData]);
-
-  const handleRetargetFrame = useCallback((frame) => {
-    const arm = armatureRef.current; if (!arm || !bvhData) return;
-    retargetFrame(bvhData.bvh, boneMap, arm, frame);
-    buildBoneDisplay(arm);
-    setStatus("Retargeted frame " + frame);
-  }, [bvhData, boneMap]);
-
-  // ── Session 61: IK handlers ───────────────────────────────────────────────
-  const handleCreateIKChain = useCallback(() => {
-    const arm = armatureRef.current; if (!arm) { setStatus("Create armature first"); return; }
-    const bones = arm.userData.bones?.slice(0, 3) || [];
-    if (bones.length < 2) { setStatus("Need at least 2 bones"); return; }
-    const target = new THREE.Vector3(0, 2, 0);
-    const chain  = createIKChain(bones, target);
-    ikChainsRef.current = [...ikChainsRef.current, chain];
-    setIkChains([...ikChainsRef.current]);
-    setStatus("IK chain created — " + bones.length + " bones");
-  }, []);
-
-  const handleSolveIK = useCallback(() => {
-    ikChainsRef.current.forEach(chain => { solveFABRIK(chain); });
-    const arm = armatureRef.current;
-    if (arm) buildBoneDisplay(arm);
-    setStatus("IK solved");
-  }, []);
-
-  const handleSetIKTarget = useCallback((x, y, z) => {
-    ikChainsRef.current.forEach(chain => setIKTarget(chain, new THREE.Vector3(x, y, z)));
-    handleSolveIK();
-  }, [handleSolveIK]);
-
   // ── Sessions 31-32: Advanced sculpt brush handlers ──────────────────────
   const handleAdvBrushStroke = useCallback((e) => {
     const mesh   = meshRef.current; if (!mesh?.geometry) return;
@@ -2026,39 +1905,6 @@ export default function App() {
   const [paintOpacity,   setPaintOpacity]   = useState(1.0);
   const [bakedMaps,      setBakedMaps]      = useState({});
   const [bakingStatus,   setBakingStatus]   = useState(null);
-  // ── Sessions 51-62: Light + Camera + Post + IK + Graph state ─────────────
-  const [sceneLights,    setSceneLights]    = useState([]);
-  const [activeLightId,  setActiveLightId]  = useState(null);
-  const [lightType,      setLightType]      = useState("point");
-  const [lightColor,     setLightColor]     = useState("#ffffff");
-  const [lightIntensity, setLightIntensity] = useState(1.0);
-  const [lightTemp,      setLightTemp]      = useState("daylight");
-  const [fogEnabled,     setFogEnabled]     = useState(false);
-  const [fogColor,       setFogColor]       = useState("#aabbcc");
-  const [fogDensity,     setFogDensity]     = useState(0.02);
-  const [hdriPreset,     setHdriPreset]     = useState("studio");
-  const [showLightPanel, setShowLightPanel] = useState(false);
-  const camManagerRef    = useRef(createCameraManager());
-  const [cameras,        setCameras]        = useState([]);
-  const [activeCamId,    setActiveCamId]    = useState(null);
-  const [camFOV,         setCamFOV]         = useState(45);
-  const [camDOF,         setCamDOF]         = useState(false);
-  const [camDOFFocus,    setCamDOFFocus]    = useState(5.0);
-  const [showCamPanel,   setShowCamPanel]   = useState(false);
-  const [postEffects,    setPostEffects]    = useState([
-    { ...EFFECT_PRESETS.colorGrade, enabled: false },
-    { ...EFFECT_PRESETS.vignette,   enabled: false },
-    { ...EFFECT_PRESETS.filmGrain,  enabled: false },
-    { ...EFFECT_PRESETS.toneMap,    enabled: false },
-  ]);
-  const [activeLUT,      setActiveLUT]      = useState("neutral");
-  const [showPostPanel,  setShowPostPanel]  = useState(false);
-  const [boneMap,        setBoneMap]        = useState({...DEFAULT_BONE_MAP});
-  const [retargetStats,  setRetargetStats]  = useState(null);
-  const [ikChains,       setIkChains]       = useState([]);
-  const ikChainsRef      = useRef([]);
-  const [showIKPanel,    setShowIKPanel]    = useState(false);
-  const [showGraphEditor,setShowGraphEditor]= useState(false);
 
   // ── Sessions 11-12: Procedural mesh handlers ────────────────────────────
   const addProceduralMesh = useCallback(() => {
@@ -2205,26 +2051,6 @@ export default function App() {
           style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:14,
             background:showTimeline?"#00ffc8":COLORS.border,
             color:showTimeline?"#06060f":"#888"}}>⏱</button>
-        <button title="Lights" onClick={()=>setShowLightPanel(l=>!l)}
-          style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:14,
-            background:showLightPanel?"#ffd700":COLORS.border,
-            color:showLightPanel?"#06060f":"#888"}}>💡</button>
-        <button title="Camera" onClick={()=>setShowCamPanel(c=>!c)}
-          style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:14,
-            background:showCamPanel?"#00ffc8":COLORS.border,
-            color:showCamPanel?"#06060f":"#888"}}>📷</button>
-        <button title="Post FX" onClick={()=>setShowPostPanel(p=>!p)}
-          style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:14,
-            background:showPostPanel?"#FF6600":COLORS.border,
-            color:showPostPanel?"#fff":"#888"}}>✨</button>
-        <button title="IK" onClick={()=>setShowIKPanel(i=>!i)}
-          style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:11,
-            background:showIKPanel?"#8844ff":COLORS.border,
-            color:showIKPanel?"#fff":"#888",fontWeight:700}}>IK</button>
-        <button title="Graph Editor" onClick={()=>setShowGraphEditor(g=>!g)}
-          style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:11,
-            background:showGraphEditor?"#4488ff":COLORS.border,
-            color:showGraphEditor?"#fff":"#888",fontWeight:700}}>GR</button>
         <button title="Advanced Tools" onClick={()=>setShowGN(g=>!g)}
           style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:10,
             background:showGN?"#FF6600":COLORS.border,
@@ -2712,197 +2538,6 @@ export default function App() {
               )}
             </div>
 
-          </div>
-        </div>
-      )}
-
-      {/* Sessions 51-62: Light + Camera + Post + IK panel */}
-      {(showLightPanel || showCamPanel || showPostPanel || showIKPanel) && (
-        <div style={{width:210,background:"#0d1117",borderLeft:"1px solid #21262d",
-          display:"flex",flexDirection:"column",flexShrink:0,
-          fontFamily:"JetBrains Mono,monospace",fontSize:11,overflow:"hidden"}}>
-          <div style={{padding:"6px 10px",borderBottom:"1px solid #21262d"}}>
-            <span style={{color:"#00ffc8",fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>
-              Scene Tools
-            </span>
-          </div>
-          <div style={{flex:1,overflowY:"auto",padding:"8px 10px"}}>
-
-            {/* Lights — Sessions 51-52 */}
-            {showLightPanel && (
-              <div style={{marginBottom:10}}>
-                <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Lighting</div>
-                <select value={lightType} onChange={e=>setLightType(e.target.value)}
-                  style={{width:"100%",background:"#1a1f2e",border:"1px solid #21262d",
-                    color:"#dde6ef",borderRadius:3,padding:"4px",fontSize:9,marginBottom:4}}>
-                  {Object.entries(LIGHT_TYPES).map(([k,v])=>(
-                    <option key={k} value={k}>{v.icon} {v.label}</option>
-                  ))}
-                </select>
-                <div style={{display:"flex",gap:4,alignItems:"center",marginBottom:4}}>
-                  <input type="color" value={lightColor} onChange={e=>setLightColor(e.target.value)}
-                    style={{width:24,height:24,border:"none",borderRadius:3,padding:0,cursor:"pointer"}}/>
-                  <input type="range" min={0} max={5} step={0.1} value={lightIntensity}
-                    onChange={e=>setLightIntensity(Number(e.target.value))} style={{flex:1}}/>
-                  <span style={{color:"#00ffc8",fontSize:8,width:24}}>{lightIntensity.toFixed(1)}</span>
-                </div>
-                <button onClick={handleAddLight}
-                  style={{width:"100%",padding:"5px",background:"#00ffc8",border:"none",color:"#06060f",
-                    borderRadius:3,cursor:"pointer",fontSize:9,fontWeight:700,marginBottom:4}}>
-                  + Add {lightType} Light
-                </button>
-                <button onClick={handleThreePointLighting}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
-                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:6}}>
-                  Three-Point Preset
-                </button>
-                <div style={{color:"#555",fontSize:8,marginBottom:2}}>Temperature</div>
-                <div style={{display:"flex",gap:2,flexWrap:"wrap",marginBottom:4}}>
-                  {Object.entries(TEMPERATURE_PRESETS).map(([k,v])=>(
-                    <button key={k} onClick={()=>handleApplyTemperature(k)}
-                      title={v.label + " " + v.kelvin + "K"}
-                      style={{width:14,height:14,borderRadius:2,border:"none",cursor:"pointer",
-                        background:v.color,outline:lightTemp===k?"2px solid #fff":"none"}}/>
-                  ))}
-                </div>
-                <div style={{color:"#555",fontSize:8,marginBottom:2}}>HDRI</div>
-                <div style={{display:"flex",gap:2,flexWrap:"wrap",marginBottom:4}}>
-                  {HDRI_PRESETS.map(p=>(
-                    <button key={p.id} onClick={()=>handleApplyHDRI(p.id)}
-                      title={p.label}
-                      style={{padding:"2px 4px",background:hdriPreset===p.id?"#00ffc8":"#1a1f2e",
-                        border:"none",color:hdriPreset===p.id?"#06060f":"#555",
-                        borderRadius:3,cursor:"pointer",fontSize:7}}>
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-                <label style={{display:"flex",gap:6,alignItems:"center",cursor:"pointer",marginBottom:4}}>
-                  <input type="checkbox" checked={fogEnabled} onChange={handleToggleFog}/>
-                  <span style={{color:"#dde6ef",fontSize:9}}>Volumetric Fog</span>
-                </label>
-                {fogEnabled && (
-                  <div style={{marginBottom:4}}>
-                    <div style={{display:"flex",gap:4,marginBottom:2}}>
-                      <input type="color" value={fogColor} onChange={e=>{setFogColor(e.target.value);}}
-                        style={{width:20,height:20,border:"none",padding:0}}/>
-                      <input type="range" min={0.001} max={0.1} step={0.001} value={fogDensity}
-                        onChange={e=>setFogDensity(Number(e.target.value))} style={{flex:1}}/>
-                    </div>
-                  </div>
-                )}
-                <div style={{color:"#555",fontSize:8}}>Lights: {sceneLights.length}</div>
-              </div>
-            )}
-
-            {/* Camera — Session 55 */}
-            {showCamPanel && (
-              <div style={{borderTop:showLightPanel?"1px solid #21262d":"none",paddingTop:showLightPanel?8:0,marginBottom:10}}>
-                <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Camera</div>
-                <div style={{marginBottom:4}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:1}}>
-                    <span style={{color:"#555",fontSize:8}}>FOV</span>
-                    <span style={{color:"#00ffc8",fontSize:8}}>{camFOV}°</span>
-                  </div>
-                  <input type="range" min={10} max={120} step={1} value={camFOV}
-                    onChange={e=>{ setCamFOV(Number(e.target.value)); if(cameraRef.current){cameraRef.current.fov=Number(e.target.value);cameraRef.current.updateProjectionMatrix();}}}
-                    style={{width:"100%"}}/>
-                </div>
-                <button onClick={handleAddCamera}
-                  style={{width:"100%",padding:"5px",background:"#00ffc8",border:"none",color:"#06060f",
-                    borderRadius:3,cursor:"pointer",fontSize:9,fontWeight:700,marginBottom:3}}>
-                  + Add Camera
-                </button>
-                <button onClick={handleSaveBookmark}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
-                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:3}}>
-                  📍 Save Bookmark
-                </button>
-                <button onClick={handleCameraShake}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
-                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:3}}>
-                  📷 Camera Shake
-                </button>
-                <label style={{display:"flex",gap:6,alignItems:"center",cursor:"pointer",marginBottom:4}}>
-                  <input type="checkbox" checked={camDOF} onChange={e=>setCamDOF(e.target.checked)}/>
-                  <span style={{color:"#dde6ef",fontSize:9}}>Depth of Field</span>
-                </label>
-                {camDOF && (
-                  <div style={{marginBottom:4}}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:1}}>
-                      <span style={{color:"#555",fontSize:8}}>Focus Distance</span>
-                      <span style={{color:"#00ffc8",fontSize:8}}>{camDOFFocus.toFixed(1)}m</span>
-                    </div>
-                    <input type="range" min={0.5} max={50} step={0.1} value={camDOFFocus}
-                      onChange={e=>setCamDOFFocus(Number(e.target.value))} style={{width:"100%"}}/>
-                  </div>
-                )}
-                <div style={{color:"#555",fontSize:8}}>Cameras: {cameras.length}</div>
-              </div>
-            )}
-
-            {/* Post Processing — Session 56 */}
-            {showPostPanel && (
-              <div style={{borderTop:"1px solid #21262d",paddingTop:8,marginBottom:10}}>
-                <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Post FX</div>
-                {postEffects.map((effect,i)=>(
-                  <div key={effect.type} style={{marginBottom:4,padding:"4px 6px",
-                    background:effect.enabled?"#0a1a0a":"#1a1f2e",
-                    border:`1px solid ${effect.enabled?"#00ffc8":"#21262d"}`,borderRadius:3}}>
-                    <label style={{display:"flex",gap:6,alignItems:"center",cursor:"pointer"}}>
-                      <input type="checkbox" checked={effect.enabled} onChange={()=>handleToggleEffect(i)}/>
-                      <span style={{color:effect.enabled?"#00ffc8":"#666",fontSize:9,fontWeight:700}}>
-                        {effect.type}
-                      </span>
-                    </label>
-                  </div>
-                ))}
-                <div style={{color:"#555",fontSize:8,marginBottom:2,marginTop:4}}>LUT</div>
-                <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
-                  {Object.entries(LUT_PRESETS).map(([k,v])=>(
-                    <button key={k} onClick={()=>setActiveLUT(k)}
-                      style={{padding:"2px 4px",background:activeLUT===k?"#FF6600":"#1a1f2e",
-                        border:"none",color:activeLUT===k?"#fff":"#555",
-                        borderRadius:3,cursor:"pointer",fontSize:7}}>
-                      {v.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* IK — Session 61 */}
-            {showIKPanel && (
-              <div style={{borderTop:"1px solid #21262d",paddingTop:8}}>
-                <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Inverse Kinematics</div>
-                <button onClick={handleCreateIKChain}
-                  style={{width:"100%",padding:"5px",background:"#00ffc8",border:"none",color:"#06060f",
-                    borderRadius:3,cursor:"pointer",fontSize:9,fontWeight:700,marginBottom:4}}>
-                  + Create IK Chain
-                </button>
-                <button onClick={handleSolveIK}
-                  style={{width:"100%",padding:"4px",background:"#FF6600",border:"none",color:"#fff",
-                    borderRadius:3,cursor:"pointer",fontSize:9,marginBottom:4}}>
-                  ▶ Solve IK
-                </button>
-                <div style={{color:"#555",fontSize:8,marginBottom:4}}>
-                  Chains: {ikChains.length}
-                </div>
-                {retargetStats && (
-                  <div style={{color:"#00ffc8",fontSize:8,lineHeight:1.6}}>
-                    Retarget: {retargetStats.coverage}% coverage<br/>
-                    {retargetStats.mapped}/{retargetStats.bvhJoints} joints mapped
-                  </div>
-                )}
-                {bvhData && (
-                  <button onClick={handleAutoDetectBoneMap}
-                    style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
-                      color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginTop:4}}>
-                    Auto-Detect Bone Map
-                  </button>
-                )}
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -3485,18 +3120,6 @@ export default function App() {
         onAddBasis={addBasisKey}
         onAddShapeKey={addShapeKey}
       />
-
-      {/* Graph Editor — Session 62 */}
-      {showGraphEditor && (
-        <div style={{position:"fixed",bottom:showTimeline?180:0,left:0,right:0,zIndex:99}}>
-          <GraphEditor
-            objects={sceneObjects}
-            activeObjId={activeObjId}
-            animKeys={animKeys}
-            fps={24}
-          />
-        </div>
-      )}
 
       {/* Animation Timeline — Sessions 17-19 */}
       {showTimeline && (
