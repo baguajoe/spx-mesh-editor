@@ -1493,13 +1493,7 @@ export default function App() {
       const result = stepPathTracer(pt, rendererRef.current, sceneRef.current, cameraRef.current);
       const stats  = getPathTracerStats(pt);
       setPtStats({ ...stats });
-      if (stats.samples === 32) { try { denoiseCanvas(rendererRef.current?.domElement); } catch(e) {} }
-      if (result?.done) {
-        try { denoiseCanvas(rendererRef.current?.domElement); } catch(e) {}
-        setPtRunning(false);
-        setStatus("Path tracing complete — " + stats.samples + " samples (denoised)");
-        return;
-      }
+      if (result?.done) { setPtRunning(false); setStatus("Path tracing complete — " + stats.samples + " samples"); return; }
       ptRafRef.current = requestAnimationFrame(loop);
     };
     ptRafRef.current = requestAnimationFrame(loop);
@@ -1736,22 +1730,6 @@ export default function App() {
   }, [tourState]);
 
   // ── Sessions 169: StreamPireX export ─────────────────────────────────────
-  const handlePublishToSPX = useCallback(async () => {
-    if (!sceneRef.current || !rendererRef.current) { setStatus("No scene to publish"); return; }
-    setStatus("Publishing to StreamPireX...");
-    try {
-      generateThumbnail(rendererRef.current, sceneRef.current, cameraRef.current);
-      const payload = buildSPXExportPayload(sceneRef.current, { format: "spx" });
-      const result = await exportToStreamPireX(payload);
-      if (result.offline) {
-        downloadSPXFile(payload, "scene.spx");
-        setStatus("Published locally (offline) ✓");
-      } else {
-        setStatus("Published to StreamPireX ✓");
-      }
-    } catch(e) { setStatus("Publish failed: " + e.message); }
-  }, []);
-
   const handleExportToSPX = useCallback(async () => {
     if (!sceneRef.current) return;
     const payload = buildSPXExportPayload(sceneRef.current, { format: exportFormat });
@@ -3257,8 +3235,6 @@ export default function App() {
   // ── Sessions 21-30: Pose + Weight + Dyntopo + NLA + BVH + Skinning ────────
   const [poseMode, setPoseMode] = useState(false);
   const [poseLibrary, setPoseLibrary] = useState({});
-  const [showPoseLibPanel, setShowPoseLibPanel] = useState(false);
-  const [poseName, setPoseName] = useState("");
   const [wpBoneIndex, setWpBoneIndex] = useState(0);
   const [wpRadius, setWpRadius] = useState(0.5);
   const [wpStrength, setWpStrength] = useState(0.1);
@@ -4029,12 +4005,6 @@ export default function App() {
             background: showMeshToolsPanel ? "#FF6600" : COLORS.border,
             color: showMeshToolsPanel ? "#fff" : "#888", fontWeight: 700
           }}>MSH</button>
-        <button title="Pose Library" onClick={() => setShowPoseLibPanel(p => !p)}
-          style={{
-            width: 38, height: 38, border: "none", borderRadius: 4, cursor: "pointer", fontSize: 10,
-            background: showPoseLibPanel ? "#8844ff" : COLORS.border,
-            color: showPoseLibPanel ? "#fff" : "#888", fontWeight: 700
-          }}>POS</button>
         <button title="Weight Paint" onClick={() => { handleEnterWeightPaint(); setWeightPainting(w => !w); }}
           style={{
             width: 38, height: 38, border: "none", borderRadius: 4, cursor: "pointer", fontSize: 11,
@@ -5983,75 +5953,6 @@ export default function App() {
           </>)}
         </div>
       )}
-      {/* Pose Library Panel */}
-      {showPoseLibPanel && (
-        <div style={{
-          position: "fixed", right: 48, top: 120, width: 180, zIndex: 120,
-          background: "#0d1117", border: "1px solid #21262d", borderRadius: 6,
-          padding: 10, color: "#dde6ef"
-        }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "#8844ff", marginBottom: 8 }}>POSE LIBRARY</div>
-          <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
-            <input
-              value={poseName}
-              onChange={e => setPoseName(e.target.value)}
-              placeholder="Pose name..."
-              style={{
-                flex: 1, background: "#161b22", border: "1px solid #21262d",
-                color: "#dde6ef", borderRadius: 3, padding: "3px 6px", fontSize: 9
-              }}
-            />
-            <button
-              onClick={() => {
-                const arm = armatureRef?.current;
-                if (!arm) { setStatus("No armature selected"); return; }
-                const name = poseName || ("Pose_" + Object.keys(poseLibrary).length);
-                setPoseLibrary(prev => savePoseToLibrary(arm, name, { ...prev }));
-                setPoseName("");
-                setStatus("Pose saved: " + name);
-              }}
-              style={{
-                background: "#8844ff", border: "none", borderRadius: 3,
-                color: "#fff", cursor: "pointer", fontSize: 9, padding: "3px 7px"
-              }}
-            >Save</button>
-          </div>
-          <div style={{ maxHeight: 200, overflowY: "auto" }}>
-            {Object.keys(poseLibrary).length === 0 && (
-              <div style={{ color: "#555", fontSize: 9, textAlign: "center", padding: 8 }}>No poses saved yet</div>
-            )}
-            {Object.keys(poseLibrary).map(name => (
-              <div key={name} style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                padding: "3px 0", borderBottom: "1px solid #161b22"
-              }}>
-                <span style={{ fontSize: 9, color: "#dde6ef", flex: 1 }}>{name}</span>
-                <button
-                  onClick={() => {
-                    const arm = armatureRef?.current;
-                    if (arm) { loadPoseFromLibrary(arm, name, poseLibrary); setStatus("Pose applied: " + name); }
-                  }}
-                  style={{
-                    background: "#1a1f2e", border: "1px solid #21262d", borderRadius: 3,
-                    color: "#8844ff", cursor: "pointer", fontSize: 8, padding: "2px 5px"
-                  }}
-                >Apply</button>
-              </div>
-            ))}
-          </div>
-          {Object.keys(poseLibrary).length > 0 && (
-            <button
-              onClick={() => setPoseLibrary({})}
-              style={{
-                width: "100%", marginTop: 6, padding: "3px", background: "#1a1f2e",
-                border: "1px solid #21262d", borderRadius: 3, color: "#555",
-                cursor: "pointer", fontSize: 8
-              }}
-            >Clear All</button>
-          )}
-        </div>
-      )}
-
       {(showRenderPanel || showVolPanel || showPassPanel || showProbePanel) && (
         <div style={{
           width: 210, background: "#0d1117", borderLeft: "1px solid #21262d",
@@ -8079,25 +7980,6 @@ export default function App() {
           </div>
         </div>
       )}
-    {/* Publish hero button */}
-      <div style={{
-        position: "fixed", top: 10, right: 56, zIndex: 200,
-        display: "flex", gap: 6, alignItems: "center"
-      }}>
-        <button
-          onClick={handlePublishToSPX}
-          title="Publish scene to StreamPireX"
-          style={{
-            background: "linear-gradient(135deg, #00ffc8, #00c8a0)",
-            border: "none", borderRadius: 6, cursor: "pointer",
-            color: "#06060f", fontWeight: 800, fontSize: 11,
-            padding: "6px 14px", boxShadow: "0 2px 12px #00ffc840",
-            letterSpacing: 0.5
-          }}
-        >
-          ▲ Publish to SPX
-        </button>
-      </div>
     </div>
   );
 }
