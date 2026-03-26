@@ -15,8 +15,6 @@ import { initVertexColors, paintVertexColor, fillVertexColor, gradientFillVertex
 import { createShapeKey, applyShapeKeys, updateBasis, buildMorphTargets } from "./mesh/ShapeKeys.js";
 import { createPipe, createStaircase, createArch, createGear, createHelix, createLathe, buildProceduralMesh } from "./mesh/ProceduralMesh.js";
 import { generateLOD, getLODStats, setLODLevel, restoreAutoLOD } from "./mesh/LODSystem.js";
-import { createArmature, addBone, selectBone, buildBoneDisplay, moveBoneHead, moveBoneTail, parentBone, getArmatureStats, serializeArmature } from "./mesh/ArmatureSystem.js";
-import { AnimationTimeline } from "./components/AnimationTimeline.jsx";
 import { createInstances, flattenInstances } from "./mesh/Instancing.js";
 import { fixNormals, removeDoubles, removeDegenerates, fillHoles, fullRepair } from "./mesh/MeshRepair.js";
 import {
@@ -1293,95 +1291,6 @@ export default function App() {
   }, [matProps]);
 
 
-  // ── Sessions 17-18: Animation handlers ──────────────────────────────────
-  const handleSeek = useCallback((frame, keys) => {
-    setAnimFrame(frame);
-    setAnimKeys(keys);
-    // Apply keyframe values to objects
-    sceneObjects.forEach(obj => {
-      if (!obj.mesh || !keys[obj.id]) return;
-      const ch = keys[obj.id];
-      if (ch["pos.x"] !== undefined) {
-        const x = getLinearValue(ch["pos.x"], frame);
-        const y = getLinearValue(ch["pos.y"], frame);
-        const z = getLinearValue(ch["pos.z"], frame);
-        if (x !== null) obj.mesh.position.x = x;
-        if (y !== null) obj.mesh.position.y = y;
-        if (z !== null) obj.mesh.position.z = z;
-      }
-      if (ch["rot.x"] !== undefined) {
-        const rx = getLinearValue(ch["rot.x"], frame);
-        const ry = getLinearValue(ch["rot.y"], frame);
-        const rz = getLinearValue(ch["rot.z"], frame);
-        if (rx !== null) obj.mesh.rotation.x = rx;
-        if (ry !== null) obj.mesh.rotation.y = ry;
-        if (rz !== null) obj.mesh.rotation.z = rz;
-      }
-      if (ch["scale"] !== undefined) {
-        const s = getLinearValue(ch["scale"], frame);
-        if (s !== null) obj.mesh.scale.setScalar(s);
-      }
-    });
-  }, [sceneObjects]);
-
-  function getLinearValue(channel, frame) {
-    const frames = Object.keys(channel).map(Number).sort((a,b)=>a-b);
-    if (!frames.length) return null;
-    if (frame <= frames[0]) return channel[frames[0]];
-    if (frame >= frames[frames.length-1]) return channel[frames[frames.length-1]];
-    for (let i = 0; i < frames.length-1; i++) {
-      const f0=frames[i], f1=frames[i+1];
-      if (frame>=f0&&frame<=f1) {
-        const t=(frame-f0)/(f1-f0);
-        return channel[f0]+(channel[f1]-channel[f0])*t;
-      }
-    }
-    return null;
-  }
-
-  // ── Session 20: Armature handlers ────────────────────────────────────────
-  const handleCreateArmature = useCallback(() => {
-    const arm = createArmature("Armature_" + armatures.length);
-    // Add a default root bone
-    addBone(arm, { name: "Root", head: new THREE.Vector3(0,0,0), tail: new THREE.Vector3(0,1,0) });
-    buildBoneDisplay(arm);
-    sceneRef.current?.add(arm);
-    armatureRef.current = arm;
-    setArmatures(prev => [...prev, arm]);
-    setActiveArmId(arm.uuid);
-    setSceneObjects(prev => [...prev, {
-      id: arm.uuid, name: arm.name, type: "armature",
-      visible: true, parentId: null, mesh: arm,
-    }]);
-    setStatus("Armature created with root bone");
-  }, [armatures]);
-
-  const handleAddBone = useCallback(() => {
-    const arm = armatureRef.current; if (!arm) { setStatus("Create armature first"); return; }
-    const bone = addBone(arm, {
-      name:     "Bone_" + arm.userData.bones.length,
-      head:     new THREE.Vector3(0, arm.userData.bones.length * 0.5, 0),
-      tail:     new THREE.Vector3(0, arm.userData.bones.length * 0.5 + 0.5, 0),
-      parentId: selectedBoneId,
-    });
-    buildBoneDisplay(arm);
-    setSelectedBoneId(bone.userData.boneId);
-    setStatus("Bone added: " + bone.name);
-  }, [selectedBoneId]);
-
-  const handleSelectBone = useCallback((boneId) => {
-    const arm = armatureRef.current; if (!arm) return;
-    selectBone(arm, boneId);
-    setSelectedBoneId(boneId);
-    setStatus("Bone selected: " + boneId);
-  }, []);
-
-  const handleParentBone = useCallback((childId, parentId) => {
-    const arm = armatureRef.current; if (!arm) return;
-    parentBone(arm, childId, parentId);
-    setStatus("Bone parented");
-  }, []);
-
   // ── Session 14: LOD handlers ────────────────────────────────────────────
   const handleGenerateLOD = useCallback(() => {
     const mesh = meshRef.current; if (!mesh || !mesh.geometry) { setStatus("No mesh selected"); return; }
@@ -1451,15 +1360,6 @@ export default function App() {
   // ── Session 16: GLTF extension helpers (wired into exportGLB) ────────────
   const [exportUnlit,    setExportUnlit]    = useState(false);
   const [exportDraco,    setExportDraco]    = useState(false);
-  // ── Sessions 17-20: Animation + Armature state ───────────────────────────
-  const [showTimeline,   setShowTimeline]   = useState(false);
-  const [animFrame,      setAnimFrame]      = useState(0);
-  const [animKeys,       setAnimKeys]       = useState({});
-  const [armatures,      setArmatures]      = useState([]);
-  const [activeArmId,    setActiveArmId]    = useState(null);
-  const [boneMode,       setBoneMode]       = useState(false);
-  const [selectedBoneId, setSelectedBoneId] = useState(null);
-  const armatureRef      = useRef(null);
 
   // ── Sessions 11-12: Procedural mesh handlers ────────────────────────────
   const addProceduralMesh = useCallback(() => {
@@ -1598,14 +1498,6 @@ export default function App() {
         <button title="Export GLB" onClick={exportGLB}
           style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:16,
             background:COLORS.border,color:COLORS.orange}}>💾</button>
-        <button title="Bone Mode" onClick={()=>setBoneMode(b=>!b)}
-          style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:14,
-            background:boneMode?"#8844ff":COLORS.border,
-            color:boneMode?"#fff":"#888"}}>🦴</button>
-        <button title="Timeline" onClick={()=>setShowTimeline(t=>!t)}
-          style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:14,
-            background:showTimeline?"#00ffc8":COLORS.border,
-            color:showTimeline?"#06060f":"#888"}}>⏱</button>
         <button title="Wireframe (Z)" onClick={toggleWireframe}
           style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:10,
             background:wireframe?COLORS.orange:COLORS.border,
@@ -1691,13 +1583,6 @@ export default function App() {
         {/* Mode bar */}
         <div style={{position:"absolute",top:10,left:"50%",transform:"translateX(-50%)",
           display:"flex",gap:4,background:"rgba(13,17,23,0.85)",borderRadius:6,padding:"4px"}}>
-          <button onClick={()=>setShowTimeline(t=>!t)}
-            style={{padding:"4px 10px",border:"none",borderRadius:3,cursor:"pointer",
-              fontSize:11,fontWeight:700,textTransform:"uppercase",
-              background:showTimeline?"#8844ff":"transparent",
-              color:showTimeline?"#fff":"#666"}}>
-            ANIM
-          </button>
           {["object","edit","sculpt","paint"].map(m=>(
             <button key={m} onClick={()=>m==="edit"?toggleEditMode():setEditMode("object")}
               style={{padding:"4px 16px",border:"none",borderRadius:3,cursor:"pointer",
@@ -1880,50 +1765,6 @@ export default function App() {
           </div>
           <div style={{marginTop:"auto",color:"#333",fontSize:9,lineHeight:1.5}}>
             Click + drag to paint.<br/>Add primitive first to paint.
-          </div>
-        </div>
-      )}
-
-      {/* Armature panel — Session 20 */}
-      {boneMode && (
-        <div style={{width:180,background:"#0d1117",borderLeft:"1px solid #21262d",
-          display:"flex",flexDirection:"column",flexShrink:0,
-          fontFamily:"JetBrains Mono,monospace",fontSize:11,overflow:"hidden"}}>
-          <div style={{padding:"6px 10px",borderBottom:"1px solid #21262d",
-            display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span style={{color:"#00ffc8",fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>
-              Armature
-            </span>
-            <button onClick={()=>setBoneMode(false)}
-              style={{background:"none",border:"none",color:"#444",cursor:"pointer",fontSize:11}}>✕</button>
-          </div>
-          <div style={{flex:1,overflowY:"auto",padding:"8px 10px"}}>
-            <button onClick={handleCreateArmature}
-              style={{width:"100%",background:"#00ffc8",border:"none",color:"#06060f",
-                borderRadius:4,padding:"6px",cursor:"pointer",fontWeight:700,fontSize:10,marginBottom:6}}>
-              + Create Armature
-            </button>
-            {armatureRef.current && (
-              <>
-                <button onClick={handleAddBone}
-                  style={{width:"100%",background:"#FF6600",border:"none",color:"#fff",
-                    borderRadius:4,padding:"5px",cursor:"pointer",fontSize:10,marginBottom:4}}>
-                  + Add Bone
-                </button>
-                <div style={{color:"#666",fontSize:9,marginTop:8,marginBottom:4}}>Bones</div>
-                {armatureRef.current.userData.bones.map(bone=>(
-                  <div key={bone.userData.boneId}
-                    onClick={()=>handleSelectBone(bone.userData.boneId)}
-                    style={{padding:"4px 8px",borderRadius:3,cursor:"pointer",marginBottom:2,
-                      background:selectedBoneId===bone.userData.boneId?"#0a2a1a":"#1a1f2e",
-                      border:`1px solid ${selectedBoneId===bone.userData.boneId?"#00ffc8":"#21262d"}`}}>
-                    <span style={{color:selectedBoneId===bone.userData.boneId?"#00ffc8":"#aaa",fontSize:9}}>
-                      🦴 {bone.name}
-                    </span>
-                  </div>
-                ))}
-              </>
-            )}
           </div>
         </div>
       )}
@@ -2204,20 +2045,6 @@ export default function App() {
         onAddShapeKey={addShapeKey}
       />
 
-      {/* Animation Timeline — Sessions 17-19 */}
-      {showTimeline && (
-        <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:100}}>
-          <AnimationTimeline
-            objects={sceneObjects}
-            activeObjId={activeObjId}
-            shapeKeys={shapeKeys}
-            onSeek={handleSeek}
-            onPlay={()=>setStatus("Playing...")}
-            onStop={()=>setStatus("Stopped")}
-            fps={24}
-          />
-        </div>
-      )}
     </div>
   );
 }
