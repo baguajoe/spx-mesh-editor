@@ -48,8 +48,6 @@ import { createPBRMaterial, applyPBRMaps, SSS_PRESETS, createSSSMaterial, TRANSM
 import { EMITTER_TYPES, VFX_PRESETS, createEmitter, emitParticles, stepEmitter, buildParticleSystem, updateParticleSystem, createDestructionEffect, stepDestructionFrags, getEmitterStats } from "./mesh/VFXSystem.js";
 import { createSPHParticle, createFluidSettings, FLUID_PRESETS, stepSPH, emitFluid, buildFluidMesh, updateFluidMesh, createPyroEmitter, stepPyro, getFluidStats } from "./mesh/FluidSystem.js";
 import { ASSET_TYPES, createAssetLibrary, addAsset, searchAssets, removeAsset, toggleFavorite, generateThumbnail, PROCEDURAL_ANIMATIONS, applyProceduralAnimation, createAudioAnalyzer, applyAudioToMesh, optimizeScene, getSceneStats } from "./mesh/AssetLibrary.js";
-import { createUser, createCommentPin, createVersionSnapshot, restoreVersion, createCollabSession, connectSession, broadcastOperation, broadcastComment, disconnectSession, buildCommentPinMesh, getCollabStats } from "./mesh/CollaborationSystem.js";
-import { isElectron, isBrowser, openFile, saveFile, MENU_ITEMS, KEYBOARD_SHORTCUTS, registerShortcuts, checkForUpdates, isFeatureAvailable, getPlatformInfo, DESKTOP_ONLY_FEATURES } from "./mesh/ElectronBridge.js";
 import { createVolumetricSettings, applyVolumetricFog, applyHeightFog, createGodRayEffect, ATMOSPHERE_PRESETS, applyAtmospherePreset, createLightShaft } from "./mesh/VolumetricSystem.js";
 import { PASS_TYPES, createPassStack, renderAllPasses, downloadPass, compositePasses } from "./mesh/RenderPasses.js";
 import { createReflectionProbe, updateReflectionProbe, applyProbeToMaterial, applyProbeToScene, createAmbientProbe, createProbeManager, getProbeStats } from "./mesh/EnvironmentProbes.js";
@@ -1339,103 +1337,6 @@ export default function App() {
     } catch(e) { setStatus("Push error: "+e.message); }
   }, [matProps]);
 
-
-  // ── Sessions 122-124: Collaboration handlers ────────────────────────────
-  const handleCreateCollabSession = useCallback(() => {
-    const session = createCollabSession({ userName: "User_" + Math.floor(Math.random()*1000) });
-    const channel = connectSession(session, (msg) => {
-      if (msg.type === "join") {
-        setCollabUsers(prev => [...prev, msg.user]);
-        setStatus("User joined: " + msg.user.name);
-      } else if (msg.type === "leave") {
-        setCollabUsers(prev => prev.filter(u => u.id !== msg.userId));
-      } else if (msg.type === "operation") {
-        applyOperation(msg.op, sceneObjects);
-        setStatus("Remote op: " + msg.op.type);
-      } else if (msg.type === "comment") {
-        setCommentPins(prev => [...prev, msg.comment]);
-        if (sceneRef.current) buildCommentPinMesh(msg.comment, sceneRef.current);
-      }
-    });
-    collabRef.current = session;
-    setCollabSession(session);
-    setStatus("Collaboration session created — ID: " + session.id.slice(0,8));
-  }, [sceneObjects]);
-
-  const handleAddComment = useCallback(() => {
-    if (!commentText || !collabRef.current) return;
-    const pos = meshRef.current?.position.clone() || new THREE.Vector3(0,1,0);
-    const pin = createCommentPin(pos, commentText, collabRef.current.localUser.name);
-    broadcastComment(collabRef.current, pin);
-    setCommentPins(prev => [...prev, pin]);
-    if (sceneRef.current) buildCommentPinMesh(pin, sceneRef.current);
-    setCommentText("");
-    setStatus("Comment added");
-  }, [commentText]);
-
-  const handleSaveVersion = useCallback(() => {
-    const snap = createVersionSnapshot(sceneObjects, "v" + (versionHistory.length+1));
-    setVersionHistory(prev => [...prev.slice(-49), snap]);
-    setStatus("Version saved: " + snap.message);
-  }, [sceneObjects, versionHistory]);
-
-  const handleRestoreVersion = useCallback((snapId) => {
-    const snap = versionHistory.find(v => v.id === snapId);
-    if (!snap) return;
-    restoreVersion(snap, sceneObjects);
-    setStatus("Restored: " + snap.message);
-  }, [versionHistory, sceneObjects]);
-
-  const handleDisconnectCollab = useCallback(() => {
-    if (collabRef.current) {
-      disconnectSession(collabRef.current);
-      setCollabSession(null);
-      setCollabUsers([]);
-      setStatus("Disconnected from session");
-    }
-  }, []);
-
-  // ── Sessions 125-130: Electron/Desktop handlers ───────────────────────────
-  const handleGetPlatformInfo = useCallback(() => {
-    const info = getPlatformInfo();
-    setPlatformInfo(info);
-    setStatus(info.isElectron ? "Running in Electron desktop" : "Running in browser");
-  }, []);
-
-  const handleNativeOpen = useCallback(async () => {
-    try {
-      const result = await openFile({ accept: ".glb,.gltf,.obj,.fbx,.spx" });
-      if (result) setStatus("Opened: " + result.path);
-    } catch(e) { setStatus("Open cancelled"); }
-  }, []);
-
-  const handleNativeSave = useCallback(async () => {
-    if (!sceneRef.current) return;
-    try {
-      const data = JSON.stringify({ scene: "SPX Scene", objects: sceneObjects.length });
-      await saveFile(data, { filename:"scene.spx", mimeType:"application/json" });
-      setStatus("Scene saved");
-    } catch(e) { setStatus("Save failed: " + e.message); }
-  }, [sceneObjects]);
-
-  const handleCheckUpdates = useCallback(async () => {
-    const result = await checkForUpdates();
-    setUpdateAvailable(result.hasUpdate);
-    setStatus(result.hasUpdate ? "Update available: " + result.version : "Up to date");
-  }, []);
-
-  // Register keyboard shortcuts on mount
-  useEffect(() => {
-    const handlers = {
-      save:           handleNativeSave,
-      open:           handleNativeOpen,
-      toggleWireframe:() => { const m=meshRef.current; if(m?.material) { m.material.wireframe=!m.material.wireframe; } },
-      focusSelected:  () => { if(meshRef.current) { const b=new THREE.Box3().setFromObject(meshRef.current); cameraRef.current?.lookAt(b.getCenter(new THREE.Vector3())); } },
-      duplicate:      () => { const m=meshRef.current; if(m&&sceneRef.current) { const c=m.clone(); c.position.x+=0.5; sceneRef.current.add(c); } },
-    };
-    shortcutCleanupRef.current = registerShortcuts(handlers);
-    return () => shortcutCleanupRef.current?.();
-  }, [handleNativeSave, handleNativeOpen]);
 
   // ── Sessions 108-115: VFX handlers ──────────────────────────────────────
   const handleCreateVFXEmitter = useCallback(() => {
@@ -2873,18 +2774,6 @@ export default function App() {
   const procAnimRef        = useRef(null);
   const [sceneStats,       setSceneStats]       = useState(null);
   const [showPerfPanel,    setShowPerfPanel]    = useState(false);
-  // ── Sessions 122-130: Collaboration + Electron state ─────────────────────
-  const [collabSession,    setCollabSession]    = useState(null);
-  const collabRef          = useRef(null);
-  const [collabUsers,      setCollabUsers]      = useState([]);
-  const [commentPins,      setCommentPins]      = useState([]);
-  const [commentText,      setCommentText]      = useState("");
-  const [versionHistory,   setVersionHistory]   = useState([]);
-  const [showCollabPanel,  setShowCollabPanel]  = useState(false);
-  const [platformInfo,     setPlatformInfo]     = useState(null);
-  const [updateAvailable,  setUpdateAvailable]  = useState(false);
-  const [showDesktopPanel, setShowDesktopPanel] = useState(false);
-  const shortcutCleanupRef = useRef(null);
 
   // ── Sessions 11-12: Procedural mesh handlers ────────────────────────────
   const addProceduralMesh = useCallback(() => {
@@ -3031,14 +2920,6 @@ export default function App() {
           style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:14,
             background:showTimeline?"#00ffc8":COLORS.border,
             color:showTimeline?"#06060f":"#888"}}>⏱</button>
-        <button title="Collaboration" onClick={()=>setShowCollabPanel(c=>!c)}
-          style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:14,
-            background:showCollabPanel?"#00ffc8":COLORS.border,
-            color:showCollabPanel?"#06060f":"#888"}}>🔗</button>
-        <button title="Desktop" onClick={()=>setShowDesktopPanel(d=>!d)}
-          style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:14,
-            background:showDesktopPanel?"#8844ff":COLORS.border,
-            color:showDesktopPanel?"#fff":"#888"}}>🖥</button>
         <button title="VFX Particles" onClick={()=>setShowVFXPanel(v=>!v)}
           style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:14,
             background:showVFXPanel?"#FF6600":COLORS.border,
@@ -3614,148 +3495,6 @@ export default function App() {
               )}
             </div>
 
-          </div>
-        </div>
-      )}
-
-      {/* Sessions 122-130: Collaboration + Desktop panel */}
-      {(showCollabPanel || showDesktopPanel) && (
-        <div style={{width:210,background:"#0d1117",borderLeft:"1px solid #21262d",
-          display:"flex",flexDirection:"column",flexShrink:0,
-          fontFamily:"JetBrains Mono,monospace",fontSize:11,overflow:"hidden"}}>
-          <div style={{padding:"6px 10px",borderBottom:"1px solid #21262d"}}>
-            <span style={{color:"#00ffc8",fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>
-              Collab + Desktop
-            </span>
-          </div>
-          <div style={{flex:1,overflowY:"auto",padding:"8px 10px"}}>
-
-            {/* Collaboration — Sessions 122-124 */}
-            {showCollabPanel && (
-              <div style={{marginBottom:10}}>
-                <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Collaboration</div>
-                {!collabSession ? (
-                  <button onClick={handleCreateCollabSession}
-                    style={{width:"100%",padding:"5px",background:"#00ffc8",border:"none",color:"#06060f",
-                      borderRadius:3,cursor:"pointer",fontSize:9,fontWeight:700,marginBottom:4}}>
-                    🔗 Start Session
-                  </button>
-                ) : (
-                  <>
-                    <div style={{color:"#00ffc8",fontSize:8,marginBottom:4}}>
-                      Session: {collabSession.id.slice(0,8)}...<br/>
-                      Users online: {collabUsers.length + 1}
-                    </div>
-                    {collabUsers.map(u=>(
-                      <div key={u.id} style={{display:"flex",gap:6,alignItems:"center",marginBottom:2}}>
-                        <div style={{width:8,height:8,borderRadius:"50%",background:u.color,flexShrink:0}}/>
-                        <span style={{color:"#dde6ef",fontSize:8}}>{u.name}</span>
-                      </div>
-                    ))}
-                    <button onClick={handleDisconnectCollab}
-                      style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
-                        color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginTop:4,marginBottom:6}}>
-                      Disconnect
-                    </button>
-                  </>
-                )}
-                <div style={{color:"#FF6600",fontSize:8,fontWeight:700,marginBottom:3,textTransform:"uppercase"}}>Comments</div>
-                <input value={commentText} onChange={e=>setCommentText(e.target.value)}
-                  placeholder="Add comment..."
-                  style={{width:"100%",background:"#1a1f2e",border:"1px solid #21262d",
-                    color:"#dde6ef",borderRadius:3,padding:"4px",fontSize:8,marginBottom:3,
-                    fontFamily:"JetBrains Mono,monospace"}}/>
-                <button onClick={handleAddComment} disabled={!collabSession}
-                  style={{width:"100%",padding:"4px",background:collabSession?"#ffaa00":"#333",
-                    border:"none",color:collabSession?"#06060f":"#555",
-                    borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:6}}>
-                  📌 Pin Comment
-                </button>
-                {commentPins.length > 0 && (
-                  <div style={{maxHeight:80,overflowY:"auto"}}>
-                    {commentPins.map(p=>(
-                      <div key={p.id} style={{padding:"2px 4px",background:"#1a1f2e",
-                        border:"1px solid #21262d",borderRadius:3,marginBottom:2}}>
-                        <div style={{color:"#ffaa00",fontSize:7}}>{p.author}</div>
-                        <div style={{color:"#dde6ef",fontSize:8}}>{p.text}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div style={{color:"#FF6600",fontSize:8,fontWeight:700,marginBottom:3,textTransform:"uppercase",marginTop:6}}>Version History</div>
-                <button onClick={handleSaveVersion}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
-                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:4}}>
-                  💾 Save Version
-                </button>
-                <div style={{maxHeight:100,overflowY:"auto"}}>
-                  {versionHistory.map((v,i)=>(
-                    <div key={v.id} style={{padding:"2px 6px",background:"#1a1f2e",
-                      border:"1px solid #21262d",borderRadius:3,marginBottom:2,
-                      display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer"}}
-                      onClick={()=>handleRestoreVersion(v.id)}>
-                      <span style={{color:"#8844ff",fontSize:7}}>v{i+1}</span>
-                      <span style={{color:"#dde6ef",fontSize:7}}>{v.message}</span>
-                    </div>
-                  ))}
-                  {versionHistory.length===0 && <div style={{color:"#555",fontSize:8}}>No versions saved</div>}
-                </div>
-              </div>
-            )}
-
-            {/* Desktop — Sessions 125-130 */}
-            {showDesktopPanel && (
-              <div style={{borderTop:showCollabPanel?"1px solid #21262d":"none",paddingTop:showCollabPanel?8:0}}>
-                <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Desktop App</div>
-                <div style={{padding:"4px 6px",background:"#1a1f2e",borderRadius:3,marginBottom:6,
-                  border:`1px solid ${isElectron()?"#00ffc8":"#FF6600"}`}}>
-                  <span style={{color:isElectron()?"#00ffc8":"#FF6600",fontSize:8,fontWeight:700}}>
-                    {isElectron() ? "🖥 Electron Desktop" : "🌐 Browser Mode"}
-                  </span>
-                </div>
-                <button onClick={handleNativeOpen}
-                  style={{width:"100%",padding:"5px",background:"#00ffc8",border:"none",color:"#06060f",
-                    borderRadius:3,cursor:"pointer",fontSize:9,fontWeight:700,marginBottom:3}}>
-                  📂 Open File
-                </button>
-                <button onClick={handleNativeSave}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
-                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:3}}>
-                  💾 Save Scene
-                </button>
-                <button onClick={handleGetPlatformInfo}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
-                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:3}}>
-                  ℹ Platform Info
-                </button>
-                <button onClick={handleCheckUpdates}
-                  style={{width:"100%",padding:"4px",
-                    background:updateAvailable?"#FF6600":"#1a1f2e",
-                    border:"1px solid #21262d",
-                    color:updateAvailable?"#fff":"#aaa",
-                    borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:6}}>
-                  {updateAvailable ? "⬆ Update Available!" : "🔄 Check Updates"}
-                </button>
-                {platformInfo && (
-                  <div style={{color:"#555",fontSize:8,lineHeight:1.6}}>
-                    Platform: {platformInfo.platform}<br/>
-                    WebGL2: {platformInfo.webGL?"✓":"✗"}<br/>
-                    Memory: {platformInfo.memory}GB<br/>
-                    Cores: {platformInfo.cores}<br/>
-                    Version: {platformInfo.appVersion}
-                  </div>
-                )}
-                <div style={{color:"#555",fontSize:8,marginTop:6}}>Keyboard Shortcuts</div>
-                <div style={{maxHeight:80,overflowY:"auto",marginTop:3}}>
-                  {Object.entries(KEYBOARD_SHORTCUTS).slice(0,8).map(([k,v])=>(
-                    <div key={k} style={{display:"flex",justifyContent:"space-between",marginBottom:1}}>
-                      <span style={{color:"#4488ff",fontSize:7,fontFamily:"monospace"}}>{k}</span>
-                      <span style={{color:"#555",fontSize:7}}>{v}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}
