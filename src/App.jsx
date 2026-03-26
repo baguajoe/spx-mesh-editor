@@ -7954,6 +7954,189 @@ export default function App() {
       )}
 
       {/* Right N-panel — press N to toggle */}
+      {/* ── N-Panel (press N to toggle) ── */}
+      {showNPanel && (
+      <div style={{
+        width: 240, background: "#252525", borderLeft: "1px solid #3a3a3a",
+        display: "flex", flexDirection: "column", flexShrink: 0, overflowY: "auto",
+        fontFamily: "JetBrains Mono,monospace", fontSize: 10
+      }}>
+
+        {/* Section helper */}
+        {[
+          { key: "transform", label: "Transform", content: (
+            <div style={{padding:"6px 8px"}}>
+              {[["Location X","0"],["Location Y","0"],["Location Z","0"],
+                ["Rotation X","0°"],["Rotation Y","0°"],["Rotation Z","0°"],
+                ["Scale X","1.000"],["Scale Y","1.000"],["Scale Z","1.000"]].map(([k,v])=>(
+                <div key={k} style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                  <span style={{color:"#888"}}>{k}</span>
+                  <div style={{background:"#333",borderRadius:2,padding:"1px 6px",minWidth:60,textAlign:"right",color:"#c8c8c8"}}>{v}</div>
+                </div>
+              ))}
+            </div>
+          )},
+          { key: "material", label: "Material", content: (
+            <div style={{padding:"6px 8px"}}>
+              <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:6}}>
+                {["PBR","SSS","Glass","Toon","Holographic","GLSL"].map(p=>(
+                  <button key={p} onClick={()=>{}} style={{padding:"2px 6px",background:"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9}}>{p}</button>
+                ))}
+              </div>
+              <button onClick={()=>setShowShaderPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showShaderPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Shader Presets</button>
+              <button onClick={()=>setShowPostPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showPostPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Post Processing</button>
+              <button onClick={()=>setShowUDIMPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showUDIMPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>UDIM Textures</button>
+              <button onClick={()=>setShowPassPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showPassPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Render Passes</button>
+              <button onClick={()=>setShowProbePanel(v=>!v)} style={{width:"100%",padding:"3px",background:showProbePanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9}}>IBL Probes</button>
+            </div>
+          )},
+          { key: "sculpt", label: "Sculpt", content: (
+            <div style={{padding:"6px 8px"}}>
+              <div style={{display:"flex",gap:2,flexWrap:"wrap",marginBottom:6}}>
+                {["clay","draw","smooth","pinch","inflate","crease","flatten","scrape"].map(b=>(
+                  <button key={b} onClick={()=>setSculptBrush(b)} style={{padding:"2px 5px",background:sculptBrush===b?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:sculptBrush===b?"#fff":"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,textTransform:"capitalize"}}>{b}</button>
+                ))}
+              </div>
+              {[["Radius",sculptRadius,v=>setSculptRadius(v),0.01,2,0.01],
+                ["Strength",sculptStrength,v=>setSculptStrength(v),0.001,1,0.001]].map(([label,val,setter,min,max,step])=>(
+                <div key={label} style={{marginBottom:4}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:1}}>
+                    <span style={{color:"#888"}}>{label}</span>
+                    <span style={{color:"#c8c8c8"}}>{val}</span>
+                  </div>
+                  <input type="range" min={min} max={max} step={step} value={val} onChange={e=>setter(Number(e.target.value))} style={{width:"100%",accentColor:"#5a5a5a"}}/>
+                </div>
+              ))}
+              <button onClick={()=>setShowDynaPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showDynaPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>DynaMesh</button>
+              <button onClick={()=>setShowMCPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showMCPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Marching Cubes</button>
+              <button onClick={()=>setShowRetopoPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showRetopoPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Auto Retopo</button>
+              <button onClick={()=>setShowMeshToolsPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showMeshToolsPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9}}>Mesh Tools</button>
+            </div>
+          )},
+          { key: "render", label: "Render", content: (
+            <div style={{padding:"6px 8px"}}>
+              <button onClick={()=>setShowPathTracerPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showPathTracerPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Path Tracer</button>
+              <button onClick={()=>setShowPostPassPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showPostPassPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Post FX</button>
+              <button onClick={()=>setShowVolPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showVolPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Volumetrics</button>
+              <button onClick={()=>setShowRenderPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showRenderPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Render Settings</button>
+              <button onClick={()=>setShowVideoPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showVideoPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Render Video</button>
+              <button onClick={()=>setShowRenderFarmPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showRenderFarmPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9}}>Render Farm</button>
+            </div>
+          )},
+          { key: "animation", label: "Animation", content: (
+            <div style={{padding:"6px 8px"}}>
+              <button onClick={()=>setShowTimeline(v=>!v)} style={{width:"100%",padding:"3px",background:showTimeline?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Timeline</button>
+              <button onClick={()=>setShowNLA(v=>!v)} style={{width:"100%",padding:"3px",background:showNLA?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>NLA Editor</button>
+              <button onClick={()=>setShowAnimUpPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showAnimUpPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Animation Upgrade</button>
+              <button onClick={()=>setShowPoseLibPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showPoseLibPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Pose Library</button>
+              <button onClick={()=>setShowWalkPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showWalkPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9}}>Walk Cycle</button>
+            </div>
+          )},
+          { key: "rigging", label: "Rigging", content: (
+            <div style={{padding:"6px 8px"}}>
+              <button onClick={()=>setShowIKPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showIKPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>IK / FK</button>
+              <button onClick={()=>setShowDriverPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showDriverPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Drivers</button>
+              <button onClick={()=>setShowConPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showConPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Constraints</button>
+              <button onClick={()=>setShowPhysPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showPhysPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9}}>Rigid Body</button>
+            </div>
+          )},
+          { key: "hair", label: "Hair & Fiber", content: (
+            <div style={{padding:"6px 8px"}}>
+              <button onClick={()=>setShowHairPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showHairPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Hair System</button>
+              <button onClick={()=>setShowHairStylePanel(v=>!v)} style={{width:"100%",padding:"3px",background:showHairStylePanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Hair Style</button>
+              <button onClick={()=>setShowFiberPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showFiberPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9}}>Fiber / Fur</button>
+            </div>
+          )},
+          { key: "cloth", label: "Cloth & Physics", content: (
+            <div style={{padding:"6px 8px"}}>
+              <button onClick={()=>setShowClothPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showClothPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Cloth Sim</button>
+              <button onClick={()=>setShowFluidPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showFluidPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Fluid Sim</button>
+              <button onClick={()=>setShowGPUPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showGPUPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9}}>GPU Particles</button>
+            </div>
+          )},
+          { key: "vfx", label: "VFX", content: (
+            <div style={{padding:"6px 8px"}}>
+              <button onClick={()=>setShowVFXPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showVFXPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9}}>VFX Emitters</button>
+            </div>
+          )},
+          { key: "procedural", label: "Procedural", content: (
+            <div style={{padding:"6px 8px"}}>
+              <div style={{color:"#888",fontSize:9,marginBottom:4}}>Type</div>
+              <select value={procType} onChange={e=>setProcType(e.target.value)} style={{width:"100%",background:"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,padding:"3px",fontSize:9,marginBottom:6}}>
+                {["pipe","staircase","arch","gear","helix","lathe"].map(t=>(
+                  <option key={t} value={t}>{t.charAt(0).toUpperCase()+t.slice(1)}</option>
+                ))}
+              </select>
+              <button onClick={addProceduralMesh} style={{width:"100%",padding:"4px",background:"#3d5a80",border:"none",color:"#fff",borderRadius:2,cursor:"pointer",fontSize:9,fontWeight:700}}>+ Generate {procType}</button>
+            </div>
+          )},
+          { key: "meshtool", label: "Mesh Tools", content: (
+            <div style={{padding:"6px 8px"}}>
+              <button onClick={()=>setShowGeoNodesPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showGeoNodesPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Geometry Nodes</button>
+              {[["Fix Normals",handleFixNormals],["Remove Doubles",handleRemoveDoubles],["Fill Holes",handleFillHoles],["Full Repair",handleFullRepair]].map(([label,fn])=>(
+                <button key={label} onClick={fn} style={{width:"100%",padding:"3px",background:"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2,textAlign:"left"}}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )},
+          { key: "camera", label: "Camera", content: (
+            <div style={{padding:"6px 8px"}}>
+              <button onClick={()=>setShowCamPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showCamPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9}}>Camera Settings</button>
+            </div>
+          )},
+          { key: "lighting", label: "Lighting", content: (
+            <div style={{padding:"6px 8px"}}>
+              <button onClick={()=>setShowLightPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showLightPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Lights</button>
+              <button onClick={handleAddLight} style={{width:"100%",padding:"3px",background:"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9}}>+ Add Light</button>
+            </div>
+          )},
+          { key: "assets", label: "Assets & Plugins", content: (
+            <div style={{padding:"6px 8px"}}>
+              <button onClick={()=>setShowAssetPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showAssetPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Asset Library</button>
+              <button onClick={()=>setShowMarketPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showMarketPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Preset Market</button>
+              <button onClick={()=>setShowPluginPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showPluginPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9}}>Plugins</button>
+            </div>
+          )},
+          { key: "collab", label: "Collaboration", content: (
+            <div style={{padding:"6px 8px"}}>
+              <button onClick={()=>setShowCollabPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showCollabPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9}}>Live Session</button>
+            </div>
+          )},
+          { key: "export", label: "Export & Pipeline", content: (
+            <div style={{padding:"6px 8px"}}>
+              <button onClick={()=>setShowExportPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showExportPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Export Settings</button>
+              <button onClick={()=>setShowPipelinePanel(v=>!v)} style={{width:"100%",padding:"3px",background:showPipelinePanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Pipeline</button>
+              <button onClick={handleExportToSPX} style={{width:"100%",padding:"4px",background:"#3d5a80",border:"none",color:"#fff",borderRadius:2,cursor:"pointer",fontSize:9,fontWeight:700,marginBottom:2}}>Export to StreamPireX</button>
+              <button onClick={exportGLB} style={{width:"100%",padding:"3px",background:"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9}}>Export GLB</button>
+            </div>
+          )},
+          { key: "settings", label: "Settings", content: (
+            <div style={{padding:"6px 8px"}}>
+              <button onClick={()=>setShowThemePanel(v=>!v)} style={{width:"100%",padding:"3px",background:showThemePanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Theme</button>
+              <button onClick={()=>setShowDesktopPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showDesktopPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Desktop Features</button>
+              <button onClick={()=>setShowPerfPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showPerfPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9,marginBottom:2}}>Performance</button>
+              <button onClick={()=>setShowWorkerPanel(v=>!v)} style={{width:"100%",padding:"3px",background:showWorkerPanel?"#3d5a80":"#333",border:"1px solid #3a3a3a",color:"#c8c8c8",borderRadius:2,cursor:"pointer",fontSize:9}}>Workers</button>
+            </div>
+          )},
+        ].map(({key, label, content}) => {
+          const [open, setOpen] = React.useState(key === "transform");
+          return (
+            <div key={key} style={{borderBottom:"1px solid #3a3a3a"}}>
+              <div onClick={()=>setOpen(o=>!o)}
+                style={{padding:"5px 8px",cursor:"pointer",display:"flex",justifyContent:"space-between",alignItems:"center",background:"#2e2e2e",userSelect:"none"}}
+                onMouseEnter={e=>e.currentTarget.style.background="#333"}
+                onMouseLeave={e=>e.currentTarget.style.background="#2e2e2e"}>
+                <span style={{color:"#c8c8c8",fontWeight:700,fontSize:10,textTransform:"uppercase",letterSpacing:0.5}}>{label}</span>
+                <span style={{color:"#666",fontSize:9}}>{open?"▾":"▸"}</span>
+              </div>
+              {open && content}
+            </div>
+          );
+        })}
+      </div>
+      )}
+
       {/* Right panel — MeshEditorPanel */}
       <MeshEditorPanel
         stats={stats}
