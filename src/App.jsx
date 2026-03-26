@@ -7618,7 +7618,7 @@ export default function App() {
                 </div>
                 <input type="range"
                   min={param === "segments" || param === "steps" || param === "teeth" ? 3 : 0.05}
-                  max={param === "segments" || param === "steps" || param === "teeth" ? 64 : 4}
+                  max={param === "segments" || param === "steps" || param === "teeth" ? 256 : 4}
                   step={param === "segments" || param === "steps" || param === "teeth" ? 1 : 0.05}
                   value={procParams[param]}
                   onChange={e => setProcParams(p => ({ ...p, [param]: Number(e.target.value) }))}
