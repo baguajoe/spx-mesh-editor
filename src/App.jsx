@@ -118,16 +118,19 @@ const PRIMITIVES = [
 ];
 
 const COLORS = {
-  bg: "#06060f",
-  panel: "#0d1117",
-  border: "#21262d",
-  teal: "#00ffc8",
-  orange: "#FF6600",
-  selected: "#FF6600",
-  hover: "#00ffc8",
+  bg: "#1d1d1d",
+  panel: "#252525",
+  border: "#3a3a3a",
+  teal: "#5b9bd5",
+  orange: "#c07030",
+  selected: "#c07030",
+  hover: "#5b9bd5",
   vert: "#ffffff",
-  edge: "#4488ff",
-  face: "#ff880044",
+  edge: "#5b9bd5",
+  face: "#5b9bd522",
+  accent: "#4772b3",
+  text: "#c8c8c8",
+  textDim: "#888",
 };
 
 export default function App() {
@@ -4362,11 +4365,11 @@ export default function App() {
       {/* Sculpt panel — Sessions 4-5 */}
       {editMode === "sculpt" && (
         <div style={{
-          width: 200, background: "#0d1117", borderLeft: "1px solid #21262d",
+          width: 200, background: "#2a2a2a", borderLeft: "1px solid #3a3a3a",
           display: "flex", flexDirection: "column", padding: 10, gap: 8, flexShrink: 0,
           fontFamily: "JetBrains Mono,monospace", fontSize: 11, overflowY: "auto"
         }}>
-          <div style={{ color: "#00ffc8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>
+          <div style={{ color: "#c8c8c8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>
             Sculpt Brushes
           </div>
           {[["push", "Push"], ["pull", "Pull"], ["smooth", "Smooth"], ["clay", "Clay"],
@@ -4381,7 +4384,7 @@ export default function App() {
               {label}
             </button>
           ))}
-          <div style={{ borderTop: "1px solid #21262d", paddingTop: 8, marginTop: 4 }}>
+          <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8, marginTop: 4 }}>
             <div style={{ color: "#666", fontSize: 9, marginBottom: 4 }}>Radius</div>
             <input type="range" min={0.1} max={3} step={0.05} value={sculptRadius}
               onChange={e => setSculptRadius(Number(e.target.value))} style={{ width: "100%" }} />
@@ -4425,11 +4428,11 @@ export default function App() {
       {/* Vertex Color Paint panel — Session 8 */}
       {editMode === "paint" && (
         <div style={{
-          width: 200, background: "#0d1117", borderLeft: "1px solid #21262d",
+          width: 200, background: "#2a2a2a", borderLeft: "1px solid #3a3a3a",
           display: "flex", flexDirection: "column", padding: 10, gap: 8, flexShrink: 0,
           fontFamily: "JetBrains Mono,monospace", fontSize: 11, overflowY: "auto"
         }}>
-          <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>
+          <div style={{ color: "#c8c8c8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>
             Vertex Colors
           </div>
           <div>
@@ -4465,17 +4468,17 @@ export default function App() {
               ))}
             </div>
           </div>
-          <div style={{ borderTop: "1px solid #21262d", paddingTop: 8, marginTop: 4, display: "flex", flexDirection: "column", gap: 4 }}>
+          <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8, marginTop: 4, display: "flex", flexDirection: "column", gap: 4 }}>
             <div style={{ color: "#666", fontSize: 9, marginBottom: 2 }}>Fill Tools</div>
             <button onClick={() => { initVertexColors(meshRef.current); fillVertexColor(meshRef.current, vcPaintColor); }}
-              style={{ padding: "5px", background: "#1a1f2e", border: "1px solid #21262d", color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 10 }}>
+              style={{ padding: "5px", background: "#333333", border: "1px solid #3a3a3a", color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 10 }}>
               Fill All
             </button>
             <div style={{ color: "#666", fontSize: 9, marginTop: 4, marginBottom: 2 }}>Gradient Color B</div>
             <input type="color" value={vcPaintColor2} onChange={e => setVcPaintColor2(e.target.value)}
               style={{ width: "100%", height: 28, border: "none", borderRadius: 4, cursor: "pointer", background: "none" }} />
             <button onClick={() => { initVertexColors(meshRef.current); gradientFillVertexColor(meshRef.current, vcPaintColor, vcPaintColor2); }}
-              style={{ padding: "5px", background: "#1a1f2e", border: "1px solid #21262d", color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 10 }}>
+              style={{ padding: "5px", background: "#333333", border: "1px solid #3a3a3a", color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 10 }}>
               Gradient Fill (Y)
             </button>
           </div>
@@ -4488,11 +4491,11 @@ export default function App() {
       {/* NLA + Dyntopo + Weight + BVH panel — Sessions 21-30 */}
       {(showNLA || dyntopoEnabled || weightPainting) && (
         <div style={{
-          width: 190, background: "#0d1117", borderLeft: "1px solid #21262d",
+          width: 190, background: "#2a2a2a", borderLeft: "1px solid #3a3a3a",
           display: "flex", flexDirection: "column", flexShrink: 0,
           fontFamily: "JetBrains Mono,monospace", fontSize: 11, overflow: "hidden"
         }}>
-          <div style={{ padding: "6px 10px", borderBottom: "1px solid #21262d" }}>
+          <div style={{ padding: "6px 10px", borderBottom: "1px solid #3a3a3a" }}>
             <span style={{ color: "#8844ff", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
               Rig Tools
             </span>
@@ -4520,14 +4523,14 @@ export default function App() {
               </div>
               <button onClick={handleResetPose}
                 style={{
-                  width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                  width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                   color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 9, marginBottom: 4
                 }}>
                 Reset to Rest
               </button>
               <button onClick={() => handleSavePose("Pose_" + Object.keys(poseLibrary).length)}
                 style={{
-                  width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                  width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                   color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 9
                 }}>
                 Save Pose
@@ -4538,7 +4541,7 @@ export default function App() {
                   {Object.keys(poseLibrary).map(name => (
                     <button key={name} onClick={() => handleLoadPose(name)}
                       style={{
-                        width: "100%", padding: "3px", background: "#1a1f2e", border: "1px solid #21262d",
+                        width: "100%", padding: "3px", background: "#333333", border: "1px solid #3a3a3a",
                         color: "#00ffc8", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 2, textAlign: "left"
                       }}>
                       {name}
@@ -4549,7 +4552,7 @@ export default function App() {
             </div>
 
             {/* Bind to Rig */}
-            <div style={{ borderTop: "1px solid #21262d", paddingTop: 8, marginBottom: 10 }}>
+            <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8, marginBottom: 10 }}>
               <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Skinning</div>
               <button onClick={handleBindToRig}
                 style={{
@@ -4560,7 +4563,7 @@ export default function App() {
               </button>
               <button onClick={() => { const mesh = meshRef.current; if (mesh) autoWeightByDistance(mesh, armatureRef.current); }}
                 style={{
-                  width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                  width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                   color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 9
                 }}>
                 Auto Weights
@@ -4569,7 +4572,7 @@ export default function App() {
 
             {/* Weight Paint controls */}
             {weightPainting && (
-              <div style={{ borderTop: "1px solid #21262d", paddingTop: 8, marginBottom: 10 }}>
+              <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8, marginBottom: 10 }}>
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Weight Paint</div>
                 <div style={{ marginBottom: 4 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
@@ -4602,7 +4605,7 @@ export default function App() {
                 </div>
                 <button onClick={() => { const m = meshRef.current; if (m) visualizeWeights(m, wpBoneIndex); }}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8
                   }}>
                   Visualize Weights
@@ -4612,7 +4615,7 @@ export default function App() {
 
             {/* Dyntopo controls */}
             {dyntopoEnabled && (
-              <div style={{ borderTop: "1px solid #21262d", paddingTop: 8, marginBottom: 10 }}>
+              <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8, marginBottom: 10 }}>
                 <div style={{ color: "#8844ff", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Dynamic Topology</div>
                 <div style={{ marginBottom: 4 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
@@ -4644,7 +4647,7 @@ export default function App() {
                 </button>
                 <button onClick={handleSmoothTopology}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8
                   }}>
                   Smooth Topology
@@ -4654,7 +4657,7 @@ export default function App() {
 
             {/* NLA */}
             {showNLA && (
-              <div style={{ borderTop: "1px solid #21262d", paddingTop: 8, marginBottom: 10 }}>
+              <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8, marginBottom: 10 }}>
                 <div style={{ color: "#00ffc8", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>NLA Editor</div>
                 <button onClick={handlePushDownAction}
                   style={{
@@ -4666,7 +4669,7 @@ export default function App() {
                 {nlaActions.map(action => (
                   <div key={action.id} style={{
                     padding: "3px 6px", background: "#1a1f2e",
-                    border: "1px solid #21262d", borderRadius: 3, marginBottom: 3
+                    border: "1px solid #3a3a3a", borderRadius: 3, marginBottom: 3
                   }}>
                     <span style={{ color: "#aaa", fontSize: 8 }}>{action.name}</span>
                     <span style={{ color: "#555", fontSize: 8, marginLeft: 6 }}>{action.frameEnd}f</span>
@@ -4689,13 +4692,13 @@ export default function App() {
             )}
 
             {/* BVH Import */}
-            <div style={{ borderTop: "1px solid #21262d", paddingTop: 8 }}>
+            <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8 }}>
               <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>BVH / Mocap</div>
               <input ref={bvhInputRef} type="file" accept=".bvh" style={{ display: "none" }}
                 onChange={e => e.target.files?.[0] && handleBVHImport(e.target.files[0])} />
               <button onClick={() => bvhInputRef.current?.click()}
                 style={{
-                  width: "100%", padding: "5px", background: "#1a1f2e", border: "1px solid #21262d",
+                  width: "100%", padding: "5px", background: "#333333", border: "1px solid #3a3a3a",
                   color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 9, marginBottom: 4
                 }}>
                 📁 Import BVH
@@ -4716,12 +4719,12 @@ export default function App() {
       {/* Sessions 131-142: GLSL Shaders + Post Passes + Marching Cubes panel */}
       {(showShaderPanel || showPostPassPanel || showMCPanel) && (
         <div style={{
-          width: 210, background: "#0d1117", borderLeft: "1px solid #21262d",
+          width: 210, background: "#2a2a2a", borderLeft: "1px solid #3a3a3a",
           display: "flex", flexDirection: "column", flexShrink: 0,
           fontFamily: "JetBrains Mono,monospace", fontSize: 11, overflow: "hidden"
         }}>
-          <div style={{ padding: "6px 10px", borderBottom: "1px solid #21262d" }}>
-            <span style={{ color: "#00ffc8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
+          <div style={{ padding: "6px 10px", borderBottom: "1px solid #3a3a3a" }}>
+            <span style={{ color: "#c8c8c8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
               GLSL + Marching Cubes
             </span>
           </div>
@@ -4745,28 +4748,28 @@ export default function App() {
                 </div>
                 <button onClick={handleApplyGLSLShader}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 3
                   }}>
                   ▶ Apply Shader
                 </button>
                 <button onClick={handleApplyToon}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 2
                   }}>
                   🎨 Toon/NPR
                 </button>
                 <button onClick={handleApplyHolographic}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 2
                   }}>
                   🔮 Holographic
                 </button>
                 <button onClick={handleApplyDissolve}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 4
                   }}>
                   💨 Dissolve
@@ -4781,14 +4784,14 @@ export default function App() {
                 </div>
                 <button onClick={handleAddOutline}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 2
                   }}>
                   ⬡ Add Outline
                 </button>
                 <button onClick={handleApplyHairGLSL}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8
                   }}>
                   💇 Hair GLSL Shader
@@ -4798,7 +4801,7 @@ export default function App() {
 
             {/* Post Passes — Sessions 139-140 */}
             {showPostPassPanel && (
-              <div style={{ borderTop: showShaderPanel ? "1px solid #21262d" : "none", paddingTop: showShaderPanel ? 8 : 0, marginBottom: 10 }}>
+              <div style={{ borderTop: showShaderPanel ? "1px solid #3a3a3a" : "none", paddingTop: showShaderPanel ? 8 : 0, marginBottom: 10 }}>
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Post Passes</div>
                 <label style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer", marginBottom: 3 }}>
                   <input type="checkbox" checked={bloomEnabled} onChange={handleToggleBloom} />
@@ -4834,7 +4837,7 @@ export default function App() {
                 </label>
                 <button onClick={handleInitPostPasses}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8
                   }}>
                   ⚙ Init Post Manager
@@ -4844,7 +4847,7 @@ export default function App() {
 
             {/* Marching Cubes — Sessions 141-142 */}
             {showMCPanel && (
-              <div style={{ borderTop: "1px solid #21262d", paddingTop: 8 }}>
+              <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8 }}>
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Marching Cubes</div>
                 <div style={{ marginBottom: 4 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 1 }}>
@@ -4864,14 +4867,14 @@ export default function App() {
                 </div>
                 <button onClick={handleMarchingCubesRemesh}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 3
                   }}>
                   ⬡ MC Remesh
                 </button>
                 <button onClick={handleFluidSurface}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 4
                   }}>
                   💧 Fluid Surface Mesh
@@ -4890,10 +4893,10 @@ export default function App() {
 
       {/* Sessions 3-9: PathTracer + FBX + Plugin + Preset panel */}
       {(showPathTracerPanel || showPipelinePanel || showPluginPanel || showMarketPanel) && (
-        <div style={{width:210,background:"#0d1117",borderLeft:"1px solid #21262d",
+        <div style={{width:210,background:"#2a2a2a",borderLeft:"1px solid #3a3a3a",
           display:"flex",flexDirection:"column",flexShrink:0,
           fontFamily:"JetBrains Mono,monospace",fontSize:11,overflow:"hidden"}}>
-          <div style={{padding:"6px 10px",borderBottom:"1px solid #21262d"}}>
+          <div style={{padding:"6px 10px",borderBottom:"1px solid #3a3a3a"}}>
             <span style={{color:"#00ffc8",fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>
               Pro Pipeline
             </span>
@@ -4905,7 +4908,7 @@ export default function App() {
               <div style={{marginBottom:10}}>
                 <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Path Tracer</div>
                 <button onClick={handleDetectPathTracer}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                  style={{width:"100%",padding:"4px",background:"#333333",border:"1px solid #3a3a3a",
                     color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:3}}>
                   🔍 Detect PathTracer
                 </button>
@@ -4924,10 +4927,10 @@ export default function App() {
                     style={{flex:1,padding:"4px",background:ptRunning?"#555":"#FF6600",
                       border:"none",color:"#fff",borderRadius:3,cursor:"pointer",fontSize:9}}>▶</button>
                   <button onClick={handleStopPathTracing}
-                    style={{flex:1,padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                    style={{flex:1,padding:"4px",background:"#333333",border:"1px solid #3a3a3a",
                       color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:9}}>■</button>
                   <button onClick={handleExportPathTracedFrame}
-                    style={{flex:1,padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                    style={{flex:1,padding:"4px",background:"#333333",border:"1px solid #3a3a3a",
                       color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:9}}>⬇</button>
                 </div>
                 {ptStats && (
@@ -4945,17 +4948,17 @@ export default function App() {
 
             {/* FBX/OBJ Pipeline */}
             {showPipelinePanel && (
-              <div style={{borderTop:showPathTracerPanel?"1px solid #21262d":"none",
+              <div style={{borderTop:showPathTracerPanel?"1px solid #3a3a3a":"none",
                 paddingTop:showPathTracerPanel?8:0,marginBottom:10}}>
                 <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Import / Export</div>
                 <div style={{color:"#555",fontSize:8,marginBottom:3}}>Import</div>
                 <button onClick={handleImportOBJ}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                  style={{width:"100%",padding:"4px",background:"#333333",border:"1px solid #3a3a3a",
                     color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:2}}>
                   📂 Import OBJ
                 </button>
                 <button onClick={handleImportFBX}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                  style={{width:"100%",padding:"4px",background:"#333333",border:"1px solid #3a3a3a",
                     color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:4}}>
                   📂 Import FBX (backend)
                 </button>
@@ -4966,7 +4969,7 @@ export default function App() {
                   💾 Export OBJ + MTL
                 </button>
                 <button onClick={handleExportFBX}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                  style={{width:"100%",padding:"4px",background:"#333333",border:"1px solid #3a3a3a",
                     color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:2}}>
                   💾 Export FBX (backend)
                 </button>
@@ -4983,7 +4986,7 @@ export default function App() {
 
             {/* Plugin Manager */}
             {showPluginPanel && (
-              <div style={{borderTop:"1px solid #21262d",paddingTop:8,marginBottom:10}}>
+              <div style={{borderTop:"1px solid #3a3a3a",paddingTop:8,marginBottom:10}}>
                 <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Plugin Manager</div>
                 <button onClick={handleInitPlugins}
                   style={{width:"100%",padding:"5px",background:"#00ffc8",border:"none",color:"#06060f",
@@ -4991,7 +4994,7 @@ export default function App() {
                   ⚙ Init Plugin API
                 </button>
                 <button onClick={handleLoadPlugin}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                  style={{width:"100%",padding:"4px",background:"#333333",border:"1px solid #3a3a3a",
                     color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:4}}>
                   📂 Load Plugin (.js)
                 </button>
@@ -5006,7 +5009,7 @@ export default function App() {
                 <div style={{color:"#555",fontSize:8,marginBottom:2}}>Built-in brushes</div>
                 {BUILTIN_BRUSH_PLUGINS.map(p=>(
                   <div key={p.name} style={{padding:"2px 6px",background:"#1a1f2e",
-                    border:"1px solid #21262d",borderRadius:3,marginBottom:2,
+                    border:"1px solid #3a3a3a",borderRadius:3,marginBottom:2,
                     display:"flex",alignItems:"center",gap:4}}>
                     <span style={{color:"#00ffc8",fontSize:9}}>{p.icon}</span>
                     <span style={{color:"#dde6ef",fontSize:8}}>{p.label}</span>
@@ -5017,11 +5020,11 @@ export default function App() {
 
             {/* Preset Marketplace */}
             {showMarketPanel && (
-              <div style={{borderTop:"1px solid #21262d",paddingTop:8}}>
+              <div style={{borderTop:"1px solid #3a3a3a",paddingTop:8}}>
                 <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Preset Marketplace</div>
                 <input value={presetSearch} onChange={e=>setPresetSearch(e.target.value)}
                   placeholder="Search presets..."
-                  style={{width:"100%",background:"#1a1f2e",border:"1px solid #21262d",
+                  style={{width:"100%",background:"#333333",border:"1px solid #3a3a3a",
                     color:"#dde6ef",borderRadius:3,padding:"4px",fontSize:8,marginBottom:3,
                     fontFamily:"JetBrains Mono,monospace"}}/>
                 <div style={{display:"flex",gap:2,flexWrap:"wrap",marginBottom:4}}>
@@ -5042,7 +5045,7 @@ export default function App() {
                 <div style={{maxHeight:200,overflowY:"auto"}}>
                   {searchPresets(pluginMarketplace, presetSearch, { category:presetCategory, freeOnly:presetFreeOnly }).map(p=>(
                     <div key={p.id} style={{padding:"4px 6px",background:"#1a1f2e",
-                      border:"1px solid #21262d",borderRadius:3,marginBottom:3}}>
+                      border:"1px solid #3a3a3a",borderRadius:3,marginBottom:3}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                         <span style={{color:"#dde6ef",fontSize:8,fontWeight:700}}>{p.name}</span>
                         <span style={{color:p.free?"#00ffc8":"#ffaa00",fontSize:7}}>
@@ -5065,7 +5068,7 @@ export default function App() {
                   ))}
                 </div>
                 <button onClick={handleSavePreset}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                  style={{width:"100%",padding:"4px",background:"#333333",border:"1px solid #3a3a3a",
                     color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginTop:4}}>
                   + Save Custom Preset
                 </button>
@@ -5077,10 +5080,10 @@ export default function App() {
 
       {/* Sessions 3-9: PathTracer + FBX + Plugin + Preset panel */}
       {(showPathTracerPanel || showPipelinePanel || showPluginPanel || showMarketPanel) && (
-        <div style={{width:210,background:"#0d1117",borderLeft:"1px solid #21262d",
+        <div style={{width:210,background:"#2a2a2a",borderLeft:"1px solid #3a3a3a",
           display:"flex",flexDirection:"column",flexShrink:0,
           fontFamily:"JetBrains Mono,monospace",fontSize:11,overflow:"hidden"}}>
-          <div style={{padding:"6px 10px",borderBottom:"1px solid #21262d"}}>
+          <div style={{padding:"6px 10px",borderBottom:"1px solid #3a3a3a"}}>
             <span style={{color:"#00ffc8",fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>
               Pro Pipeline
             </span>
@@ -5092,7 +5095,7 @@ export default function App() {
               <div style={{marginBottom:10}}>
                 <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Path Tracer</div>
                 <button onClick={handleDetectPathTracer}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                  style={{width:"100%",padding:"4px",background:"#333333",border:"1px solid #3a3a3a",
                     color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:3}}>
                   🔍 Detect PathTracer
                 </button>
@@ -5111,10 +5114,10 @@ export default function App() {
                     style={{flex:1,padding:"4px",background:ptRunning?"#555":"#FF6600",
                       border:"none",color:"#fff",borderRadius:3,cursor:"pointer",fontSize:9}}>▶</button>
                   <button onClick={handleStopPathTracing}
-                    style={{flex:1,padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                    style={{flex:1,padding:"4px",background:"#333333",border:"1px solid #3a3a3a",
                       color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:9}}>■</button>
                   <button onClick={handleExportPathTracedFrame}
-                    style={{flex:1,padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                    style={{flex:1,padding:"4px",background:"#333333",border:"1px solid #3a3a3a",
                       color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:9}}>⬇</button>
                 </div>
                 {ptStats && (
@@ -5132,17 +5135,17 @@ export default function App() {
 
             {/* FBX/OBJ Pipeline */}
             {showPipelinePanel && (
-              <div style={{borderTop:showPathTracerPanel?"1px solid #21262d":"none",
+              <div style={{borderTop:showPathTracerPanel?"1px solid #3a3a3a":"none",
                 paddingTop:showPathTracerPanel?8:0,marginBottom:10}}>
                 <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Import / Export</div>
                 <div style={{color:"#555",fontSize:8,marginBottom:3}}>Import</div>
                 <button onClick={handleImportOBJ}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                  style={{width:"100%",padding:"4px",background:"#333333",border:"1px solid #3a3a3a",
                     color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:2}}>
                   📂 Import OBJ
                 </button>
                 <button onClick={handleImportFBX}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                  style={{width:"100%",padding:"4px",background:"#333333",border:"1px solid #3a3a3a",
                     color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:4}}>
                   📂 Import FBX (backend)
                 </button>
@@ -5153,7 +5156,7 @@ export default function App() {
                   💾 Export OBJ + MTL
                 </button>
                 <button onClick={handleExportFBX}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                  style={{width:"100%",padding:"4px",background:"#333333",border:"1px solid #3a3a3a",
                     color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:2}}>
                   💾 Export FBX (backend)
                 </button>
@@ -5170,7 +5173,7 @@ export default function App() {
 
             {/* Plugin Manager */}
             {showPluginPanel && (
-              <div style={{borderTop:"1px solid #21262d",paddingTop:8,marginBottom:10}}>
+              <div style={{borderTop:"1px solid #3a3a3a",paddingTop:8,marginBottom:10}}>
                 <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Plugin Manager</div>
                 <button onClick={handleInitPlugins}
                   style={{width:"100%",padding:"5px",background:"#00ffc8",border:"none",color:"#06060f",
@@ -5178,7 +5181,7 @@ export default function App() {
                   ⚙ Init Plugin API
                 </button>
                 <button onClick={handleLoadPlugin}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                  style={{width:"100%",padding:"4px",background:"#333333",border:"1px solid #3a3a3a",
                     color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:4}}>
                   📂 Load Plugin (.js)
                 </button>
@@ -5193,7 +5196,7 @@ export default function App() {
                 <div style={{color:"#555",fontSize:8,marginBottom:2}}>Built-in brushes</div>
                 {BUILTIN_BRUSH_PLUGINS.map(p=>(
                   <div key={p.name} style={{padding:"2px 6px",background:"#1a1f2e",
-                    border:"1px solid #21262d",borderRadius:3,marginBottom:2,
+                    border:"1px solid #3a3a3a",borderRadius:3,marginBottom:2,
                     display:"flex",alignItems:"center",gap:4}}>
                     <span style={{color:"#00ffc8",fontSize:9}}>{p.icon}</span>
                     <span style={{color:"#dde6ef",fontSize:8}}>{p.label}</span>
@@ -5204,11 +5207,11 @@ export default function App() {
 
             {/* Preset Marketplace */}
             {showMarketPanel && (
-              <div style={{borderTop:"1px solid #21262d",paddingTop:8}}>
+              <div style={{borderTop:"1px solid #3a3a3a",paddingTop:8}}>
                 <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Preset Marketplace</div>
                 <input value={presetSearch} onChange={e=>setPresetSearch(e.target.value)}
                   placeholder="Search presets..."
-                  style={{width:"100%",background:"#1a1f2e",border:"1px solid #21262d",
+                  style={{width:"100%",background:"#333333",border:"1px solid #3a3a3a",
                     color:"#dde6ef",borderRadius:3,padding:"4px",fontSize:8,marginBottom:3,
                     fontFamily:"JetBrains Mono,monospace"}}/>
                 <div style={{display:"flex",gap:2,flexWrap:"wrap",marginBottom:4}}>
@@ -5229,7 +5232,7 @@ export default function App() {
                 <div style={{maxHeight:200,overflowY:"auto"}}>
                   {searchPresets(pluginMarketplace, presetSearch, { category:presetCategory, freeOnly:presetFreeOnly }).map(p=>(
                     <div key={p.id} style={{padding:"4px 6px",background:"#1a1f2e",
-                      border:"1px solid #21262d",borderRadius:3,marginBottom:3}}>
+                      border:"1px solid #3a3a3a",borderRadius:3,marginBottom:3}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                         <span style={{color:"#dde6ef",fontSize:8,fontWeight:700}}>{p.name}</span>
                         <span style={{color:p.free?"#00ffc8":"#ffaa00",fontSize:7}}>
@@ -5252,7 +5255,7 @@ export default function App() {
                   ))}
                 </div>
                 <button onClick={handleSavePreset}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
+                  style={{width:"100%",padding:"4px",background:"#333333",border:"1px solid #3a3a3a",
                     color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginTop:4}}>
                   + Save Custom Preset
                 </button>
@@ -5265,12 +5268,12 @@ export default function App() {
       {/* Sessions 157-169: Rendering + Performance + Polish panel */}
       {(showRenderFarmPanel || showWorkerPanel || showThemePanel || showExportPanel) && (
         <div style={{
-          width: 210, background: "#0d1117", borderLeft: "1px solid #21262d",
+          width: 210, background: "#2a2a2a", borderLeft: "1px solid #3a3a3a",
           display: "flex", flexDirection: "column", flexShrink: 0,
           fontFamily: "JetBrains Mono,monospace", fontSize: 11, overflow: "hidden"
         }}>
-          <div style={{ padding: "6px 10px", borderBottom: "1px solid #21262d" }}>
-            <span style={{ color: "#00ffc8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
+          <div style={{ padding: "6px 10px", borderBottom: "1px solid #3a3a3a" }}>
+            <span style={{ color: "#c8c8c8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
               Rendering + Polish
             </span>
           </div>
@@ -5282,7 +5285,7 @@ export default function App() {
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Render Farm</div>
                 <button onClick={handleDetectWebGPU}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 3
                   }}>
                   🔍 Detect WebGPU
@@ -5296,26 +5299,26 @@ export default function App() {
                   <button onClick={handleEnableIBL}
                     style={{
                       flex: 1, padding: "4px", background: iblEnabled ? "#00ffc8" : "#1a1f2e",
-                      border: "1px solid #21262d", color: iblEnabled ? "#06060f" : "#aaa",
+                      border: "1px solid #3a3a3a", color: iblEnabled ? "#06060f" : "#aaa",
                       borderRadius: 3, cursor: "pointer", fontSize: 8
                     }}>IBL</button>
                   <button onClick={handleEnableShadows}
                     style={{
                       flex: 1, padding: "4px", background: shadowsEnabled ? "#ffaa00" : "#1a1f2e",
-                      border: "1px solid #21262d", color: shadowsEnabled ? "#06060f" : "#aaa",
+                      border: "1px solid #3a3a3a", color: shadowsEnabled ? "#06060f" : "#aaa",
                       borderRadius: 3, cursor: "pointer", fontSize: 8
                     }}>CSM</button>
                   <button onClick={handleEnableNPROutline}
                     style={{
                       flex: 1, padding: "4px", background: nprOutline ? "#8844ff" : "#1a1f2e",
-                      border: "1px solid #21262d", color: nprOutline ? "#fff" : "#aaa",
+                      border: "1px solid #3a3a3a", color: nprOutline ? "#fff" : "#aaa",
                       borderRadius: 3, cursor: "pointer", fontSize: 8
                     }}>NPR</button>
                 </div>
                 <div style={{ color: "#555", fontSize: 8, marginBottom: 2 }}>Job Name</div>
                 <input value={farmJobName} onChange={e => setFarmJobName(e.target.value)}
                   style={{
-                    width: "100%", background: "#1a1f2e", border: "1px solid #21262d", color: "#dde6ef",
+                    width: "100%", background: "#333333", border: "1px solid #3a3a3a", color: "#dde6ef",
                     borderRadius: 3, padding: "3px", fontSize: 8, marginBottom: 3, fontFamily: "JetBrains Mono,monospace"
                   }} />
                 <div style={{ display: "flex", gap: 3, marginBottom: 3 }}>
@@ -5323,7 +5326,7 @@ export default function App() {
                     <div style={{ color: "#555", fontSize: 7, marginBottom: 1 }}>Start</div>
                     <input type="number" value={farmFrameStart} onChange={e => setFarmFrameStart(Number(e.target.value))}
                       style={{
-                        width: "100%", background: "#1a1f2e", border: "1px solid #21262d", color: "#dde6ef",
+                        width: "100%", background: "#333333", border: "1px solid #3a3a3a", color: "#dde6ef",
                         borderRadius: 3, padding: "3px", fontSize: 8, fontFamily: "JetBrains Mono,monospace"
                       }} />
                   </div>
@@ -5331,14 +5334,14 @@ export default function App() {
                     <div style={{ color: "#555", fontSize: 7, marginBottom: 1 }}>End</div>
                     <input type="number" value={farmFrameEnd} onChange={e => setFarmFrameEnd(Number(e.target.value))}
                       style={{
-                        width: "100%", background: "#1a1f2e", border: "1px solid #21262d", color: "#dde6ef",
+                        width: "100%", background: "#333333", border: "1px solid #3a3a3a", color: "#dde6ef",
                         borderRadius: 3, padding: "3px", fontSize: 8, fontFamily: "JetBrains Mono,monospace"
                       }} />
                   </div>
                 </div>
                 <button onClick={handleAddRenderJob}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 3
                   }}>
                   + Add Job
@@ -5354,7 +5357,7 @@ export default function App() {
                   {renderFarm.jobs.map(j => (
                     <div key={j.id} style={{
                       padding: "2px 4px", background: "#1a1f2e",
-                      border: "1px solid #21262d", borderRadius: 3, marginBottom: 2,
+                      border: "1px solid #3a3a3a", borderRadius: 3, marginBottom: 2,
                       display: "flex", justifyContent: "space-between", alignItems: "center"
                     }}>
                       <span style={{ color: JOB_STATUS[j.status]?.color || "#aaa", fontSize: 7 }}>●</span>
@@ -5370,11 +5373,11 @@ export default function App() {
 
             {/* Workers — Sessions 162-165 */}
             {showWorkerPanel && (
-              <div style={{ borderTop: showRenderFarmPanel ? "1px solid #21262d" : "none", paddingTop: showRenderFarmPanel ? 8 : 0, marginBottom: 10 }}>
+              <div style={{ borderTop: showRenderFarmPanel ? "1px solid #3a3a3a" : "none", paddingTop: showRenderFarmPanel ? 8 : 0, marginBottom: 10 }}>
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Worker Threads</div>
                 <button onClick={handleInitWorkers}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 4
                   }}>
                   ⚙ Init Workers
@@ -5389,7 +5392,7 @@ export default function App() {
                   style={{
                     width: "100%", padding: "4px",
                     background: useWorkerCloth ? "#4488ff" : "#1a1f2e",
-                    border: "1px solid #21262d",
+                    border: "1px solid #3a3a3a",
                     color: useWorkerCloth ? "#fff" : "#aaa",
                     borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 3
                   }}>
@@ -5399,7 +5402,7 @@ export default function App() {
                   style={{
                     width: "100%", padding: "4px",
                     background: useWorkerSPH ? "#4488ff" : "#1a1f2e",
-                    border: "1px solid #21262d",
+                    border: "1px solid #3a3a3a",
                     color: useWorkerSPH ? "#fff" : "#aaa",
                     borderRadius: 3, cursor: "pointer", fontSize: 8
                   }}>
@@ -5410,7 +5413,7 @@ export default function App() {
 
             {/* Theme — Sessions 166 */}
             {showThemePanel && (
-              <div style={{ borderTop: "1px solid #21262d", paddingTop: 8, marginBottom: 10 }}>
+              <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8, marginBottom: 10 }}>
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Theme</div>
                 <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginBottom: 6 }}>
                   {Object.entries(THEMES).map(([k, v]) => (
@@ -5428,14 +5431,14 @@ export default function App() {
                 </div>
                 <button onClick={handleToggleShortcutOverlay}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 3
                   }}>
                   ⌨ Keyboard Shortcuts
                 </button>
                 <button onClick={handleStartTour}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8
                   }}>
                   🎓 Start Tour
@@ -5445,7 +5448,7 @@ export default function App() {
 
             {/* Export — Sessions 169 */}
             {showExportPanel && (
-              <div style={{ borderTop: "1px solid #21262d", paddingTop: 8 }}>
+              <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8 }}>
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Export to StreamPireX</div>
                 <div style={{ display: "flex", gap: 2, flexWrap: "wrap", marginBottom: 4 }}>
                   {Object.entries(SPX_EXPORT_FORMATS).map(([k, v]) => (
@@ -5464,7 +5467,7 @@ export default function App() {
                 </div>
                 <button onClick={handleExportToSPX}
                   style={{
-                    width: "100%", padding: "6px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "6px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 10, fontWeight: 700, marginBottom: 4
                   }}>
                   🚀 Export to StreamPireX
@@ -5485,12 +5488,12 @@ export default function App() {
       {/* Sessions 143-156: GPU Particles + Upgrades panel */}
       {(showGPUPanel || showHairStylePanel || showAnimUpPanel) && (
         <div style={{
-          width: 200, background: "#0d1117", borderLeft: "1px solid #21262d",
+          width: 200, background: "#2a2a2a", borderLeft: "1px solid #3a3a3a",
           display: "flex", flexDirection: "column", flexShrink: 0,
           fontFamily: "JetBrains Mono,monospace", fontSize: 11, overflow: "hidden"
         }}>
-          <div style={{ padding: "6px 10px", borderBottom: "1px solid #21262d" }}>
-            <span style={{ color: "#00ffc8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
+          <div style={{ padding: "6px 10px", borderBottom: "1px solid #3a3a3a" }}>
+            <span style={{ color: "#c8c8c8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
               Upgrades
             </span>
           </div>
@@ -5502,7 +5505,7 @@ export default function App() {
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>GPU Particles</div>
                 <button onClick={handleCreateGPUParticles}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 3
                   }}>
                   ✦ Create GPU System
@@ -5515,7 +5518,7 @@ export default function App() {
                     }}>▶</button>
                   <button onClick={handleStopGPUParticles}
                     style={{
-                      flex: 1, padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                      flex: 1, padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                       color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 9
                     }}>■</button>
                   <button onClick={handleBurstGPUParticles}
@@ -5540,7 +5543,7 @@ export default function App() {
                 </div>
                 <button onClick={handleAddForceField}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 4
                   }}>
                   + Add Force Field
@@ -5558,7 +5561,7 @@ export default function App() {
 
             {/* Hair Styles */}
             {showHairStylePanel && (
-              <div style={{ borderTop: showGPUPanel ? "1px solid #21262d" : "none", paddingTop: showGPUPanel ? 8 : 0, marginBottom: 10 }}>
+              <div style={{ borderTop: showGPUPanel ? "1px solid #3a3a3a" : "none", paddingTop: showGPUPanel ? 8 : 0, marginBottom: 10 }}>
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Hair Styles</div>
                 <div style={{ color: "#555", fontSize: 8, marginBottom: 2 }}>Density Map</div>
                 <div style={{ display: "flex", gap: 2, flexWrap: "wrap", marginBottom: 4 }}>
@@ -5575,7 +5578,7 @@ export default function App() {
                 </div>
                 <button onClick={handleEmitHairFromUV}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 4
                   }}>
                   💇 Emit from UV
@@ -5584,7 +5587,7 @@ export default function App() {
                 {["braid", "bun", "ponytail"].map(s => (
                   <button key={s} onClick={() => handleGenerateHairStyle(s)}
                     style={{
-                      width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                      width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                       color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 2, textTransform: "capitalize"
                     }}>
                     {s === "braid" ? "🪢" : s === "bun" ? "🔵" : "🐴"} {s}
@@ -5595,11 +5598,11 @@ export default function App() {
 
             {/* Animation Upgrades */}
             {showAnimUpPanel && (
-              <div style={{ borderTop: "1px solid #21262d", paddingTop: 8 }}>
+              <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8 }}>
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Anim Upgrades</div>
                 <button onClick={handleCreateIKFKBlend}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 4
                   }}>
                   Create IK/FK Blend
@@ -5617,21 +5620,21 @@ export default function App() {
                 )}
                 <button onClick={handleUpdateShapeKeyDrivers}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 3
                   }}>
                   Update SK Drivers
                 </button>
                 <button onClick={handleComputeEnvelopeWeights}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 3
                   }}>
                   Compute Envelope Weights
                 </button>
                 <button onClick={handleUpgradeCloth}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 3
                   }}>
                   Upgrade Cloth Constraints
@@ -5654,12 +5657,12 @@ export default function App() {
       {/* Sessions 122-130: Collaboration + Desktop panel */}
       {(showCollabPanel || showDesktopPanel) && (
         <div style={{
-          width: 210, background: "#0d1117", borderLeft: "1px solid #21262d",
+          width: 210, background: "#2a2a2a", borderLeft: "1px solid #3a3a3a",
           display: "flex", flexDirection: "column", flexShrink: 0,
           fontFamily: "JetBrains Mono,monospace", fontSize: 11, overflow: "hidden"
         }}>
-          <div style={{ padding: "6px 10px", borderBottom: "1px solid #21262d" }}>
-            <span style={{ color: "#00ffc8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
+          <div style={{ padding: "6px 10px", borderBottom: "1px solid #3a3a3a" }}>
+            <span style={{ color: "#c8c8c8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
               Collab + Desktop
             </span>
           </div>
@@ -5672,7 +5675,7 @@ export default function App() {
                 {!collabSession ? (
                   <button onClick={handleCreateCollabSession}
                     style={{
-                      width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                      width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                       borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 4
                     }}>
                     🔗 Start Session
@@ -5691,7 +5694,7 @@ export default function App() {
                     ))}
                     <button onClick={handleDisconnectCollab}
                       style={{
-                        width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                        width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                         color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginTop: 4, marginBottom: 6
                       }}>
                       Disconnect
@@ -5702,7 +5705,7 @@ export default function App() {
                 <input value={commentText} onChange={e => setCommentText(e.target.value)}
                   placeholder="Add comment..."
                   style={{
-                    width: "100%", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#dde6ef", borderRadius: 3, padding: "4px", fontSize: 8, marginBottom: 3,
                     fontFamily: "JetBrains Mono,monospace"
                   }} />
@@ -5719,7 +5722,7 @@ export default function App() {
                     {commentPins.map(p => (
                       <div key={p.id} style={{
                         padding: "2px 4px", background: "#1a1f2e",
-                        border: "1px solid #21262d", borderRadius: 3, marginBottom: 2
+                        border: "1px solid #3a3a3a", borderRadius: 3, marginBottom: 2
                       }}>
                         <div style={{ color: "#ffaa00", fontSize: 7 }}>{p.author}</div>
                         <div style={{ color: "#dde6ef", fontSize: 8 }}>{p.text}</div>
@@ -5730,7 +5733,7 @@ export default function App() {
                 <div style={{ color: "#FF6600", fontSize: 8, fontWeight: 700, marginBottom: 3, textTransform: "uppercase", marginTop: 6 }}>Version History</div>
                 <button onClick={handleSaveVersion}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 4
                   }}>
                   💾 Save Version
@@ -5739,7 +5742,7 @@ export default function App() {
                   {versionHistory.map((v, i) => (
                     <div key={v.id} style={{
                       padding: "2px 6px", background: "#1a1f2e",
-                      border: "1px solid #21262d", borderRadius: 3, marginBottom: 2,
+                      border: "1px solid #3a3a3a", borderRadius: 3, marginBottom: 2,
                       display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer"
                     }}
                       onClick={() => handleRestoreVersion(v.id)}>
@@ -5754,7 +5757,7 @@ export default function App() {
 
             {/* Desktop — Sessions 125-130 */}
             {showDesktopPanel && (
-              <div style={{ borderTop: showCollabPanel ? "1px solid #21262d" : "none", paddingTop: showCollabPanel ? 8 : 0 }}>
+              <div style={{ borderTop: showCollabPanel ? "1px solid #3a3a3a" : "none", paddingTop: showCollabPanel ? 8 : 0 }}>
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Desktop App</div>
                 <div style={{
                   padding: "4px 6px", background: "#1a1f2e", borderRadius: 3, marginBottom: 6,
@@ -5766,21 +5769,21 @@ export default function App() {
                 </div>
                 <button onClick={handleNativeOpen}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 3
                   }}>
                   📂 Open File
                 </button>
                 <button onClick={handleNativeSave}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 3
                   }}>
                   💾 Save Scene
                 </button>
                 <button onClick={handleGetPlatformInfo}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 3
                   }}>
                   ℹ Platform Info
@@ -5789,7 +5792,7 @@ export default function App() {
                   style={{
                     width: "100%", padding: "4px",
                     background: updateAvailable ? "#FF6600" : "#1a1f2e",
-                    border: "1px solid #21262d",
+                    border: "1px solid #3a3a3a",
                     color: updateAvailable ? "#fff" : "#aaa",
                     borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 6
                   }}>
@@ -5822,12 +5825,12 @@ export default function App() {
       {/* Sessions 108-121: VFX + Fluid + Asset + Performance panel */}
       {(showVFXPanel || showFluidPanel || showAssetPanel || showPerfPanel) && (
         <div style={{
-          width: 210, background: "#0d1117", borderLeft: "1px solid #21262d",
+          width: 210, background: "#2a2a2a", borderLeft: "1px solid #3a3a3a",
           display: "flex", flexDirection: "column", flexShrink: 0,
           fontFamily: "JetBrains Mono,monospace", fontSize: 11, overflow: "hidden"
         }}>
-          <div style={{ padding: "6px 10px", borderBottom: "1px solid #21262d" }}>
-            <span style={{ color: "#00ffc8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
+          <div style={{ padding: "6px 10px", borderBottom: "1px solid #3a3a3a" }}>
+            <span style={{ color: "#c8c8c8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
               VFX + Assets
             </span>
           </div>
@@ -5851,7 +5854,7 @@ export default function App() {
                 </div>
                 <button onClick={handleCreateVFXEmitter}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 3
                   }}>
                   ✦ Create Emitter
@@ -5866,7 +5869,7 @@ export default function App() {
                   </button>
                   <button onClick={handleStopVFX}
                     style={{
-                      flex: 1, padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                      flex: 1, padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                       color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 9
                     }}>
                     ■ Stop
@@ -5874,7 +5877,7 @@ export default function App() {
                 </div>
                 <button onClick={handleDestructMesh}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 4
                   }}>
                   💥 Destruct Mesh
@@ -5890,7 +5893,7 @@ export default function App() {
 
             {/* Fluid — Sessions 108 */}
             {showFluidPanel && (
-              <div style={{ borderTop: showVFXPanel ? "1px solid #21262d" : "none", paddingTop: showVFXPanel ? 8 : 0, marginBottom: 10 }}>
+              <div style={{ borderTop: showVFXPanel ? "1px solid #3a3a3a" : "none", paddingTop: showVFXPanel ? 8 : 0, marginBottom: 10 }}>
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Fluid + Pyro</div>
                 <div style={{ display: "flex", gap: 2, flexWrap: "wrap", marginBottom: 4 }}>
                   {Object.entries(FLUID_PRESETS).map(([k, v]) => (
@@ -5906,7 +5909,7 @@ export default function App() {
                 </div>
                 <button onClick={handleCreateFluid}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 3
                   }}>
                   💧 Create Fluid
@@ -5921,7 +5924,7 @@ export default function App() {
                   </button>
                   <button onClick={handleStopFluid}
                     style={{
-                      flex: 1, padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                      flex: 1, padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                       color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 9
                     }}>
                     ■ Stop
@@ -5929,7 +5932,7 @@ export default function App() {
                 </div>
                 <button onClick={handleCreatePyro}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 4
                   }}>
                   🔥 Create Pyro/Fire
@@ -5945,12 +5948,12 @@ export default function App() {
 
             {/* Asset Library — Sessions 116-119 */}
             {showAssetPanel && (
-              <div style={{ borderTop: "1px solid #21262d", paddingTop: 8, marginBottom: 10 }}>
+              <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8, marginBottom: 10 }}>
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Asset Library</div>
                 <input value={assetSearch} onChange={e => handleSearchAssets(e.target.value)}
                   placeholder="Search assets..."
                   style={{
-                    width: "100%", background: "#1a1f2e", border: "1px solid #21262d", color: "#dde6ef",
+                    width: "100%", background: "#333333", border: "1px solid #3a3a3a", color: "#dde6ef",
                     borderRadius: 3, padding: "4px", fontSize: 9, marginBottom: 4,
                     fontFamily: "JetBrains Mono,monospace"
                   }} />
@@ -5969,7 +5972,7 @@ export default function App() {
                 </div>
                 <button onClick={handleSaveToLibrary}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 4
                   }}>
                   + Save to Library
@@ -5978,7 +5981,7 @@ export default function App() {
                   {searchAssets(assetLibrary, assetSearch, { type: assetTypeFilter }).map(a => (
                     <div key={a.id} style={{
                       padding: "3px 6px", background: "#1a1f2e",
-                      border: "1px solid #21262d", borderRadius: 3, marginBottom: 2,
+                      border: "1px solid #3a3a3a", borderRadius: 3, marginBottom: 2,
                       display: "flex", justifyContent: "space-between", alignItems: "center"
                     }}>
                       <div>
@@ -5998,18 +6001,18 @@ export default function App() {
 
             {/* Performance + Procedural — Sessions 120-121 */}
             {showPerfPanel && (
-              <div style={{ borderTop: "1px solid #21262d", paddingTop: 8 }}>
+              <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8 }}>
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Performance</div>
                 <button onClick={handleGetSceneStats}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 3
                   }}>
                   📊 Scene Stats
                 </button>
                 <button onClick={handleOptimizeScene}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 6
                   }}>
                   ⚡ Optimize Scene
@@ -6056,12 +6059,12 @@ export default function App() {
       {/* Sessions 91-107: Rendering panel */}
       {showUDIMPanel && (
         <div style={{position:'fixed',top:40,right:220,width:200,background:'#0d1117',
-          border:'1px solid #21262d',borderRadius:4,padding:8,zIndex:100,overflowY:'auto',maxHeight:'70vh'}}>
+          border:'1px solid #3a3a3a',borderRadius:4,padding:8,zIndex:100,overflowY:'auto',maxHeight:'70vh'}}>
           <div style={{color:'#00ffc8',fontSize:9,fontWeight:700,marginBottom:6}}>UDIM TEXTURES</div>
           <div style={{marginBottom:4}}>
             <span style={{color:'#888',fontSize:8}}>Tile Count</span>
             <select value={udimTileCount} onChange={e=>setUdimTileCount(Number(e.target.value))}
-              style={{width:'100%',background:'#0d1117',border:'1px solid #21262d',color:'#dde6ef',fontSize:8,padding:2,marginTop:2}}>
+              style={{width:'100%',background:'#0d1117',border:'1px solid #3a3a3a',color:'#dde6ef',fontSize:8,padding:2,marginTop:2}}>
               {[1,2,4,6,8,10,16,20].map(n=><option key={n} value={n}>{n} tile{n>1?'s':''}</option>)}
             </select>
           </div>
@@ -6075,7 +6078,7 @@ export default function App() {
             <div style={{marginBottom:4}}>
               <span style={{color:'#888',fontSize:8}}>Active Tile</span>
               <select value={udimActiveTile} onChange={e=>setUdimActiveTile(Number(e.target.value))}
-                style={{width:'100%',background:'#0d1117',border:'1px solid #21262d',color:'#dde6ef',fontSize:8,padding:2,marginTop:2}}>
+                style={{width:'100%',background:'#0d1117',border:'1px solid #3a3a3a',color:'#dde6ef',fontSize:8,padding:2,marginTop:2}}>
                 {udimLayout.tiles.map(t=><option key={t.id} value={t.id}>UDIM {t.id}</option>)}
               </select>
             </div>
@@ -6085,15 +6088,15 @@ export default function App() {
                 style={{width:'100%',height:24,border:'none',background:'none',cursor:'pointer',marginTop:2}} />
             </div>
             <button onClick={handleFillUDIMTile} style={{width:'100%',padding:'4px',background:'#1a1f2e',
-              border:'1px solid #21262d',color:'#aaa',borderRadius:3,cursor:'pointer',fontSize:8,marginBottom:3}}>
+              border:'1px solid #3a3a3a',color:'#aaa',borderRadius:3,cursor:'pointer',fontSize:8,marginBottom:3}}>
               Fill Active Tile
             </button>
             <button onClick={handleApplyUDIMToMesh} style={{width:'100%',padding:'4px',background:'#1a1f2e',
-              border:'1px solid #21262d',color:'#aaa',borderRadius:3,cursor:'pointer',fontSize:8,marginBottom:3}}>
+              border:'1px solid #3a3a3a',color:'#aaa',borderRadius:3,cursor:'pointer',fontSize:8,marginBottom:3}}>
               Apply to Mesh
             </button>
             <button onClick={handleExportUDIMAtlas} style={{width:'100%',padding:'4px',background:'#1a1f2e',
-              border:'1px solid #21262d',color:'#FF6600',borderRadius:3,cursor:'pointer',fontSize:8,marginBottom:3}}>
+              border:'1px solid #3a3a3a',color:'#FF6600',borderRadius:3,cursor:'pointer',fontSize:8,marginBottom:3}}>
               Export Atlas 4096px
             </button>
             <div style={{color:'#555',fontSize:7}}>Tiles: {getUDIMStats(udimLayout).initialized}/{getUDIMStats(udimLayout).tiles}</div>
@@ -6104,7 +6107,7 @@ export default function App() {
       {showPoseLibPanel && (
         <div style={{
           position: "fixed", right: 48, top: 120, width: 180, zIndex: 120,
-          background: "#0d1117", border: "1px solid #21262d", borderRadius: 6,
+          background: "#0d1117", border: "1px solid #3a3a3a", borderRadius: 6,
           padding: 10, color: "#dde6ef"
         }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: "#8844ff", marginBottom: 8 }}>POSE LIBRARY</div>
@@ -6114,7 +6117,7 @@ export default function App() {
               onChange={e => setPoseName(e.target.value)}
               placeholder="Pose name..."
               style={{
-                flex: 1, background: "#161b22", border: "1px solid #21262d",
+                flex: 1, background: "#161b22", border: "1px solid #3a3a3a",
                 color: "#dde6ef", borderRadius: 3, padding: "3px 6px", fontSize: 9
               }}
             />
@@ -6149,7 +6152,7 @@ export default function App() {
                     if (arm) { loadPoseFromLibrary(arm, name, poseLibrary); setStatus("Pose applied: " + name); }
                   }}
                   style={{
-                    background: "#1a1f2e", border: "1px solid #21262d", borderRadius: 3,
+                    background: "#333333", border: "1px solid #3a3a3a", borderRadius: 3,
                     color: "#8844ff", cursor: "pointer", fontSize: 8, padding: "2px 5px"
                   }}
                 >Apply</button>
@@ -6161,7 +6164,7 @@ export default function App() {
               onClick={() => setPoseLibrary({})}
               style={{
                 width: "100%", marginTop: 6, padding: "3px", background: "#1a1f2e",
-                border: "1px solid #21262d", borderRadius: 3, color: "#555",
+                border: "1px solid #3a3a3a", borderRadius: 3, color: "#555",
                 cursor: "pointer", fontSize: 8
               }}
             >Clear All</button>
@@ -6172,7 +6175,7 @@ export default function App() {
       {showVideoPanel && (
         <div style={{
           position: "fixed", right: 8, top: 54, width: 220, background: "#0d1117",
-          border: "1px solid #21262d", borderRadius: 6, padding: 12, zIndex: 120
+          border: "1px solid #3a3a3a", borderRadius: 6, padding: 12, zIndex: 120
         }}>
           <div style={{ color: "#00ffc8", fontSize: 10, fontWeight: 700, marginBottom: 8 }}>🎬 Render Video</div>
           {[
@@ -6222,12 +6225,12 @@ export default function App() {
 
       {(showRenderPanel || showVolPanel || showPassPanel || showProbePanel) && (
         <div style={{
-          width: 210, background: "#0d1117", borderLeft: "1px solid #21262d",
+          width: 210, background: "#2a2a2a", borderLeft: "1px solid #3a3a3a",
           display: "flex", flexDirection: "column", flexShrink: 0,
           fontFamily: "JetBrains Mono,monospace", fontSize: 11, overflow: "hidden"
         }}>
-          <div style={{ padding: "6px 10px", borderBottom: "1px solid #21262d" }}>
-            <span style={{ color: "#00ffc8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
+          <div style={{ padding: "6px 10px", borderBottom: "1px solid #3a3a3a" }}>
+            <span style={{ color: "#c8c8c8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
               Rendering
             </span>
           </div>
@@ -6252,7 +6255,7 @@ export default function App() {
                 </div>
                 <button onClick={handleApplyRenderPreset}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 4
                   }}>
                   Apply Preset
@@ -6288,29 +6291,29 @@ export default function App() {
                 <div style={{ color: "#555", fontSize: 8, marginBottom: 2 }}>Materials</div>
                 <button onClick={handleApplyPBR}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 2
                   }}>
                   Apply PBR Material
                 </button>
                 <select value={sssPreset} onChange={e => setSssPreset(e.target.value)}
-                  style={{ width: "100%", background: "#1a1f2e", border: "1px solid #21262d", color: "#dde6ef", borderRadius: 3, padding: "3px", fontSize: 8, marginBottom: 2 }}>
+                  style={{ width: "100%", background: "#333333", border: "1px solid #3a3a3a", color: "#dde6ef", borderRadius: 3, padding: "3px", fontSize: 8, marginBottom: 2 }}>
                   {Object.entries(SSS_PRESETS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                 </select>
                 <button onClick={handleApplySSS}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 2
                   }}>
                   Apply SSS
                 </button>
                 <select value={transmissionPreset} onChange={e => setTransmissionPreset(e.target.value)}
-                  style={{ width: "100%", background: "#1a1f2e", border: "1px solid #21262d", color: "#dde6ef", borderRadius: 3, padding: "3px", fontSize: 8, marginBottom: 2 }}>
+                  style={{ width: "100%", background: "#333333", border: "1px solid #3a3a3a", color: "#dde6ef", borderRadius: 3, padding: "3px", fontSize: 8, marginBottom: 2 }}>
                   {Object.entries(TRANSMISSION_PRESETS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                 </select>
                 <button onClick={handleApplyTransmission}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 4
                   }}>
                   Apply Transmission
@@ -6332,21 +6335,21 @@ export default function App() {
                   onChange={e => setDispScale(Number(e.target.value))} style={{ width: "100%", marginBottom: 2 }} />
                 <button onClick={handleApplyDisplacement}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 4
                   }}>
                   Apply Displacement
                 </button>
                 <button onClick={handleCaptureFrame}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 4
                   }}>
                   📷 Capture Frame
                 </button>
                 <button onClick={handleGetRenderStats}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8
                   }}>
                   📊 Render Stats
@@ -6363,7 +6366,7 @@ export default function App() {
 
             {/* Volumetric — Sessions 100-101 */}
             {showVolPanel && (
-              <div style={{ borderTop: showRenderPanel ? "1px solid #21262d" : "none", paddingTop: showRenderPanel ? 8 : 0, marginBottom: 10 }}>
+              <div style={{ borderTop: showRenderPanel ? "1px solid #3a3a3a" : "none", paddingTop: showRenderPanel ? 8 : 0, marginBottom: 10 }}>
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Volumetric</div>
                 <label style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer", marginBottom: 4 }}>
                   <input type="checkbox" checked={volumetricSettings.enabled} onChange={handleToggleVolumetric} />
@@ -6386,7 +6389,7 @@ export default function App() {
                 </div>
                 <button onClick={handleApplyAtmosphere}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700
                   }}>
                   Apply Atmosphere
@@ -6396,7 +6399,7 @@ export default function App() {
 
             {/* Render Passes — Sessions 96, 101-103 */}
             {showPassPanel && (
-              <div style={{ borderTop: "1px solid #21262d", paddingTop: 8, marginBottom: 10 }}>
+              <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8, marginBottom: 10 }}>
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Render Passes</div>
                 {Object.entries(PASS_TYPES).map(([k, v]) => (
                   <label key={k} style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer", marginBottom: 2 }}>
@@ -6415,7 +6418,7 @@ export default function App() {
                 ))}
                 <button onClick={handleRenderPasses}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginTop: 6
                   }}>
                   ▶ Render All Passes
@@ -6425,12 +6428,12 @@ export default function App() {
 
             {/* Environment Probes — Sessions 102-103 */}
             {showProbePanel && (
-              <div style={{padding:'8px 0',borderBottom:'1px solid #21262d',marginBottom:6}}>
+              <div style={{padding:'8px 0',borderBottom:'1px solid #3a3a3a',marginBottom:6}}>
                 <div style={{color:'#00ffc8',fontSize:9,fontWeight:700,marginBottom:6}}>GI / ENVIRONMENT PROBES</div>
                 <div style={{marginBottom:4}}>
                   <span style={{color:'#888',fontSize:8}}>Bake Resolution</span>
                   <select value={giResolution} onChange={e=>setGiResolution(Number(e.target.value))}
-                    style={{width:'100%',background:'#0d1117',border:'1px solid #21262d',color:'#dde6ef',fontSize:8,padding:2,marginTop:2}}>
+                    style={{width:'100%',background:'#0d1117',border:'1px solid #3a3a3a',color:'#dde6ef',fontSize:8,padding:2,marginTop:2}}>
                     <option value={64}>64 (fast)</option>
                     <option value={128}>128</option>
                     <option value={256}>256 (default)</option>
@@ -6444,7 +6447,7 @@ export default function App() {
                   {giBaked ? 'Rebake GI' : 'Bake GI Probe'}
                 </button>
                 <button onClick={handleCreateReflectionProbe} style={{width:'100%',padding:'4px',
-                  background:'#1a1f2e',border:'1px solid #21262d',color:'#aaa',
+                  background:'#1a1f2e',border:'1px solid #3a3a3a',color:'#aaa',
                   borderRadius:3,cursor:'pointer',fontSize:8,marginBottom:3}}>
                   Add Reflection Probe
                 </button>
@@ -6452,18 +6455,18 @@ export default function App() {
               </div>
             )}
             {showProbePanel && (
-              <div style={{ borderTop: "1px solid #21262d", paddingTop: 8 }}>
+              <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8 }}>
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Environment Probes</div>
                 <button onClick={handleAddProbe}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 3
                   }}>
                   + Reflection Probe
                 </button>
                 <button onClick={handleAddAmbientProbe}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 4
                   }}>
                   + Ambient (GI) Probe
@@ -6478,12 +6481,12 @@ export default function App() {
       {/* Sessions 78-90: Hair + Cloth panel */}
       {(showHairPanel || showClothPanel) && (
         <div style={{
-          width: 210, background: "#0d1117", borderLeft: "1px solid #21262d",
+          width: 210, background: "#2a2a2a", borderLeft: "1px solid #3a3a3a",
           display: "flex", flexDirection: "column", flexShrink: 0,
           fontFamily: "JetBrains Mono,monospace", fontSize: 11, overflow: "hidden"
         }}>
-          <div style={{ padding: "6px 10px", borderBottom: "1px solid #21262d" }}>
-            <span style={{ color: "#00ffc8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
+          <div style={{ padding: "6px 10px", borderBottom: "1px solid #3a3a3a" }}>
+            <span style={{ color: "#c8c8c8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
               Hair + Cloth
             </span>
           </div>
@@ -6521,7 +6524,7 @@ export default function App() {
                 </div>
                 <button onClick={handleEmitHair}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 4
                   }}>
                   💇 Emit Hair
@@ -6555,7 +6558,7 @@ export default function App() {
                 </div>
                 <button onClick={handleGenerateHairCards}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 3
                   }}>
                   🃏 Generate Hair Cards
@@ -6566,7 +6569,7 @@ export default function App() {
                 </label>
                 <button onClick={handleResetHair}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 3
                   }}>
                   ↺ Reset Hair
@@ -6577,7 +6580,7 @@ export default function App() {
 
             {/* Cloth — Sessions 88-90 */}
             {showClothPanel && (
-              <div style={{ borderTop: showHairPanel ? "1px solid #21262d" : "none", paddingTop: showHairPanel ? 8 : 0 }}>
+              <div style={{ borderTop: showHairPanel ? "1px solid #3a3a3a" : "none", paddingTop: showHairPanel ? 8 : 0 }}>
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Cloth Simulation</div>
                 <div style={{ color: "#555", fontSize: 8, marginBottom: 2 }}>Preset</div>
                 <div style={{ display: "flex", gap: 2, flexWrap: "wrap", marginBottom: 4 }}>
@@ -6594,7 +6597,7 @@ export default function App() {
                 </div>
                 <button onClick={handleCreateCloth}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 3
                   }}>
                   🧵 Create Cloth
@@ -6609,14 +6612,14 @@ export default function App() {
                   </button>
                   <button onClick={handleStopCloth}
                     style={{
-                      flex: 1, padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                      flex: 1, padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                       color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 9
                     }}>
                     ■ Stop
                   </button>
                   <button onClick={handleResetCloth}
                     style={{
-                      flex: 1, padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                      flex: 1, padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                       color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 9
                     }}>
                     ↺
@@ -6624,15 +6627,15 @@ export default function App() {
                 </div>
                 <label style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer", marginBottom: 4 }}>
                   <input type="checkbox" checked={clothSelfCol} onChange={e => setClothSelfCol(e.target.checked)} />
-                  <span style={{ color: "#dde6ef", fontSize: 9 }}>Self Collision</span>
+                  <span style={{ color: "#c8c8c8", fontSize: 9 }}>Self Collision</span>
                 </label>
                 <label style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer", marginBottom: 4 }}>
                   <input type="checkbox" checked={clothPinMode} onChange={e => setClothPinMode(e.target.checked)} />
-                  <span style={{ color: "#dde6ef", fontSize: 9 }}>Pin Mode</span>
+                  <span style={{ color: "#c8c8c8", fontSize: 9 }}>Pin Mode</span>
                 </label>
                 <button onClick={handleAddClothCollider}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 4
                   }}>
                   + Add Collider
@@ -6655,12 +6658,12 @@ export default function App() {
       {/* Sessions 71-77: DynaMesh + AutoRetopo + Fibermesh panel */}
       {(showDynaPanel || showRetopoPanel || showFiberPanel) && (
         <div style={{
-          width: 200, background: "#0d1117", borderLeft: "1px solid #21262d",
+          width: 200, background: "#2a2a2a", borderLeft: "1px solid #3a3a3a",
           display: "flex", flexDirection: "column", flexShrink: 0,
           fontFamily: "JetBrains Mono,monospace", fontSize: 11, overflow: "hidden"
         }}>
-          <div style={{ padding: "6px 10px", borderBottom: "1px solid #21262d" }}>
-            <span style={{ color: "#00ffc8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
+          <div style={{ padding: "6px 10px", borderBottom: "1px solid #3a3a3a" }}>
+            <span style={{ color: "#c8c8c8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
               ZBrush Tools
             </span>
           </div>
@@ -6697,7 +6700,7 @@ export default function App() {
                 </div>
                 <button onClick={handleDynaMeshRemesh}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 4
                   }}>
                   ⬡ DynaMesh Remesh
@@ -6713,7 +6716,7 @@ export default function App() {
 
             {/* Auto-Retopo — Sessions 75-76 */}
             {showRetopoPanel && (
-              <div style={{ borderTop: showDynaPanel ? "1px solid #21262d" : "none", paddingTop: showDynaPanel ? 8 : 0, marginBottom: 10 }}>
+              <div style={{ borderTop: showDynaPanel ? "1px solid #3a3a3a" : "none", paddingTop: showDynaPanel ? 8 : 0, marginBottom: 10 }}>
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Auto-Retopo</div>
                 <div style={{ marginBottom: 4 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 1 }}>
@@ -6736,11 +6739,11 @@ export default function App() {
                 <label style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer", marginBottom: 6 }}>
                   <input type="checkbox" checked={retopoSettings.preserveHard}
                     onChange={e => setRetopoSettings(p => ({ ...p, preserveHard: e.target.checked }))} />
-                  <span style={{ color: "#dde6ef", fontSize: 9 }}>Preserve Hard Edges</span>
+                  <span style={{ color: "#c8c8c8", fontSize: 9 }}>Preserve Hard Edges</span>
                 </label>
                 <button onClick={handleAutoRetopo}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 3
                   }}>
                   ⬡ Auto-Retopo
@@ -6764,7 +6767,7 @@ export default function App() {
 
             {/* Fibermesh — Session 77 */}
             {showFiberPanel && (
-              <div style={{ borderTop: "1px solid #21262d", paddingTop: 8 }}>
+              <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8 }}>
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Fibermesh</div>
                 <div style={{ marginBottom: 4 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 1 }}>
@@ -6797,7 +6800,7 @@ export default function App() {
                 </div>
                 <button onClick={handleGenerateFibermesh}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 6
                   }}>
                   ✦ Generate Fibermesh
@@ -6827,12 +6830,12 @@ export default function App() {
       {/* Sessions 63-70: Drivers + Constraints + Physics + Walk panel */}
       {(showDriverPanel || showConPanel || showPhysPanel || showWalkPanel) && (
         <div style={{
-          width: 200, background: "#0d1117", borderLeft: "1px solid #21262d",
+          width: 200, background: "#2a2a2a", borderLeft: "1px solid #3a3a3a",
           display: "flex", flexDirection: "column", flexShrink: 0,
           fontFamily: "JetBrains Mono,monospace", fontSize: 11, overflow: "hidden"
         }}>
-          <div style={{ padding: "6px 10px", borderBottom: "1px solid #21262d" }}>
-            <span style={{ color: "#00ffc8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
+          <div style={{ padding: "6px 10px", borderBottom: "1px solid #3a3a3a" }}>
+            <span style={{ color: "#c8c8c8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
               Animation Systems
             </span>
           </div>
@@ -6844,14 +6847,14 @@ export default function App() {
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Drivers</div>
                 <input value={driverExpr} onChange={e => setDriverExpr(e.target.value)}
                   style={{
-                    width: "100%", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#00ffc8", borderRadius: 3, padding: "4px", fontSize: 9, marginBottom: 4,
                     fontFamily: "JetBrains Mono,monospace"
                   }}
                   placeholder="sin(frame * 0.1)" />
                 <button onClick={handleAddDriver}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 4
                   }}>
                   + Add Driver
@@ -6861,7 +6864,7 @@ export default function App() {
                   {Object.entries(DRIVER_PRESETS).map(([k, v]) => (
                     <button key={k} onClick={() => handleApplyDriverPreset(k)}
                       style={{
-                        padding: "2px 4px", background: "#1a1f2e", border: "1px solid #21262d",
+                        padding: "2px 4px", background: "#333333", border: "1px solid #3a3a3a",
                         color: "#8844ff", borderRadius: 3, cursor: "pointer", fontSize: 7
                       }}>
                       {v.label}
@@ -6895,11 +6898,11 @@ export default function App() {
 
             {/* Constraints — Session 65 */}
             {showConPanel && (
-              <div style={{ borderTop: showDriverPanel ? "1px solid #21262d" : "none", paddingTop: showDriverPanel ? 8 : 0, marginBottom: 10 }}>
+              <div style={{ borderTop: showDriverPanel ? "1px solid #3a3a3a" : "none", paddingTop: showDriverPanel ? 8 : 0, marginBottom: 10 }}>
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Constraints</div>
                 <select value={constraintType} onChange={e => setConstraintType(e.target.value)}
                   style={{
-                    width: "100%", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#dde6ef", borderRadius: 3, padding: "4px", fontSize: 9, marginBottom: 4
                   }}>
                   {Object.entries(CONSTRAINT_TYPES).map(([k, v]) => (
@@ -6908,7 +6911,7 @@ export default function App() {
                 </select>
                 <button onClick={handleAddConstraint}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 4
                   }}>
                   + Add Constraint
@@ -6923,7 +6926,7 @@ export default function App() {
                 {constraints.map(c => (
                   <div key={c.id} style={{
                     padding: "3px 6px", background: "#1a1f2e",
-                    border: "1px solid #21262d", borderRadius: 3, marginBottom: 3,
+                    border: "1px solid #3a3a3a", borderRadius: 3, marginBottom: 3,
                     display: "flex", justifyContent: "space-between", alignItems: "center"
                   }}>
                     <span style={{ color: "#00ffc8", fontSize: 8 }}>
@@ -6938,11 +6941,11 @@ export default function App() {
 
             {/* Physics Bake — Session 66 */}
             {showPhysPanel && (
-              <div style={{ borderTop: "1px solid #21262d", paddingTop: 8, marginBottom: 10 }}>
+              <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8, marginBottom: 10 }}>
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Physics</div>
                 <button onClick={handleAddRigidBody}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 4
                   }}>
                   + Add Rigid Body
@@ -6956,7 +6959,7 @@ export default function App() {
                 </button>
                 <button onClick={handleFractureMesh}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 9, marginBottom: 4
                   }}>
                   💥 Fracture Mesh
@@ -6971,12 +6974,12 @@ export default function App() {
 
             {/* Walk Cycle — Session 67 */}
             {showWalkPanel && (
-              <div style={{ borderTop: "1px solid #21262d", paddingTop: 8 }}>
+              <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8 }}>
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Walk Cycle</div>
                 <div style={{ color: "#555", fontSize: 8, marginBottom: 2 }}>Style</div>
                 <select value={walkStyle} onChange={e => setWalkStyle(e.target.value)}
                   style={{
-                    width: "100%", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#dde6ef", borderRadius: 3, padding: "4px", fontSize: 9, marginBottom: 4
                   }}>
                   {Object.entries(WALK_STYLES).map(([k, v]) => (
@@ -7001,21 +7004,21 @@ export default function App() {
                 </div>
                 <button onClick={handleGenerateWalkCycle}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 3
                   }}>
                   🚶 Generate Walk
                 </button>
                 <button onClick={handleGenerateIdle}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 3
                   }}>
                   😐 Generate Idle
                 </button>
                 <button onClick={handleGenerateBreathing}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 3
                   }}>
                   🌬 Generate Breathing
@@ -7034,12 +7037,12 @@ export default function App() {
       {/* Sessions 51-62: Light + Camera + Post + IK panel */}
       {(showLightPanel || showCamPanel || showPostPanel || showIKPanel) && (
         <div style={{
-          width: 210, background: "#0d1117", borderLeft: "1px solid #21262d",
+          width: 210, background: "#2a2a2a", borderLeft: "1px solid #3a3a3a",
           display: "flex", flexDirection: "column", flexShrink: 0,
           fontFamily: "JetBrains Mono,monospace", fontSize: 11, overflow: "hidden"
         }}>
-          <div style={{ padding: "6px 10px", borderBottom: "1px solid #21262d" }}>
-            <span style={{ color: "#00ffc8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
+          <div style={{ padding: "6px 10px", borderBottom: "1px solid #3a3a3a" }}>
+            <span style={{ color: "#c8c8c8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
               Scene Tools
             </span>
           </div>
@@ -7051,7 +7054,7 @@ export default function App() {
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Lighting</div>
                 <select value={lightType} onChange={e => setLightType(e.target.value)}
                   style={{
-                    width: "100%", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#dde6ef", borderRadius: 3, padding: "4px", fontSize: 9, marginBottom: 4
                   }}>
                   {Object.entries(LIGHT_TYPES).map(([k, v]) => (
@@ -7067,14 +7070,14 @@ export default function App() {
                 </div>
                 <button onClick={handleAddLight}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 4
                   }}>
                   + Add {lightType} Light
                 </button>
                 <button onClick={handleThreePointLighting}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 6
                   }}>
                   Three-Point Preset
@@ -7106,7 +7109,7 @@ export default function App() {
                 </div>
                 <label style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer", marginBottom: 4 }}>
                   <input type="checkbox" checked={fogEnabled} onChange={handleToggleFog} />
-                  <span style={{ color: "#dde6ef", fontSize: 9 }}>Volumetric Fog</span>
+                  <span style={{ color: "#c8c8c8", fontSize: 9 }}>Volumetric Fog</span>
                 </label>
                 {fogEnabled && (
                   <div style={{ marginBottom: 4 }}>
@@ -7124,7 +7127,7 @@ export default function App() {
 
             {/* Camera — Session 55 */}
             {showCamPanel && (
-              <div style={{ borderTop: showLightPanel ? "1px solid #21262d" : "none", paddingTop: showLightPanel ? 8 : 0, marginBottom: 10 }}>
+              <div style={{ borderTop: showLightPanel ? "1px solid #3a3a3a" : "none", paddingTop: showLightPanel ? 8 : 0, marginBottom: 10 }}>
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Camera</div>
                 <div style={{ marginBottom: 4 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 1 }}>
@@ -7137,28 +7140,28 @@ export default function App() {
                 </div>
                 <button onClick={handleAddCamera}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 3
                   }}>
                   + Add Camera
                 </button>
                 <button onClick={handleSaveBookmark}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 3
                   }}>
                   📍 Save Bookmark
                 </button>
                 <button onClick={handleCameraShake}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 3
                   }}>
                   📷 Camera Shake
                 </button>
                 <label style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer", marginBottom: 4 }}>
                   <input type="checkbox" checked={camDOF} onChange={e => setCamDOF(e.target.checked)} />
-                  <span style={{ color: "#dde6ef", fontSize: 9 }}>Depth of Field</span>
+                  <span style={{ color: "#c8c8c8", fontSize: 9 }}>Depth of Field</span>
                 </label>
                 {camDOF && (
                   <div style={{ marginBottom: 4 }}>
@@ -7176,7 +7179,7 @@ export default function App() {
 
             {/* Post Processing — Session 56 */}
             {showPostPanel && (
-              <div style={{ borderTop: "1px solid #21262d", paddingTop: 8, marginBottom: 10 }}>
+              <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8, marginBottom: 10 }}>
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Post FX</div>
                 {postEffects.map((effect, i) => (
                   <div key={effect.type} style={{
@@ -7210,11 +7213,11 @@ export default function App() {
 
             {/* IK — Session 61 */}
             {showIKPanel && (
-              <div style={{ borderTop: "1px solid #21262d", paddingTop: 8 }}>
+              <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8 }}>
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Inverse Kinematics</div>
                 <button onClick={handleCreateIKChain}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 4
                   }}>
                   + Create IK Chain
@@ -7238,7 +7241,7 @@ export default function App() {
                 {bvhData && (
                   <button onClick={handleAutoDetectBoneMap}
                     style={{
-                      width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                      width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                       color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginTop: 4
                     }}>
                     Auto-Detect Bone Map
@@ -7253,12 +7256,12 @@ export default function App() {
       {/* Sessions 31-50: Advanced Tools panel */}
       {(showGN || matPreset || paintStack || bakedMaps.ao) && (
         <div style={{
-          width: 200, background: "#0d1117", borderLeft: "1px solid #21262d",
+          width: 200, background: "#2a2a2a", borderLeft: "1px solid #3a3a3a",
           display: "flex", flexDirection: "column", flexShrink: 0,
           fontFamily: "JetBrains Mono,monospace", fontSize: 11, overflow: "hidden"
         }}>
-          <div style={{ padding: "6px 10px", borderBottom: "1px solid #21262d" }}>
-            <span style={{ color: "#00ffc8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
+          <div style={{ padding: "6px 10px", borderBottom: "1px solid #3a3a3a" }}>
+            <span style={{ color: "#c8c8c8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
               Advanced Tools
             </span>
           </div>
@@ -7275,7 +7278,7 @@ export default function App() {
                 onChange={e => setRemeshVoxel(Number(e.target.value))} style={{ width: "100%", marginBottom: 4 }} />
               <button onClick={handleVoxelRemesh}
                 style={{
-                  width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                  width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                   borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 3
                 }}>
                 Voxel Remesh
@@ -7284,7 +7287,7 @@ export default function App() {
                 {["x", "y", "z"].map(ax => (
                   <button key={ax} onClick={() => handleSymmetrize(ax)}
                     style={{
-                      flex: 1, padding: "3px", background: "#1a1f2e", border: "1px solid #21262d",
+                      flex: 1, padding: "3px", background: "#333333", border: "1px solid #3a3a3a",
                       color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8
                     }}>
                     Sym {ax.toUpperCase()}
@@ -7294,12 +7297,12 @@ export default function App() {
             </div>
 
             {/* Multires — Sessions 34-35 */}
-            <div style={{ borderTop: "1px solid #21262d", paddingTop: 8, marginBottom: 10 }}>
+            <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8, marginBottom: 10 }}>
               <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Multires</div>
               {!multiresStack ? (
                 <button onClick={handleCreateMultires}
                   style={{
-                    width: "100%", padding: "5px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "5px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 9, marginBottom: 4
                   }}>
                   Create Stack
@@ -7312,14 +7315,14 @@ export default function App() {
                   <div style={{ display: "flex", gap: 3, marginBottom: 4 }}>
                     <button onClick={handleSubdivideMultires}
                       style={{
-                        flex: 1, padding: "4px", background: "#00ffc8", border: "none", color: "#06060f",
+                        flex: 1, padding: "4px", background: "#4772b3", border: "none", color: "#ffffff",
                         borderRadius: 3, cursor: "pointer", fontSize: 8, fontWeight: 700
                       }}>
                       + Subdivide
                     </button>
                     <button onClick={handleBakeDownMultires}
                       style={{
-                        flex: 1, padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                        flex: 1, padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                         color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8
                       }}>
                       Bake Down
@@ -7342,13 +7345,13 @@ export default function App() {
             </div>
 
             {/* Alpha Brush — Session 36 */}
-            <div style={{ borderTop: "1px solid #21262d", paddingTop: 8, marginBottom: 10 }}>
+            <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8, marginBottom: 10 }}>
               <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Alpha Brush</div>
               <input ref={alphaInputRef} type="file" accept="image/*" style={{ display: "none" }}
                 onChange={e => e.target.files?.[0] && handleLoadAlpha(e.target.files[0])} />
               <button onClick={() => alphaInputRef.current?.click()}
                 style={{
-                  width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                  width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                   color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 9, marginBottom: 4
                 }}>
                 📁 Load Alpha Image
@@ -7371,7 +7374,7 @@ export default function App() {
             </div>
 
             {/* Smart Materials — Session 40 */}
-            <div style={{ borderTop: "1px solid #21262d", paddingTop: 8, marginBottom: 10 }}>
+            <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8, marginBottom: 10 }}>
               <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Materials</div>
               {Object.entries(matCategories).map(([cat, keys]) => (
                 <div key={cat} style={{ marginBottom: 6 }}>
@@ -7392,14 +7395,14 @@ export default function App() {
               <div style={{ display: "flex", gap: 3, marginTop: 4 }}>
                 <button onClick={handleEdgeWear}
                   style={{
-                    flex: 1, padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    flex: 1, padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8
                   }}>
                   Edge Wear
                 </button>
                 <button onClick={handleCavityDirt}
                   style={{
-                    flex: 1, padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    flex: 1, padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8
                   }}>
                   Cavity Dirt
@@ -7408,12 +7411,12 @@ export default function App() {
             </div>
 
             {/* Texture Paint — Sessions 41-43 */}
-            <div style={{ borderTop: "1px solid #21262d", paddingTop: 8, marginBottom: 10 }}>
+            <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8, marginBottom: 10 }}>
               <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Texture Paint</div>
               {!paintStack ? (
                 <button onClick={handleInitPaintStack}
                   style={{
-                    width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                    width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                     borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 4
                   }}>
                   Initialize Canvas
@@ -7435,7 +7438,7 @@ export default function App() {
                   </div>
                   <button onClick={handleAddPaintLayer}
                     style={{
-                      width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                      width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                       color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 3
                     }}>
                     + Add Layer ({paintStack.layers.length})
@@ -7452,7 +7455,7 @@ export default function App() {
             </div>
 
             {/* Texture Baker — Session 48 */}
-            <div style={{ borderTop: "1px solid #21262d", paddingTop: 8, marginBottom: 10 }}>
+            <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8, marginBottom: 10 }}>
               <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Texture Baker</div>
               {bakingStatus && (
                 <div style={{ color: "#00ffc8", fontSize: 8, marginBottom: 4, lineHeight: 1.4 }}>{bakingStatus}</div>
@@ -7469,7 +7472,7 @@ export default function App() {
                   {Object.keys(bakedMaps).filter(k => bakedMaps[k]).map(k => (
                     <button key={k} onClick={() => handleDownloadBakedMap(k)}
                       style={{
-                        padding: "3px 6px", background: "#1a1f2e", border: "1px solid #21262d",
+                        padding: "3px 6px", background: "#333333", border: "1px solid #3a3a3a",
                         color: "#00ffc8", borderRadius: 3, cursor: "pointer", fontSize: 8
                       }}>
                       ↓ {k}
@@ -7480,7 +7483,7 @@ export default function App() {
             </div>
 
             {/* Grease Pencil — Session 37 */}
-            <div style={{ borderTop: "1px solid #21262d", paddingTop: 8, marginBottom: 10 }}>
+            <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8, marginBottom: 10 }}>
               <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Grease Pencil</div>
               <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 4 }}>
                 <input type="color" value={gpColor} onChange={e => setGpColor(e.target.value)}
@@ -7497,11 +7500,11 @@ export default function App() {
               </div>
               <label style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer", marginBottom: 4 }}>
                 <input type="checkbox" checked={gpOnionSkin} onChange={e => setGpOnionSkin(e.target.checked)} />
-                <span style={{ color: "#dde6ef", fontSize: 9 }}>Onion Skin</span>
+                <span style={{ color: "#c8c8c8", fontSize: 9 }}>Onion Skin</span>
               </label>
               <button onClick={handleGPStrokeToMesh}
                 style={{
-                  width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                  width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                   color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8
                 }}>
                 Strokes → Mesh
@@ -7509,7 +7512,7 @@ export default function App() {
             </div>
 
             {/* Geometry Nodes — Session 38 */}
-            <div style={{ borderTop: "1px solid #21262d", paddingTop: 8 }}>
+            <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8 }}>
               <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Geo Nodes</div>
               <div style={{ display: "flex", gap: 2, flexWrap: "wrap", marginBottom: 4 }}>
                 {["input", "output", "transform", "array", "noise", "subdivide", "decimate"].map(t => (
@@ -7527,14 +7530,14 @@ export default function App() {
               </div>
               <button onClick={handleGNEvaluate}
                 style={{
-                  width: "100%", padding: "5px", background: "#00ffc8", border: "none", color: "#06060f",
+                  width: "100%", padding: "5px", background: "#4772b3", border: "none", color: "#ffffff",
                   borderRadius: 3, cursor: "pointer", fontSize: 9, fontWeight: 700, marginBottom: 3
                 }}>
                 ▶ Evaluate Graph
               </button>
               <button onClick={() => handleAddSpline()}
                 style={{
-                  width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                  width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                   color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8, marginBottom: 3
                 }}>
                 + Add Spline
@@ -7542,7 +7545,7 @@ export default function App() {
               {activeSpline && (
                 <button onClick={handlePipeAlongCurve}
                   style={{
-                    width: "100%", padding: "4px", background: "#1a1f2e", border: "1px solid #21262d",
+                    width: "100%", padding: "4px", background: "#333333", border: "1px solid #3a3a3a",
                     color: "#aaa", borderRadius: 3, cursor: "pointer", fontSize: 8
                   }}>
                   Pipe Along Curve
@@ -7556,15 +7559,15 @@ export default function App() {
       {/* Armature panel — Session 20 */}
       {boneMode && (
         <div style={{
-          width: 180, background: "#0d1117", borderLeft: "1px solid #21262d",
+          width: 180, background: "#2a2a2a", borderLeft: "1px solid #3a3a3a",
           display: "flex", flexDirection: "column", flexShrink: 0,
           fontFamily: "JetBrains Mono,monospace", fontSize: 11, overflow: "hidden"
         }}>
           <div style={{
-            padding: "6px 10px", borderBottom: "1px solid #21262d",
+            padding: "6px 10px", borderBottom: "1px solid #3a3a3a",
             display: "flex", justifyContent: "space-between", alignItems: "center"
           }}>
-            <span style={{ color: "#00ffc8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
+            <span style={{ color: "#c8c8c8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
               Armature
             </span>
             <button onClick={() => setBoneMode(false)}
@@ -7573,7 +7576,7 @@ export default function App() {
           <div style={{ flex: 1, overflowY: "auto", padding: "8px 10px" }}>
             <button onClick={handleCreateArmature}
               style={{
-                width: "100%", background: "#00ffc8", border: "none", color: "#06060f",
+                width: "100%", background: "#4772b3", border: "none", color: "#ffffff",
                 borderRadius: 4, padding: "6px", cursor: "pointer", fontWeight: 700, fontSize: 10, marginBottom: 6
               }}>
               + Create Armature
@@ -7609,23 +7612,23 @@ export default function App() {
 
       {/* LOD + Instancing panel — Sessions 14-15 */}
       <div style={{
-        width: 190, background: "#0d1117", borderLeft: "1px solid #21262d",
+        width: 190, background: "#2a2a2a", borderLeft: "1px solid #3a3a3a",
         display: "flex", flexDirection: "column", flexShrink: 0,
         fontFamily: "JetBrains Mono,monospace", fontSize: 11, overflow: "hidden"
       }}>
-        <div style={{ padding: "6px 10px", borderBottom: "1px solid #21262d" }}>
-          <span style={{ color: "#00ffc8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
+        <div style={{ padding: "6px 10px", borderBottom: "1px solid #3a3a3a" }}>
+          <span style={{ color: "#c8c8c8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
             LOD + Instances
           </span>
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "8px 10px" }}>
 
-          <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>
+          <div style={{ color: "#c8c8c8", fontSize: 9, fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>
             LOD System
           </div>
           <button onClick={handleGenerateLOD}
             style={{
-              width: "100%", background: "#00ffc8", border: "none", color: "#06060f",
+              width: "100%", background: "#4772b3", border: "none", color: "#ffffff",
               borderRadius: 4, padding: "6px", cursor: "pointer", fontWeight: 700, fontSize: 10, marginBottom: 6
             }}>
             ⬡ Generate LOD
@@ -7635,7 +7638,7 @@ export default function App() {
               <div style={{ color: "#666", fontSize: 9, marginBottom: 4 }}>Preview Level</div>
               <select value={lodLevel} onChange={e => handleSetLODLevel(e.target.value)}
                 style={{
-                  width: "100%", background: "#1a1f2e", border: "1px solid #21262d",
+                  width: "100%", background: "#333333", border: "1px solid #3a3a3a",
                   color: "#dde6ef", borderRadius: 3, padding: "4px", fontSize: 10, marginBottom: 6
                 }}>
                 <option value="auto">Auto (distance-based)</option>
@@ -7654,8 +7657,8 @@ export default function App() {
             </div>
           )}
 
-          <div style={{ borderTop: "1px solid #21262d", paddingTop: 8, marginTop: 4 }}>
-            <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>
+          <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8, marginTop: 4 }}>
+            <div style={{ color: "#c8c8c8", fontSize: 9, fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>
               Instancing
             </div>
             <div style={{ marginBottom: 6 }}>
@@ -7696,24 +7699,24 @@ export default function App() {
             </button>
             <button onClick={handleFlattenInstances}
               style={{
-                width: "100%", background: "#1a1f2e", border: "1px solid #21262d", color: "#aaa",
+                width: "100%", background: "#333333", border: "1px solid #3a3a3a", color: "#aaa",
                 borderRadius: 4, padding: "5px", cursor: "pointer", fontSize: 9, marginBottom: 4
               }}>
               Flatten to Meshes
             </button>
           </div>
 
-          <div style={{ borderTop: "1px solid #21262d", paddingTop: 8, marginTop: 4 }}>
-            <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>
+          <div style={{ borderTop: "1px solid #3a3a3a", paddingTop: 8, marginTop: 4 }}>
+            <div style={{ color: "#c8c8c8", fontSize: 9, fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>
               Export Options
             </div>
             <label style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer", marginBottom: 4 }}>
               <input type="checkbox" checked={exportUnlit} onChange={e => setExportUnlit(e.target.checked)} />
-              <span style={{ color: "#dde6ef", fontSize: 10 }}>Unlit (KHR_materials_unlit)</span>
+              <span style={{ color: "#c8c8c8", fontSize: 10 }}>Unlit (KHR_materials_unlit)</span>
             </label>
             <label style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer", marginBottom: 4 }}>
               <input type="checkbox" checked={exportDraco} onChange={e => setExportDraco(e.target.checked)} />
-              <span style={{ color: "#dde6ef", fontSize: 10 }}>Draco compression</span>
+              <span style={{ color: "#c8c8c8", fontSize: 10 }}>Draco compression</span>
             </label>
             {exportDraco && (
               <div style={{ color: "#555", fontSize: 9, lineHeight: 1.4 }}>
@@ -7726,12 +7729,12 @@ export default function App() {
 
       {/* Procedural Mesh panel — Sessions 11-12 */}
       <div style={{
-        width: 200, background: "#0d1117", borderLeft: "1px solid #21262d",
+        width: 200, background: "#2a2a2a", borderLeft: "1px solid #3a3a3a",
         display: "flex", flexDirection: "column", flexShrink: 0,
         fontFamily: "JetBrains Mono,monospace", fontSize: 11, overflow: "hidden"
       }}>
-        <div style={{ padding: "6px 10px", borderBottom: "1px solid #21262d" }}>
-          <span style={{ color: "#00ffc8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
+        <div style={{ padding: "6px 10px", borderBottom: "1px solid #3a3a3a" }}>
+          <span style={{ color: "#c8c8c8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
             Procedural
           </span>
         </div>
@@ -7739,7 +7742,7 @@ export default function App() {
           <div style={{ color: "#666", fontSize: 9, marginBottom: 4 }}>Type</div>
           <select value={procType} onChange={e => setProcType(e.target.value)}
             style={{
-              width: "100%", background: "#1a1f2e", border: "1px solid #21262d",
+              width: "100%", background: "#333333", border: "1px solid #3a3a3a",
               color: "#dde6ef", borderRadius: 3, padding: "4px", fontSize: 10, marginBottom: 8
             }}>
             {["pipe", "staircase", "arch", "gear", "helix", "lathe"].map(t => (
@@ -7751,7 +7754,7 @@ export default function App() {
               <div key={param} style={{ marginBottom: 6 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
                   <span style={{ color: "#666", fontSize: 9 }}>{param}</span>
-                  <span style={{ color: "#00ffc8", fontSize: 9 }}>{procParams[param]}</span>
+                  <span style={{ color: "#a0a0a0", fontSize: 9 }}>{procParams[param]}</span>
                 </div>
                 <input type="range"
                   min={param === "segments" || param === "steps" || param === "teeth" ? 3 : 0.05}
@@ -7764,15 +7767,15 @@ export default function App() {
             ))}
           <button onClick={addProceduralMesh}
             style={{
-              width: "100%", background: "#00ffc8", border: "none", color: "#06060f",
+              width: "100%", background: "#4772b3", border: "none", color: "#ffffff",
               borderRadius: 4, padding: "7px", cursor: "pointer", fontWeight: 700, fontSize: 11, marginTop: 4
             }}>
             + Generate {procType.charAt(0).toUpperCase() + procType.slice(1)}
           </button>
 
-          <div style={{ borderTop: "1px solid #21262d", marginTop: 12, paddingTop: 10 }}>
+          <div style={{ borderTop: "1px solid #3a3a3a", marginTop: 12, paddingTop: 10 }}>
             <div style={{
-              color: "#FF6600", fontSize: 9, fontWeight: 700, textTransform: "uppercase",
+              color: "#c8c8c8", fontSize: 9, fontWeight: 700, textTransform: "uppercase",
               letterSpacing: 1, marginBottom: 6
             }}>Mesh Repair</div>
             {repairStatus && (
@@ -7787,7 +7790,7 @@ export default function App() {
             ].map(([label, fn]) => (
               <button key={label} onClick={fn}
                 style={{
-                  width: "100%", background: "#1a1f2e", border: "1px solid #21262d",
+                  width: "100%", background: "#333333", border: "1px solid #3a3a3a",
                   color: "#dde6ef", borderRadius: 3, padding: "5px", cursor: "pointer",
                   fontSize: 10, marginBottom: 4, textAlign: "left"
                 }}>
@@ -7801,33 +7804,33 @@ export default function App() {
       {/* Shape Keys panel — Sessions 9-10 */}
       {shapeKeys.length > 0 && (
         <div style={{
-          width: 220, background: "#0d1117", borderLeft: "1px solid #21262d",
+          width: 220, background: "#2a2a2a", borderLeft: "1px solid #3a3a3a",
           display: "flex", flexDirection: "column", flexShrink: 0,
           fontFamily: "JetBrains Mono,monospace", fontSize: 11, overflow: "hidden"
         }}>
           <div style={{
-            padding: "6px 10px", borderBottom: "1px solid #21262d",
+            padding: "6px 10px", borderBottom: "1px solid #3a3a3a",
             display: "flex", justifyContent: "space-between", alignItems: "center"
           }}>
-            <span style={{ color: "#00ffc8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
+            <span style={{ color: "#c8c8c8", fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
               Shape Keys ({shapeKeys.length})
             </span>
             <div style={{ display: "flex", gap: 4 }}>
               <button onClick={addShapeKey}
                 style={{
-                  background: "#00ffc8", border: "none", color: "#06060f", borderRadius: 3,
+                  background: "#4772b3", border: "none", color: "#ffffff", borderRadius: 3,
                   padding: "2px 6px", cursor: "pointer", fontSize: 9, fontWeight: 700
                 }}>+ Key</button>
               <button onClick={resetAllShapeKeys}
                 style={{
-                  background: "#1a1f2e", border: "1px solid #21262d", color: "#888", borderRadius: 3,
+                  background: "#333333", border: "1px solid #3a3a3a", color: "#888", borderRadius: 3,
                   padding: "2px 6px", cursor: "pointer", fontSize: 9
                 }}>Reset</button>
             </div>
           </div>
           <div style={{ flex: 1, overflowY: "auto" }}>
             {shapeKeys.map((key, idx) => (
-              <div key={key.id} style={{ padding: "6px 10px", borderBottom: "1px solid #21262d" }}>
+              <div key={key.id} style={{ padding: "6px 10px", borderBottom: "1px solid #3a3a3a" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                   <span style={{ color: idx === 0 ? "#888" : "#dde6ef", fontSize: 10, fontWeight: 700 }}>
                     {key.name}
@@ -7916,14 +7919,14 @@ export default function App() {
       {/* ── Session E: Geometry Nodes Panel ── */}
       {showGeoNodesPanel && (
         <div style={{position:'fixed',top:40,right:260,width:340,background:'#0d1117',
-          border:'1px solid #21262d',borderRadius:4,padding:10,zIndex:105,overflowY:'auto',maxHeight:'80vh'}}>
+          border:'1px solid #3a3a3a',borderRadius:4,padding:10,zIndex:105,overflowY:'auto',maxHeight:'80vh'}}>
           <div style={{color:'#00ffc8',fontSize:10,fontWeight:700,marginBottom:8}}>GEOMETRY NODES</div>
           <div style={{display:'flex',gap:4,flexWrap:'wrap',marginBottom:6}}>
             {['transform','array','noise','subdivide','decimate','boolean','merge'].map(t=>(
               <button key={t} onClick={()=>setGeoNodeType(t)}
                 style={{padding:'2px 6px',fontSize:8,borderRadius:3,cursor:'pointer',
                   background:geoNodeType===t?NODE_TYPES[t]?.color||'#4488ff':'#1a1f2e',
-                  border:'1px solid #21262d',color:geoNodeType===t?'#06060f':'#aaa',fontWeight:700}}>
+                  border:'1px solid #3a3a3a',color:geoNodeType===t?'#06060f':'#aaa',fontWeight:700}}>
                 {t}
               </button>
             ))}
@@ -7932,7 +7935,7 @@ export default function App() {
             <button onClick={handleGeoAddInput} style={{flex:1,padding:'3px',fontSize:8,background:'#003322',
               border:'1px solid #00ffc8',color:'#00ffc8',borderRadius:3,cursor:'pointer'}}>+ Input</button>
             <button onClick={handleGeoAddNode} style={{flex:1,padding:'3px',fontSize:8,background:'#1a1f2e',
-              border:'1px solid #21262d',color:'#aaa',borderRadius:3,cursor:'pointer'}}>+ Node</button>
+              border:'1px solid #3a3a3a',color:'#aaa',borderRadius:3,cursor:'pointer'}}>+ Node</button>
             <button onClick={handleGeoAddOutput} style={{flex:1,padding:'3px',fontSize:8,background:'#2a0a00',
               border:'1px solid #FF6600',color:'#FF6600',borderRadius:3,cursor:'pointer'}}>+ Output</button>
             <button onClick={handleGeoConnect} style={{flex:1,padding:'3px',fontSize:8,background:'#1a1f2e',
@@ -7954,7 +7957,7 @@ export default function App() {
                     <span style={{color:'#555',fontSize:7,width:50}}>{k}</span>
                     <input type={typeof v==='number'?'number':'text'} value={v}
                       onChange={e=>handleGeoUpdateParam(node.id,k,e.target.value)}
-                      style={{flex:1,background:'#06060f',border:'1px solid #21262d',color:'#dde6ef',
+                      style={{flex:1,background:'#06060f',border:'1px solid #3a3a3a',color:'#dde6ef',
                         fontSize:8,padding:'1px 3px',borderRadius:2}} />
                   </div>
                 ))}
@@ -7990,7 +7993,7 @@ export default function App() {
       {/* ── Session E: Mesh Tools Panel ── */}
       {showMeshToolsPanel && (
         <div style={{position:'fixed',top:40,right:260,width:200,background:'#0d1117',
-          border:'1px solid #21262d',borderRadius:4,padding:8,zIndex:105,overflowY:'auto',maxHeight:'80vh'}}>
+          border:'1px solid #3a3a3a',borderRadius:4,padding:8,zIndex:105,overflowY:'auto',maxHeight:'80vh'}}>
           <div style={{color:'#FF6600',fontSize:9,fontWeight:700,marginBottom:6}}>MESH TOOLS</div>
 
           <div style={{color:'#555',fontSize:7,marginBottom:3}}>REPAIR</div>
@@ -8007,14 +8010,14 @@ export default function App() {
             ['Symmetrize X', handleSymmetrize],
           ].map(([label,fn])=>(
             <button key={label} onClick={fn} style={{width:'100%',padding:'3px',fontSize:8,background:'#1a1f2e',
-              border:'1px solid #21262d',color:'#aaa',borderRadius:3,cursor:'pointer',marginBottom:2}}>
+              border:'1px solid #3a3a3a',color:'#aaa',borderRadius:3,cursor:'pointer',marginBottom:2}}>
               {label}
             </button>
           ))}
 
           <div style={{color:'#555',fontSize:7,marginBottom:3,marginTop:6}}>UV PROJECTION</div>
           <select value={uvAxis} onChange={e=>setUvAxis(e.target.value)}
-            style={{width:'100%',background:'#0d1117',border:'1px solid #21262d',color:'#dde6ef',fontSize:8,padding:2,marginBottom:3}}>
+            style={{width:'100%',background:'#0d1117',border:'1px solid #3a3a3a',color:'#dde6ef',fontSize:8,padding:2,marginBottom:3}}>
             <option value='x'>X Axis</option><option value='y'>Y Axis</option><option value='z'>Z Axis</option>
           </select>
           {[
@@ -8023,14 +8026,14 @@ export default function App() {
             ['UV Sphere', handleUVSphere],
           ].map(([label,fn])=>(
             <button key={label} onClick={fn} style={{width:'100%',padding:'3px',fontSize:8,background:'#1a1f2e',
-              border:'1px solid #21262d',color:'#aaa',borderRadius:3,cursor:'pointer',marginBottom:2}}>
+              border:'1px solid #3a3a3a',color:'#aaa',borderRadius:3,cursor:'pointer',marginBottom:2}}>
               {label}
             </button>
           ))}
 
           <div style={{color:'#555',fontSize:7,marginBottom:3,marginTop:6}}>BOOLEAN</div>
           <select value={boolOp} onChange={e=>setBoolOp(e.target.value)}
-            style={{width:'100%',background:'#0d1117',border:'1px solid #21262d',color:'#dde6ef',fontSize:8,padding:2,marginBottom:3}}>
+            style={{width:'100%',background:'#0d1117',border:'1px solid #3a3a3a',color:'#dde6ef',fontSize:8,padding:2,marginBottom:3}}>
             <option value='union'>Union</option><option value='subtract'>Subtract</option><option value='intersect'>Intersect</option>
           </select>
           <button onClick={handleBooleanOp} style={{width:'100%',padding:'4px',fontSize:8,background:'#1a1f2e',
@@ -8044,7 +8047,7 @@ export default function App() {
             ['Optimize Scene', handleOptimizeScene],
           ].map(([label,fn])=>(
             <button key={label} onClick={fn} style={{width:'100%',padding:'3px',fontSize:8,background:'#1a1f2e',
-              border:'1px solid #21262d',color:'#aaa',borderRadius:3,cursor:'pointer',marginBottom:2}}>
+              border:'1px solid #3a3a3a',color:'#aaa',borderRadius:3,cursor:'pointer',marginBottom:2}}>
               {label}
             </button>
           ))}
@@ -8096,7 +8099,7 @@ export default function App() {
           <div
             style={{
               background: "#0d1117",
-              border: "1px solid #21262d",
+              border: "1px solid #3a3a3a",
               borderRadius: 8,
               padding: 24,
               maxWidth: 700,
@@ -8163,7 +8166,7 @@ export default function App() {
                             key={ki}
                             style={{
                               background: "#1a1f2e",
-                              border: "1px solid #21262d",
+                              border: "1px solid #3a3a3a",
                               borderRadius: 3,
                               padding: "1px 5px",
                               color: "#00ffc8",
@@ -8218,7 +8221,7 @@ export default function App() {
               onClick={() => setTourVisible(false)}
               style={{
                 background: "none",
-                border: "1px solid #21262d",
+                border: "1px solid #3a3a3a",
                 color: "#555",
                 borderRadius: 3,
                 padding: "4px 10px",
