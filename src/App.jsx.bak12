@@ -42,9 +42,6 @@ import { DRIVER_TYPES, createDriver, createVariable, evaluateDriver, resolveVari
 import { CONSTRAINT_TYPES, createConstraint, applyConstraint, applyAllConstraints, applyLookAt, applyFloor, applyStretchTo } from "./mesh/ConstraintSystem.js";
 import { createBakeBuffer, bakeFrame, restoreFrame, createRigidBody, stepRigidBody, bakeRigidBodies, applyBakedFrame, fractureMesh } from "./mesh/PhysicsBake.js";
 import { WALK_STYLES, generateWalkCycle, applyWalkCycleFrame, generateIdleCycle, generateBreathingCycle } from "./mesh/WalkCycleGenerator.js";
-import { createDynaMeshSettings, dynaMeshRemesh, checkDynaMeshTrigger, getDynaMeshStats } from "./mesh/DynaMeshSystem.js";
-import { createRetopoSettings, quadDominantRetopo, detectHardEdges, getRetopoStats } from "./mesh/AutoRetopo.js";
-import { generateFibermesh, buildFibermeshLines, buildFibermeshTubes, combStrands, adjustLength, clumpStrands, puffStrands, smoothStrands, getFibermeshStats, serializeFibermesh } from "./mesh/FibermeshSystem.js";
 import { AnimationTimeline } from "./components/AnimationTimeline.jsx";
 import { createInstances, flattenInstances } from "./mesh/Instancing.js";
 import { fixNormals, removeDoubles, removeDegenerates, fillHoles, fullRepair } from "./mesh/MeshRepair.js";
@@ -1323,101 +1320,6 @@ export default function App() {
   }, [matProps]);
 
 
-  // ── Session 71-72: DynaMesh handlers ────────────────────────────────────
-  const handleDynaMeshRemesh = useCallback(() => {
-    const mesh = meshRef.current; if (!mesh) { setStatus("No mesh selected"); return; }
-    setStatus("DynaMesh remeshing...");
-    try {
-      const newMesh = dynaMeshRemesh(mesh, dynaMeshSettings);
-      sceneRef.current?.remove(mesh);
-      sceneRef.current?.add(newMesh);
-      meshRef.current = newMesh;
-      heMeshRef.current = null;
-      setSceneObjects(prev => prev.map(o => o.mesh === mesh ? {...o, mesh: newMesh} : o));
-      const stats = getDynaMeshStats(newMesh);
-      setDynaMeshStats(stats);
-      setStatus("DynaMesh complete — " + stats.vertices + "v / " + stats.triangles + "t");
-    } catch(e) { setStatus("DynaMesh failed: " + e.message); }
-  }, [dynaMeshSettings]);
-
-  const handleToggleDynaMesh = useCallback(() => {
-    setDynaMeshSettings(prev => ({...prev, enabled: !prev.enabled}));
-    setStatus(dynaMeshSettings.enabled ? "DynaMesh off" : "DynaMesh on");
-  }, [dynaMeshSettings.enabled]);
-
-  // ── Sessions 75-76: Auto-retopo handlers ─────────────────────────────────
-  const handleAutoRetopo = useCallback(() => {
-    const mesh = meshRef.current; if (!mesh) { setStatus("No mesh selected"); return; }
-    setStatus("Auto-retopo running...");
-    try {
-      const result = quadDominantRetopo(mesh, retopoSettings);
-      const stats  = getRetopoStats(mesh, result);
-      sceneRef.current?.add(result);
-      setRetopoResult(result);
-      setRetopoStats(stats);
-      setSceneObjects(prev => [...prev, {
-        id: crypto.randomUUID(), name: result.name, type: "box",
-        visible: true, parentId: null, mesh: result,
-      }]);
-      setStatus("Retopo complete — " + stats.reductionRatio + " reduction, " + stats.retopoFaces + " faces");
-    } catch(e) { setStatus("Retopo failed: " + e.message); }
-  }, [retopoSettings]);
-
-  const handleApplyRetopo = useCallback(() => {
-    if (!retopoResult) { setStatus("Run auto-retopo first"); return; }
-    const mesh = meshRef.current; if (!mesh) return;
-    sceneRef.current?.remove(mesh);
-    meshRef.current = retopoResult;
-    setSceneObjects(prev => prev.map(o => o.mesh === mesh ? {...o, mesh: retopoResult} : o));
-    setRetopoResult(null);
-    setStatus("Retopo applied");
-  }, [retopoResult]);
-
-  // ── Session 77: Fibermesh handlers ───────────────────────────────────────
-  const handleGenerateFibermesh = useCallback(() => {
-    const mesh = meshRef.current; if (!mesh) { setStatus("No mesh selected"); return; }
-    setStatus("Generating fibermesh...");
-    try {
-      const strands = generateFibermesh(mesh, {
-        density: fiberDensity, length: fiberLength, segments: 8,
-      });
-      fiberStrandsRef.current = strands;
-      setFiberStrands([...strands]);
-
-      // Remove old fiber group
-      if (fiberGroup) sceneRef.current?.remove(fiberGroup);
-
-      const group = fiberMode === "tubes"
-        ? buildFibermeshTubes(strands)
-        : buildFibermeshLines(strands);
-
-      if (group) {
-        sceneRef.current?.add(group);
-        setFiberGroup(group);
-      }
-      const stats = getFibermeshStats(strands);
-      setStatus("Fibermesh: " + stats.strands + " strands, avg " + stats.avgLength + " length");
-    } catch(e) { setStatus("Fibermesh failed: " + e.message); }
-  }, [fiberDensity, fiberLength, fiberMode, fiberGroup]);
-
-  const handleFiberBrushStroke = useCallback((hit) => {
-    const strands = fiberStrandsRef.current;
-    if (!strands.length || !hit) return;
-    switch (fiberBrush) {
-      case "comb":   combStrands(strands, hit.point, hit.face?.normal || new THREE.Vector3(0,1,0), { radius:0.3, strength:0.05 }); break;
-      case "length": adjustLength(strands, hit.point, 1.1, { radius:0.3 }); break;
-      case "clump":  clumpStrands(strands, hit.point, { radius:0.3, strength:0.2 }); break;
-      case "puff":   puffStrands(strands, hit.point, hit.face?.normal || new THREE.Vector3(0,1,0), { radius:0.3, strength:0.05 }); break;
-      case "smooth": smoothStrands(strands, hit.point, { radius:0.3, strength:0.3 }); break;
-    }
-    // Rebuild display
-    if (fiberGroup) sceneRef.current?.remove(fiberGroup);
-    const group = fiberMode === "tubes"
-      ? buildFibermeshTubes(strands)
-      : buildFibermeshLines(strands);
-    if (group) { sceneRef.current?.add(group); setFiberGroup(group); }
-  }, [fiberBrush, fiberMode, fiberGroup]);
-
   // ── Session 64: Driver handlers ──────────────────────────────────────────
   const handleAddDriver = useCallback(() => {
     const driver = createDriver({
@@ -2300,23 +2202,6 @@ export default function App() {
   const [walkCycleData,  setWalkCycleData]  = useState(null);
   const [walkPlaying,    setWalkPlaying]    = useState(false);
   const [showWalkPanel,  setShowWalkPanel]  = useState(false);
-  // ── Sessions 71-77: DynaMesh + AutoRetopo + Fibermesh ────────────────────
-  const [dynaMeshSettings, setDynaMeshSettings] = useState(createDynaMeshSettings());
-  const [dynaMeshStats,    setDynaMeshStats]    = useState(null);
-  const [showDynaPanel,    setShowDynaPanel]    = useState(false);
-  const dynaMeshPrevMatrix = useRef(null);
-  const [retopoSettings,   setRetopoSettings]   = useState(createRetopoSettings());
-  const [retopoResult,     setRetopoResult]     = useState(null);
-  const [retopoStats,      setRetopoStats]      = useState(null);
-  const [showRetopoPanel,  setShowRetopoPanel]  = useState(false);
-  const [fiberStrands,     setFiberStrands]     = useState([]);
-  const fiberStrandsRef    = useRef([]);
-  const [fiberGroup,       setFiberGroup]       = useState(null);
-  const [fiberDensity,     setFiberDensity]     = useState(0.5);
-  const [fiberLength,      setFiberLength]      = useState(0.3);
-  const [fiberMode,        setFiberMode]        = useState("tubes");
-  const [fiberBrush,       setFiberBrush]       = useState("comb");
-  const [showFiberPanel,   setShowFiberPanel]   = useState(false);
 
   // ── Sessions 11-12: Procedural mesh handlers ────────────────────────────
   const addProceduralMesh = useCallback(() => {
@@ -2463,18 +2348,6 @@ export default function App() {
           style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:14,
             background:showTimeline?"#00ffc8":COLORS.border,
             color:showTimeline?"#06060f":"#888"}}>⏱</button>
-        <button title="DynaMesh" onClick={()=>setShowDynaPanel(d=>!d)}
-          style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:11,
-            background:showDynaPanel?"#00ffc8":COLORS.border,
-            color:showDynaPanel?"#06060f":"#888",fontWeight:700}}>DM</button>
-        <button title="Auto-Retopo" onClick={()=>setShowRetopoPanel(r=>!r)}
-          style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:11,
-            background:showRetopoPanel?"#FF6600":COLORS.border,
-            color:showRetopoPanel?"#fff":"#888",fontWeight:700}}>RT</button>
-        <button title="Fibermesh" onClick={()=>setShowFiberPanel(f=>!f)}
-          style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:14,
-            background:showFiberPanel?"#8844ff":COLORS.border,
-            color:showFiberPanel?"#fff":"#888"}}>🪡</button>
         <button title="Drivers" onClick={()=>setShowDriverPanel(d=>!d)}
           style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:11,
             background:showDriverPanel?"#8844ff":COLORS.border,
@@ -2998,164 +2871,6 @@ export default function App() {
               )}
             </div>
 
-          </div>
-        </div>
-      )}
-
-      {/* Sessions 71-77: DynaMesh + AutoRetopo + Fibermesh panel */}
-      {(showDynaPanel || showRetopoPanel || showFiberPanel) && (
-        <div style={{width:200,background:"#0d1117",borderLeft:"1px solid #21262d",
-          display:"flex",flexDirection:"column",flexShrink:0,
-          fontFamily:"JetBrains Mono,monospace",fontSize:11,overflow:"hidden"}}>
-          <div style={{padding:"6px 10px",borderBottom:"1px solid #21262d"}}>
-            <span style={{color:"#00ffc8",fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>
-              ZBrush Tools
-            </span>
-          </div>
-          <div style={{flex:1,overflowY:"auto",padding:"8px 10px"}}>
-
-            {/* DynaMesh — Sessions 71-72 */}
-            {showDynaPanel && (
-              <div style={{marginBottom:10}}>
-                <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>DynaMesh</div>
-                <label style={{display:"flex",gap:6,alignItems:"center",cursor:"pointer",marginBottom:4}}>
-                  <input type="checkbox" checked={dynaMeshSettings.enabled}
-                    onChange={handleToggleDynaMesh}/>
-                  <span style={{color:dynaMeshSettings.enabled?"#00ffc8":"#666",fontSize:9,fontWeight:700}}>
-                    {dynaMeshSettings.enabled ? "DynaMesh ON" : "DynaMesh OFF"}
-                  </span>
-                </label>
-                <div style={{marginBottom:4}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:1}}>
-                    <span style={{color:"#555",fontSize:8}}>Resolution</span>
-                    <span style={{color:"#00ffc8",fontSize:8}}>{dynaMeshSettings.resolution}</span>
-                  </div>
-                  <input type="range" min={32} max={512} step={32} value={dynaMeshSettings.resolution}
-                    onChange={e=>setDynaMeshSettings(p=>({...p,resolution:Number(e.target.value)}))}
-                    style={{width:"100%"}}/>
-                </div>
-                <div style={{marginBottom:4}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:1}}>
-                    <span style={{color:"#555",fontSize:8}}>Smooth</span>
-                    <span style={{color:"#00ffc8",fontSize:8}}>{dynaMeshSettings.smooth}</span>
-                  </div>
-                  <input type="range" min={0} max={5} step={1} value={dynaMeshSettings.smooth}
-                    onChange={e=>setDynaMeshSettings(p=>({...p,smooth:Number(e.target.value)}))}
-                    style={{width:"100%"}}/>
-                </div>
-                <button onClick={handleDynaMeshRemesh}
-                  style={{width:"100%",padding:"5px",background:"#00ffc8",border:"none",color:"#06060f",
-                    borderRadius:3,cursor:"pointer",fontSize:9,fontWeight:700,marginBottom:4}}>
-                  ⬡ DynaMesh Remesh
-                </button>
-                {dynaMeshStats && (
-                  <div style={{color:"#555",fontSize:8,lineHeight:1.6}}>
-                    {dynaMeshStats.vertices}v / {dynaMeshStats.triangles}t<br/>
-                    Size: {dynaMeshStats.meshSize}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Auto-Retopo — Sessions 75-76 */}
-            {showRetopoPanel && (
-              <div style={{borderTop:showDynaPanel?"1px solid #21262d":"none",paddingTop:showDynaPanel?8:0,marginBottom:10}}>
-                <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Auto-Retopo</div>
-                <div style={{marginBottom:4}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:1}}>
-                    <span style={{color:"#555",fontSize:8}}>Target Faces</span>
-                    <span style={{color:"#00ffc8",fontSize:8}}>{retopoSettings.targetFaces}</span>
-                  </div>
-                  <input type="range" min={100} max={10000} step={100} value={retopoSettings.targetFaces}
-                    onChange={e=>setRetopoSettings(p=>({...p,targetFaces:Number(e.target.value)}))}
-                    style={{width:"100%"}}/>
-                </div>
-                <div style={{marginBottom:4}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:1}}>
-                    <span style={{color:"#555",fontSize:8}}>Hard Edge Angle</span>
-                    <span style={{color:"#00ffc8",fontSize:8}}>{retopoSettings.hardAngle}°</span>
-                  </div>
-                  <input type="range" min={15} max={90} step={5} value={retopoSettings.hardAngle}
-                    onChange={e=>setRetopoSettings(p=>({...p,hardAngle:Number(e.target.value)}))}
-                    style={{width:"100%"}}/>
-                </div>
-                <label style={{display:"flex",gap:6,alignItems:"center",cursor:"pointer",marginBottom:6}}>
-                  <input type="checkbox" checked={retopoSettings.preserveHard}
-                    onChange={e=>setRetopoSettings(p=>({...p,preserveHard:e.target.checked}))}/>
-                  <span style={{color:"#dde6ef",fontSize:9}}>Preserve Hard Edges</span>
-                </label>
-                <button onClick={handleAutoRetopo}
-                  style={{width:"100%",padding:"5px",background:"#00ffc8",border:"none",color:"#06060f",
-                    borderRadius:3,cursor:"pointer",fontSize:9,fontWeight:700,marginBottom:3}}>
-                  ⬡ Auto-Retopo
-                </button>
-                {retopoStats && (
-                  <>
-                    <div style={{color:"#00ffc8",fontSize:8,lineHeight:1.6,marginBottom:4}}>
-                      {retopoStats.originalFaces}f → {retopoStats.retopoFaces}f ({retopoStats.reductionRatio})
-                    </div>
-                    <button onClick={handleApplyRetopo}
-                      style={{width:"100%",padding:"4px",background:"#FF6600",border:"none",color:"#fff",
-                        borderRadius:3,cursor:"pointer",fontSize:9}}>
-                      Apply Retopo
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-
-            {/* Fibermesh — Session 77 */}
-            {showFiberPanel && (
-              <div style={{borderTop:"1px solid #21262d",paddingTop:8}}>
-                <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Fibermesh</div>
-                <div style={{marginBottom:4}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:1}}>
-                    <span style={{color:"#555",fontSize:8}}>Density</span>
-                    <span style={{color:"#00ffc8",fontSize:8}}>{fiberDensity.toFixed(1)}</span>
-                  </div>
-                  <input type="range" min={0.1} max={3} step={0.1} value={fiberDensity}
-                    onChange={e=>setFiberDensity(Number(e.target.value))} style={{width:"100%"}}/>
-                </div>
-                <div style={{marginBottom:4}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:1}}>
-                    <span style={{color:"#555",fontSize:8}}>Length</span>
-                    <span style={{color:"#00ffc8",fontSize:8}}>{fiberLength.toFixed(2)}</span>
-                  </div>
-                  <input type="range" min={0.05} max={2} step={0.05} value={fiberLength}
-                    onChange={e=>setFiberLength(Number(e.target.value))} style={{width:"100%"}}/>
-                </div>
-                <div style={{display:"flex",gap:3,marginBottom:4}}>
-                  {["lines","tubes"].map(m=>(
-                    <button key={m} onClick={()=>setFiberMode(m)}
-                      style={{flex:1,padding:"3px",border:"none",borderRadius:3,cursor:"pointer",
-                        fontSize:8,fontWeight:700,
-                        background:fiberMode===m?"#FF6600":"#1a1f2e",
-                        color:fiberMode===m?"#fff":"#666"}}>
-                      {m}
-                    </button>
-                  ))}
-                </div>
-                <button onClick={handleGenerateFibermesh}
-                  style={{width:"100%",padding:"5px",background:"#00ffc8",border:"none",color:"#06060f",
-                    borderRadius:3,cursor:"pointer",fontSize:9,fontWeight:700,marginBottom:6}}>
-                  ✦ Generate Fibermesh
-                </button>
-                <div style={{color:"#555",fontSize:8,marginBottom:4}}>Brush</div>
-                <div style={{display:"flex",gap:2,flexWrap:"wrap",marginBottom:4}}>
-                  {["comb","length","clump","puff","smooth"].map(b=>(
-                    <button key={b} onClick={()=>setFiberBrush(b)}
-                      style={{padding:"2px 5px",background:fiberBrush===b?"#8844ff":"#1a1f2e",
-                        border:"none",color:fiberBrush===b?"#fff":"#555",
-                        borderRadius:3,cursor:"pointer",fontSize:8}}>
-                      {b}
-                    </button>
-                  ))}
-                </div>
-                <div style={{color:"#555",fontSize:8}}>
-                  Strands: {fiberStrands.length}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}
