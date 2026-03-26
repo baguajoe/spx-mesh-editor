@@ -316,6 +316,7 @@ export default function App() {
   const [sculptFalloff, setSculptFalloff] = useState("smooth");
   const [sculptSymX, setSculptSymX] = useState(false);
   const sculptingRef = useRef(false);
+  const [dyntopoEnabled, setDyntopoEnabled] = useState(false);
   const lazyMouseRef = useRef({ x: 0, y: 0 });
   const sculptStrokeCountRef = useRef(0);
   // ── Session 8: Vertex color paint state ──────────────────────────────────
@@ -353,6 +354,24 @@ export default function App() {
   const [selectedVerts, setSelectedVerts] = useState(new Set());
   const [selectedEdges, setSelectedEdges] = useState(new Set());
   const [selectedFaces, setSelectedFaces] = useState(new Set());
+  const [activeShaderPreset, setActiveShaderPreset] = useState("toon");
+  const [shaderOptions, setShaderOptions] = useState({});
+  const [hairGroup, setHairGroup] = useState(null);
+  const [bloomEnabled, setBloomEnabled] = useState(false);
+  const [ssaoEnabled, setSsaoEnabled] = useState(false);
+  const [dofEnabled, setDofEnabled] = useState(false);
+  const [mcIsolevel, setMcIsolevel] = useState(0.5);
+  const [mcResolution, setMcResolution] = useState(32);
+  const [fluidSurface, setFluidSurface] = useState(null);
+const [farmFrameEnd, setFarmFrameEnd] = useState(24);
+  const [farmFrameStart, setFarmFrameStart] = useState(0);
+const [farmJobName, setFarmJobName] = useState("Render_001");
+  const [useWorkerCloth, setUseWorkerCloth] = useState(false);
+  const [useWorkerSPH, setUseWorkerSPH] = useState(false);
+const [exportFormat, setExportFormat] = useState("glb");
+  const [vfxPreset, setVfxPreset] = useState("fire");
+  const [gpuRunning, setGpuRunning] = useState(false);
+  const [forceFieldType, setForceFieldType] = useState("vortex");
   const [knifePoints, setKnifePoints] = useState([]);
   const [slideAmount, setSlideAmount] = useState(0);
   const [history, setHistory] = useState([]);
@@ -3362,7 +3381,6 @@ export default function App() {
   const [wpMode, setWpMode] = useState("add");
   const [weightPainting, setWeightPainting] = useState(false);
   const wpPaintingRef = useRef(false);
-  const [dyntopoEnabled, setDyntopoEnabled] = useState(false);
   const [dyntopoDetail, setDyntopoDetail] = useState(0.05);
   const [dyntopoMode, setDyntopoMode] = useState("both");
   const [nlaActions, setNlaActions] = useState([]);
@@ -3487,7 +3505,6 @@ export default function App() {
   // ── Sessions 78-90: Hair + Cloth state ───────────────────────────────────
   const [hairStrands, setHairStrands] = useState([]);
   const hairStrandsRef = useRef([]);
-  const [hairGroup, setHairGroup] = useState(null);
   const [hairPreset, setHairPreset] = useState("medium");
   const [hairDisplayMode, setHairDisplayMode] = useState("lines");
   const [hairGroomBrush, setHairGroomBrush] = useState("comb");
@@ -3654,7 +3671,6 @@ export default function App() {
   const vfxEmittersRef = useRef([]);
   const [vfxSystems, setVfxSystems] = useState([]);
   const vfxSystemsRef = useRef([]);
-  const [vfxPreset, setVfxPreset] = useState("fire");
   const [vfxRunning, setVfxRunning] = useState(false);
   const vfxRafRef = useRef(null);
   const [destFrags, setDestFrags] = useState([]);
@@ -3692,33 +3708,23 @@ export default function App() {
   const [showDesktopPanel, setShowDesktopPanel] = useState(false);
   const shortcutCleanupRef = useRef(null);
   // ── Sessions 131-142: GLSL Shaders + Post Passes + Marching Cubes ────────
-  const [activeShaderPreset, setActiveShaderPreset] = useState("toon");
-  const [shaderOptions, setShaderOptions] = useState({});
   const [dissolveAmount, setDissolveAmount2] = useState(0.0);
   const [outlineMesh, setOutlineMesh] = useState(null);
   const [holoMesh, setHoloMesh] = useState(null);
   const postPassManagerRef = useRef(null);
-  const [bloomEnabled, setBloomEnabled] = useState(false);
-  const [ssaoEnabled, setSsaoEnabled] = useState(false);
-  const [dofEnabled, setDofEnabled] = useState(false);
   const [chromaticEnabled, setChromaticEnabled] = useState(false);
   const [bloomStrength, setBloomStrength] = useState(0.5);
   const [bloomThreshold, setBloomThreshold] = useState(0.8);
   const [showShaderPanel, setShowShaderPanel] = useState(false);
   const [showPostPassPanel, setShowPostPassPanel] = useState(false);
-  const [mcResolution, setMcResolution] = useState(32);
-  const [mcIsolevel, setMcIsolevel] = useState(0.5);
   const [mcStats, setMcStats] = useState(null);
   const [showMCPanel, setShowMCPanel] = useState(false);
-  const [fluidSurface, setFluidSurface] = useState(null);
   // ── Sessions 143-156: GPU Particles + Cloth/Hair/Anim upgrades ───────────
   const [gpuParticleSys, setGpuParticleSys] = useState(null);
   const gpuParticleSysRef = useRef(null);
   const [gpuParticleStats, setGpuParticleStats] = useState(null);
-  const [gpuRunning, setGpuRunning] = useState(false);
   const gpuRafRef = useRef(null);
   const [forceFields, setForceFields] = useState([]);
-  const [forceFieldType, setForceFieldType] = useState("vortex");
   const [showGPUPanel, setShowGPUPanel] = useState(false);
   const clothSpatialHash = useRef(createSpatialHash(0.1));
   const [useUpgradedCloth, setUseUpgradedCloth] = useState(false);
@@ -3738,16 +3744,11 @@ export default function App() {
   const [nprOutline, setNprOutline] = useState(null);
   const [renderFarm, setRenderFarm] = useState(createRenderFarm());
   const renderFarmRef = useRef(createRenderFarm());
-  const [farmJobName, setFarmJobName] = useState("Render_001");
-  const [farmFrameStart, setFarmFrameStart] = useState(0);
-  const [farmFrameEnd, setFarmFrameEnd] = useState(24);
   const [showRenderFarmPanel, setShowRenderFarmPanel] = useState(false);
   const clothWorkerRef = useRef(null);
   const sphWorkerRef = useRef(null);
   const workerPoolRef = useRef(null);
   const [workerSupport, setWorkerSupport] = useState(null);
-  const [useWorkerCloth, setUseWorkerCloth] = useState(false);
-  const [useWorkerSPH, setUseWorkerSPH] = useState(false);
   const [showWorkerPanel, setShowWorkerPanel] = useState(false);
   const [activeTheme, setActiveTheme] = useState("dark");
   const [customTheme, setCustomTheme] = useState(THEMES.dark);
@@ -3755,7 +3756,6 @@ export default function App() {
   const [showShortcutOverlay, setShowShortcutOverlay] = useState(false);
   const [tourState, setTourState] = useState(createTourState());
   const [tourVisible, setTourVisible] = useState(false);
-  const [exportFormat, setExportFormat] = useState("glb");
   const [showExportPanel, setShowExportPanel] = useState(false);
   const [exportResult, setExportResult] = useState(null);
 
