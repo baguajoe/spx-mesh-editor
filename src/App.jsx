@@ -2367,6 +2367,36 @@ export default function App() {
     setStatus(next.enabled ? "Volumetric fog ON" : "Volumetric fog OFF");
   }, [volumetricSettings]);
 
+  const handleSeek = useCallback((frame, keys) => {
+    setAnimFrame(frame);
+    setAnimKeys(keys);
+    // Apply keyframe values to objects
+    sceneObjects.forEach(obj => {
+      if (!obj.mesh || !keys[obj.id]) return;
+      const ch = keys[obj.id];
+      if (ch["pos.x"] !== undefined) {
+        const x = getLinearValue(ch["pos.x"], frame);
+        const y = getLinearValue(ch["pos.y"], frame);
+        const z = getLinearValue(ch["pos.z"], frame);
+        if (x !== null) obj.mesh.position.x = x;
+        if (y !== null) obj.mesh.position.y = y;
+        if (z !== null) obj.mesh.position.z = z;
+      }
+      if (ch["rot.x"] !== undefined) {
+        const rx = getLinearValue(ch["rot.x"], frame);
+        const ry = getLinearValue(ch["rot.y"], frame);
+        const rz = getLinearValue(ch["rot.z"], frame);
+        if (rx !== null) obj.mesh.rotation.x = rx;
+        if (ry !== null) obj.mesh.rotation.y = ry;
+        if (rz !== null) obj.mesh.rotation.z = rz;
+      }
+      if (ch["scale"] !== undefined) {
+        const s = getLinearValue(ch["scale"], frame);
+        if (s !== null) obj.mesh.scale.setScalar(s);
+      }
+    });
+  }, [sceneObjects]);
+
   const handleRenderVideo = useCallback(async () => {
     const renderer = rendererRef.current;
     const canvas   = canvasRef.current;
@@ -3302,35 +3332,6 @@ export default function App() {
   }, [bvhData]);
 
   // ── Sessions 17-18: Animation handlers ──────────────────────────────────
-  const handleSeek = useCallback((frame, keys) => {
-    setAnimFrame(frame);
-    setAnimKeys(keys);
-    // Apply keyframe values to objects
-    sceneObjects.forEach(obj => {
-      if (!obj.mesh || !keys[obj.id]) return;
-      const ch = keys[obj.id];
-      if (ch["pos.x"] !== undefined) {
-        const x = getLinearValue(ch["pos.x"], frame);
-        const y = getLinearValue(ch["pos.y"], frame);
-        const z = getLinearValue(ch["pos.z"], frame);
-        if (x !== null) obj.mesh.position.x = x;
-        if (y !== null) obj.mesh.position.y = y;
-        if (z !== null) obj.mesh.position.z = z;
-      }
-      if (ch["rot.x"] !== undefined) {
-        const rx = getLinearValue(ch["rot.x"], frame);
-        const ry = getLinearValue(ch["rot.y"], frame);
-        const rz = getLinearValue(ch["rot.z"], frame);
-        if (rx !== null) obj.mesh.rotation.x = rx;
-        if (ry !== null) obj.mesh.rotation.y = ry;
-        if (rz !== null) obj.mesh.rotation.z = rz;
-      }
-      if (ch["scale"] !== undefined) {
-        const s = getLinearValue(ch["scale"], frame);
-        if (s !== null) obj.mesh.scale.setScalar(s);
-      }
-    });
-  }, [sceneObjects]);
 
   function getLinearValue(channel, frame) {
     const frames = Object.keys(channel).map(Number).sort((a, b) => a - b);
