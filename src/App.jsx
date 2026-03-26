@@ -354,6 +354,10 @@ export default function App() {
   const [selectedVerts, setSelectedVerts] = useState(new Set());
   const [selectedEdges, setSelectedEdges] = useState(new Set());
   const [selectedFaces, setSelectedFaces] = useState(new Set());
+  const [showPathTracerPanel, setShowPathTracerPanel] = useState(false);
+  const [showPipelinePanel, setShowPipelinePanel] = useState(false);
+  const [showPluginPanel, setShowPluginPanel] = useState(false);
+  const [showMarketPanel, setShowMarketPanel] = useState(false);
   const [knifePoints, setKnifePoints] = useState([]);
   const [slideAmount, setSlideAmount] = useState(0);
   const [history, setHistory] = useState([]);
