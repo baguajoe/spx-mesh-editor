@@ -354,9 +354,6 @@ export default function App() {
   const [selectedVerts, setSelectedVerts] = useState(new Set());
   const [selectedEdges, setSelectedEdges] = useState(new Set());
   const [selectedFaces, setSelectedFaces] = useState(new Set());
-const [farmFrameEnd, setFarmFrameEnd] = useState(24);
-const [farmJobName, setFarmJobName] = useState("Render_001");
-const [exportFormat, setExportFormat] = useState("glb");
   const [knifePoints, setKnifePoints] = useState([]);
   const [slideAmount, setSlideAmount] = useState(0);
   const [history, setHistory] = useState([]);
@@ -1037,6 +1034,10 @@ const [exportFormat, setExportFormat] = useState("glb");
   const [forceFieldType, setForceFieldType] = useState("vortex");
   const [activeShaderPreset, setActiveShaderPreset] = useState("toon");
   const [shaderOptions, setShaderOptions] = useState({});
+  const [farmFrameEnd, setFarmFrameEnd] = useState(24);
+  const [farmJobName, setFarmJobName] = useState("Render_001");
+  const [exportFormat, setExportFormat] = useState("glb");
+  const [pluginMarketplace, setPluginMarketplace] = useState({ presets: [] });
   // ── Sessions 4-5: Sculpt stroke ───────────────────────────────────────────
   const applySculpt = useCallback((e) => {
     const mesh = meshRef.current; if (!mesh) return;
