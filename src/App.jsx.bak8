@@ -16,12 +16,6 @@ import { createShapeKey, applyShapeKeys, updateBasis, buildMorphTargets } from "
 import { createPipe, createStaircase, createArch, createGear, createHelix, createLathe, buildProceduralMesh } from "./mesh/ProceduralMesh.js";
 import { generateLOD, getLODStats, setLODLevel, restoreAutoLOD } from "./mesh/LODSystem.js";
 import { createArmature, addBone, selectBone, buildBoneDisplay, moveBoneHead, moveBoneTail, parentBone, getArmatureStats, serializeArmature } from "./mesh/ArmatureSystem.js";
-import { enterPoseMode, exitPoseMode, capturePose, applyPose, resetToRestPose, poseBone, rotateFKChain, savePoseToLibrary, loadPoseFromLibrary } from "./mesh/PoseMode.js";
-import { initWeights, paintWeight, normalizeWeights, autoWeightByDistance, visualizeWeights } from "./mesh/WeightPainting.js";
-import { applyDyntopo, dyntopoFloodFill, smoothTopology, DYNTOPO_DEFAULTS } from "./mesh/DynamicTopology.js";
-import { createAction, createTrack, createStrip, evaluateNLA, pushDownAction, bakeNLA } from "./mesh/NLASystem.js";
-import { parseBVH, buildSkeletonFromBVH, applyBVHFrame, buildAnimationClip } from "./mesh/BVHImporter.js";
-import { bindMeshToArmature, createMixer, playClip } from "./mesh/SkinningSystem.js";
 import { AnimationTimeline } from "./components/AnimationTimeline.jsx";
 import { createInstances, flattenInstances } from "./mesh/Instancing.js";
 import { fixNormals, removeDoubles, removeDegenerates, fillHoles, fullRepair } from "./mesh/MeshRepair.js";
@@ -939,7 +933,6 @@ export default function App() {
   const onMouseUp = useCallback((e) => {
     sculptingRef.current  = false;
     vcPaintingRef.current = false;
-    wpPaintingRef.current = false;
     onGizmoMouseUp();
     orbitRef.current = null;
     if (slideRef.current?.active) confirmEdgeSlide();
@@ -1300,131 +1293,6 @@ export default function App() {
   }, [matProps]);
 
 
-  // ── Session 21: Pose mode handlers ──────────────────────────────────────
-  const handleEnterPoseMode = useCallback(() => {
-    const arm = armatureRef.current; if (!arm) { setStatus("Create armature first"); return; }
-    enterPoseMode(arm);
-    setPoseMode(true);
-    setStatus("Pose mode — rotate bones to pose");
-  }, []);
-
-  const handleExitPoseMode = useCallback(() => {
-    const arm = armatureRef.current; if (!arm) return;
-    exitPoseMode(arm);
-    setPoseMode(false);
-    setStatus("Object mode");
-  }, []);
-
-  const handleResetPose = useCallback(() => {
-    const arm = armatureRef.current; if (!arm) return;
-    resetToRestPose(arm);
-    buildBoneDisplay(arm);
-    setStatus("Pose reset to rest");
-  }, []);
-
-  const handleSavePose = useCallback((name) => {
-    const arm = armatureRef.current; if (!arm) return;
-    setPoseLibrary(prev => savePoseToLibrary(arm, name || "Pose_"+Date.now(), {...prev}));
-    setStatus("Pose saved");
-  }, []);
-
-  const handleLoadPose = useCallback((name) => {
-    const arm = armatureRef.current; if (!arm) return;
-    loadPoseFromLibrary(arm, name, poseLibrary);
-    buildBoneDisplay(arm);
-    setStatus("Pose loaded: " + name);
-  }, [poseLibrary]);
-
-  // ── Session 26: Weight painting handlers ─────────────────────────────────
-  const handleEnterWeightPaint = useCallback(() => {
-    const mesh = meshRef.current; if (!mesh) { setStatus("Select a mesh first"); return; }
-    initWeights(mesh, 4);
-    setWeightPainting(true);
-    setStatus("Weight paint mode — paint bone influences");
-  }, []);
-
-  const applyWeightPaint = useCallback((e) => {
-    const mesh   = meshRef.current; if (!mesh) return;
-    const camera = cameraRef.current; if (!camera) return;
-    const canvas = canvasRef.current; if (!canvas) return;
-    const { getSculptHit } = await import("./mesh/SculptEngine.js").catch(()=>({getSculptHit:null}));
-    if (!getSculptHit) return;
-    const hit = getSculptHit(e, canvas, camera, mesh);
-    if (!hit) return;
-    paintWeight(mesh, hit, { boneIndex: wpBoneIndex, radius: wpRadius, strength: wpStrength, mode: wpMode });
-    visualizeWeights(mesh, wpBoneIndex);
-  }, [wpBoneIndex, wpRadius, wpStrength, wpMode]);
-
-  // ── Session 28: Bind mesh to rig ─────────────────────────────────────────
-  const handleBindToRig = useCallback(() => {
-    const mesh = meshRef.current; if (!mesh) { setStatus("Select mesh first"); return; }
-    const arm  = armatureRef.current; if (!arm) { setStatus("Create armature first"); return; }
-    const skinned = bindMeshToArmature(mesh, arm);
-    if (!skinned) { setStatus("Binding failed"); return; }
-    sceneRef.current?.remove(mesh);
-    sceneRef.current?.add(skinned);
-    meshRef.current = skinned;
-    setSkinnedMesh(skinned);
-    setStatus("Mesh bound to armature — auto-weights applied");
-  }, []);
-
-  // ── Sessions 29-30: Dyntopo handlers ─────────────────────────────────────
-  const handleDyntopoFlood = useCallback(() => {
-    const mesh = meshRef.current; if (!mesh) return;
-    dyntopoFloodFill(mesh, dyntopoDetail);
-    setStatus("Dyntopo flood fill applied");
-  }, [dyntopoDetail]);
-
-  const handleSmoothTopology = useCallback(() => {
-    const mesh = meshRef.current; if (!mesh) return;
-    smoothTopology(mesh, 3);
-    setStatus("Topology smoothed");
-  }, []);
-
-  // ── Sessions 22-23: NLA handlers ─────────────────────────────────────────
-  const handlePushDownAction = useCallback(() => {
-    if (!animKeys || !Object.keys(animKeys).length) { setStatus("No keyframes to push down"); return; }
-    const action = pushDownAction("Action_"+nlaActions.length, animKeys, animFrame);
-    setNlaActions(prev => [...prev, action]);
-    const strip  = createStrip(action, { frameStart: 0, frameEnd: animFrame });
-    setNlaTracks(prev => prev.map((t,i) => i===0 ? {...t, strips:[...t.strips,strip]} : t));
-    setStatus("Action pushed down: " + action.name);
-  }, [animKeys, animFrame, nlaActions]);
-
-  // ── Sessions 22-23: NLA evaluate ─────────────────────────────────────────
-  const handleNLASeek = useCallback((frame) => {
-    if (!showNLA) return;
-    const result = evaluateNLA(nlaTracks, nlaActions, frame);
-    sceneObjects.forEach(obj => {
-      if (!obj.mesh || !result[obj.id]) return;
-      const ch = result[obj.id];
-      if (ch["pos.x"] !== undefined) obj.mesh.position.x = ch["pos.x"];
-      if (ch["pos.y"] !== undefined) obj.mesh.position.y = ch["pos.y"];
-      if (ch["pos.z"] !== undefined) obj.mesh.position.z = ch["pos.z"];
-    });
-  }, [nlaTracks, nlaActions, showNLA, sceneObjects]);
-
-  // ── Session 25: BVH import ────────────────────────────────────────────────
-  const handleBVHImport = useCallback((file) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const bvh  = parseBVH(e.target.result);
-        const { skeleton, bones, rootBone } = buildSkeletonFromBVH(bvh);
-        setBvhData({ bvh, skeleton, bones, rootBone });
-        setStatus("BVH imported: " + bvh.joints.length + " joints, " + bvh.frames.length + " frames");
-      } catch(err) { setStatus("BVH parse error: " + err.message); }
-    };
-    reader.readAsText(file);
-  }, []);
-
-  const handleApplyBVHFrame = useCallback((frame) => {
-    if (!bvhData) return;
-    applyBVHFrame(bvhData.bvh, bvhData.skeleton, frame);
-    const arm = armatureRef.current;
-    if (arm) buildBoneDisplay(arm);
-  }, [bvhData]);
-
   // ── Sessions 17-18: Animation handlers ──────────────────────────────────
   const handleSeek = useCallback((frame, keys) => {
     setAnimFrame(frame);
@@ -1592,25 +1460,6 @@ export default function App() {
   const [boneMode,       setBoneMode]       = useState(false);
   const [selectedBoneId, setSelectedBoneId] = useState(null);
   const armatureRef      = useRef(null);
-  // ── Sessions 21-30: Pose + Weight + Dyntopo + NLA + BVH + Skinning ────────
-  const [poseMode,       setPoseMode]       = useState(false);
-  const [poseLibrary,    setPoseLibrary]    = useState({});
-  const [wpBoneIndex,    setWpBoneIndex]    = useState(0);
-  const [wpRadius,       setWpRadius]       = useState(0.5);
-  const [wpStrength,     setWpStrength]     = useState(0.1);
-  const [wpMode,         setWpMode]         = useState("add");
-  const [weightPainting, setWeightPainting] = useState(false);
-  const wpPaintingRef    = useRef(false);
-  const [dyntopoEnabled, setDyntopoEnabled] = useState(false);
-  const [dyntopoDetail,  setDyntopoDetail]  = useState(0.05);
-  const [dyntopoMode,    setDyntopoMode]    = useState("both");
-  const [nlaActions,     setNlaActions]     = useState([]);
-  const [nlaTracks,      setNlaTracks]      = useState([createTrack("Track 1")]);
-  const [showNLA,        setShowNLA]        = useState(false);
-  const [bvhData,        setBvhData]        = useState(null);
-  const [skinnedMesh,    setSkinnedMesh]    = useState(null);
-  const mixerRef         = useRef(null);
-  const bvhInputRef      = useRef(null);
 
   // ── Sessions 11-12: Procedural mesh handlers ────────────────────────────
   const addProceduralMesh = useCallback(() => {
@@ -1757,14 +1606,6 @@ export default function App() {
           style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:14,
             background:showTimeline?"#00ffc8":COLORS.border,
             color:showTimeline?"#06060f":"#888"}}>⏱</button>
-        <button title="Weight Paint" onClick={()=>{ handleEnterWeightPaint(); setWeightPainting(w=>!w); }}
-          style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:11,
-            background:weightPainting?"#FF6600":COLORS.border,
-            color:weightPainting?"#fff":"#888",fontWeight:700}}>WP</button>
-        <button title="Dyntopo" onClick={()=>setDyntopoEnabled(d=>!d)}
-          style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:11,
-            background:dyntopoEnabled?"#8844ff":COLORS.border,
-            color:dyntopoEnabled?"#fff":"#888",fontWeight:700}}>DT</button>
         <button title="Wireframe (Z)" onClick={toggleWireframe}
           style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:10,
             background:wireframe?COLORS.orange:COLORS.border,
@@ -1850,13 +1691,6 @@ export default function App() {
         {/* Mode bar */}
         <div style={{position:"absolute",top:10,left:"50%",transform:"translateX(-50%)",
           display:"flex",gap:4,background:"rgba(13,17,23,0.85)",borderRadius:6,padding:"4px"}}>
-          <button onClick={()=>setShowNLA(n=>!n)}
-            style={{padding:"4px 10px",border:"none",borderRadius:3,cursor:"pointer",
-              fontSize:11,fontWeight:700,textTransform:"uppercase",
-              background:showNLA?"#00ffc8":"transparent",
-              color:showNLA?"#06060f":"#666"}}>
-            NLA
-          </button>
           <button onClick={()=>setShowTimeline(t=>!t)}
             style={{padding:"4px 10px",border:"none",borderRadius:3,cursor:"pointer",
               fontSize:11,fontWeight:700,textTransform:"uppercase",
@@ -2046,200 +1880,6 @@ export default function App() {
           </div>
           <div style={{marginTop:"auto",color:"#333",fontSize:9,lineHeight:1.5}}>
             Click + drag to paint.<br/>Add primitive first to paint.
-          </div>
-        </div>
-      )}
-
-      {/* NLA + Dyntopo + Weight + BVH panel — Sessions 21-30 */}
-      {(showNLA || dyntopoEnabled || weightPainting) && (
-        <div style={{width:190,background:"#0d1117",borderLeft:"1px solid #21262d",
-          display:"flex",flexDirection:"column",flexShrink:0,
-          fontFamily:"JetBrains Mono,monospace",fontSize:11,overflow:"hidden"}}>
-          <div style={{padding:"6px 10px",borderBottom:"1px solid #21262d"}}>
-            <span style={{color:"#8844ff",fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>
-              Rig Tools
-            </span>
-          </div>
-          <div style={{flex:1,overflowY:"auto",padding:"8px 10px"}}>
-
-            {/* Pose Mode */}
-            <div style={{marginBottom:10}}>
-              <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Pose Mode</div>
-              <div style={{display:"flex",gap:4,marginBottom:4}}>
-                <button onClick={handleEnterPoseMode}
-                  style={{flex:1,padding:"4px",background:poseMode?"#00ffc8":"#1a1f2e",
-                    border:"none",color:poseMode?"#06060f":"#aaa",borderRadius:3,cursor:"pointer",fontSize:9}}>
-                  Enter
-                </button>
-                <button onClick={handleExitPoseMode}
-                  style={{flex:1,padding:"4px",background:"#1a1f2e",
-                    border:"none",color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:9}}>
-                  Exit
-                </button>
-              </div>
-              <button onClick={handleResetPose}
-                style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
-                  color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:9,marginBottom:4}}>
-                Reset to Rest
-              </button>
-              <button onClick={()=>handleSavePose("Pose_"+Object.keys(poseLibrary).length)}
-                style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
-                  color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:9}}>
-                Save Pose
-              </button>
-              {Object.keys(poseLibrary).length > 0 && (
-                <div style={{marginTop:4}}>
-                  <div style={{color:"#555",fontSize:8,marginBottom:2}}>Pose Library</div>
-                  {Object.keys(poseLibrary).map(name=>(
-                    <button key={name} onClick={()=>handleLoadPose(name)}
-                      style={{width:"100%",padding:"3px",background:"#1a1f2e",border:"1px solid #21262d",
-                        color:"#00ffc8",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:2,textAlign:"left"}}>
-                      {name}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Bind to Rig */}
-            <div style={{borderTop:"1px solid #21262d",paddingTop:8,marginBottom:10}}>
-              <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Skinning</div>
-              <button onClick={handleBindToRig}
-                style={{width:"100%",padding:"5px",background:"#FF6600",border:"none",
-                  color:"#fff",borderRadius:3,cursor:"pointer",fontSize:9,marginBottom:4}}>
-                Bind Mesh to Rig
-              </button>
-              <button onClick={()=>{ const mesh=meshRef.current; if(mesh) autoWeightByDistance(mesh,armatureRef.current); }}
-                style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
-                  color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:9}}>
-                Auto Weights
-              </button>
-            </div>
-
-            {/* Weight Paint controls */}
-            {weightPainting && (
-              <div style={{borderTop:"1px solid #21262d",paddingTop:8,marginBottom:10}}>
-                <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Weight Paint</div>
-                <div style={{marginBottom:4}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
-                    <span style={{color:"#555",fontSize:8}}>Bone</span>
-                    <span style={{color:"#00ffc8",fontSize:8}}>{wpBoneIndex}</span>
-                  </div>
-                  <input type="range" min={0} max={7} step={1} value={wpBoneIndex}
-                    onChange={e=>setWpBoneIndex(Number(e.target.value))} style={{width:"100%"}}/>
-                </div>
-                <div style={{marginBottom:4}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
-                    <span style={{color:"#555",fontSize:8}}>Radius</span>
-                    <span style={{color:"#00ffc8",fontSize:8}}>{wpRadius.toFixed(2)}</span>
-                  </div>
-                  <input type="range" min={0.05} max={3} step={0.05} value={wpRadius}
-                    onChange={e=>setWpRadius(Number(e.target.value))} style={{width:"100%"}}/>
-                </div>
-                <div style={{display:"flex",gap:3,marginBottom:4}}>
-                  {["add","sub","set"].map(m=>(
-                    <button key={m} onClick={()=>setWpMode(m)}
-                      style={{flex:1,padding:"3px",border:"none",borderRadius:3,cursor:"pointer",
-                        fontSize:8,fontWeight:700,
-                        background:wpMode===m?"#FF6600":"#1a1f2e",
-                        color:wpMode===m?"#fff":"#666"}}>
-                      {m}
-                    </button>
-                  ))}
-                </div>
-                <button onClick={()=>{ const m=meshRef.current; if(m) visualizeWeights(m, wpBoneIndex); }}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
-                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8}}>
-                  Visualize Weights
-                </button>
-              </div>
-            )}
-
-            {/* Dyntopo controls */}
-            {dyntopoEnabled && (
-              <div style={{borderTop:"1px solid #21262d",paddingTop:8,marginBottom:10}}>
-                <div style={{color:"#8844ff",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Dynamic Topology</div>
-                <div style={{marginBottom:4}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:2}}>
-                    <span style={{color:"#555",fontSize:8}}>Detail Size</span>
-                    <span style={{color:"#8844ff",fontSize:8}}>{dyntopoDetail.toFixed(3)}</span>
-                  </div>
-                  <input type="range" min={0.01} max={0.5} step={0.01} value={dyntopoDetail}
-                    onChange={e=>setDyntopoDetail(Number(e.target.value))} style={{width:"100%"}}/>
-                </div>
-                <div style={{display:"flex",gap:3,marginBottom:4}}>
-                  {["subdivide","collapse","both"].map(m=>(
-                    <button key={m} onClick={()=>setDyntopoMode(m)}
-                      style={{flex:1,padding:"3px",border:"none",borderRadius:3,cursor:"pointer",
-                        fontSize:8,fontWeight:700,
-                        background:dyntopoMode===m?"#8844ff":"#1a1f2e",
-                        color:dyntopoMode===m?"#fff":"#666"}}>
-                      {m}
-                    </button>
-                  ))}
-                </div>
-                <button onClick={handleDyntopoFlood}
-                  style={{width:"100%",padding:"4px",background:"#8844ff",border:"none",
-                    color:"#fff",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:3}}>
-                  Flood Fill
-                </button>
-                <button onClick={handleSmoothTopology}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
-                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8}}>
-                  Smooth Topology
-                </button>
-              </div>
-            )}
-
-            {/* NLA */}
-            {showNLA && (
-              <div style={{borderTop:"1px solid #21262d",paddingTop:8,marginBottom:10}}>
-                <div style={{color:"#00ffc8",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>NLA Editor</div>
-                <button onClick={handlePushDownAction}
-                  style={{width:"100%",padding:"5px",background:"#00ffc8",border:"none",
-                    color:"#06060f",borderRadius:3,cursor:"pointer",fontSize:9,marginBottom:4,fontWeight:700}}>
-                  Push Down Action
-                </button>
-                {nlaActions.map(action=>(
-                  <div key={action.id} style={{padding:"3px 6px",background:"#1a1f2e",
-                    border:"1px solid #21262d",borderRadius:3,marginBottom:3}}>
-                    <span style={{color:"#aaa",fontSize:8}}>{action.name}</span>
-                    <span style={{color:"#555",fontSize:8,marginLeft:6}}>{action.frameEnd}f</span>
-                  </div>
-                ))}
-                {nlaTracks.map(track=>(
-                  <div key={track.id} style={{marginTop:4}}>
-                    <div style={{color:"#555",fontSize:8,marginBottom:2}}>{track.name} — {track.strips.length} strips</div>
-                    {track.strips.map(strip=>(
-                      <div key={strip.id} style={{padding:"2px 6px",background:"#0a2a1a",
-                        border:"1px solid #00ffc822",borderRadius:3,marginBottom:2}}>
-                        <span style={{color:"#00ffc8",fontSize:8}}>{strip.actionName}</span>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* BVH Import */}
-            <div style={{borderTop:"1px solid #21262d",paddingTop:8}}>
-              <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>BVH / Mocap</div>
-              <input ref={bvhInputRef} type="file" accept=".bvh" style={{display:"none"}}
-                onChange={e=>e.target.files?.[0] && handleBVHImport(e.target.files[0])}/>
-              <button onClick={()=>bvhInputRef.current?.click()}
-                style={{width:"100%",padding:"5px",background:"#1a1f2e",border:"1px solid #21262d",
-                  color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:9,marginBottom:4}}>
-                📁 Import BVH
-              </button>
-              {bvhData && (
-                <div style={{color:"#00ffc8",fontSize:8,lineHeight:1.6}}>
-                  ✓ {bvhData.bvh.joints.length} joints<br/>
-                  ✓ {bvhData.bvh.frames.length} frames<br/>
-                  ✓ {(1/bvhData.bvh.frameTime).toFixed(0)}fps
-                </div>
-              )}
-            </div>
-
           </div>
         </div>
       )}
