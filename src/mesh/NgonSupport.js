@@ -1,0 +1,10 @@
+import * as THREE from "three";
+export function triangulateNgon(verts){const tris=[];for(let i=1;i<verts.length-1;i++)tris.push([verts[0],verts[i],verts[i+1]]);return tris;}
+export function buildNgonGeometry(ngons){const pos=[],nrm=[],uvs=[],idx=[];let off=0;for(const ng of ngons){for(const[a,b,c]of triangulateNgon(ng)){const n=b.clone().sub(a).cross(c.clone().sub(a)).normalize();for(const v of[a,b,c]){pos.push(v.x,v.y,v.z);nrm.push(n.x,n.y,n.z);uvs.push(0.5,0.5);}idx.push(off,off+1,off+2);off+=3;}}const geo=new THREE.BufferGeometry();geo.setAttribute("position",new THREE.Float32BufferAttribute(pos,3));geo.setAttribute("normal",new THREE.Float32BufferAttribute(nrm,3));geo.setAttribute("uv",new THREE.Float32BufferAttribute(uvs,2));geo.setIndex(idx);return geo;}
+export function addNgonFace(hem,vertIndices){if(!hem.ngonFaces)hem.ngonFaces=[];hem.ngonFaces.push({verts:[...vertIndices],id:crypto.randomUUID()});}
+export function getNgonFaces(hem){return hem.ngonFaces||[];}
+export function dissolveEdge(hem,edgeId){if(!hem._dissolvedEdges)hem._dissolvedEdges=new Set();hem._dissolvedEdges.add(edgeId);return hem;}
+export function bridgeFaces(hem,faceIdA,faceIdB){if(!hem.ngonFaces)hem.ngonFaces=[];const a=hem.ngonFaces.find(f=>f.id===faceIdA),b=hem.ngonFaces.find(f=>f.id===faceIdB);if(!a||!b)return hem;hem.ngonFaces.push({verts:[...a.verts,...b.verts],id:crypto.randomUUID(),bridged:true});return hem;}
+export function gridFill(hem,edgeLoop){if(!hem.ngonFaces)hem.ngonFaces=[];const n=edgeLoop.length,half=Math.floor(n/2);for(let i=0;i<half-1;i++)hem.ngonFaces.push({verts:[edgeLoop[i],edgeLoop[i+1],edgeLoop[n-i-2],edgeLoop[n-i-1]],id:crypto.randomUUID(),type:"quad"});return hem;}
+export function getNgonStats(hem){const ng=hem.ngonFaces||[];return{total:ng.length,quads:ng.filter(f=>f.verts.length===4).length,tris:ng.filter(f=>f.verts.length===3).length,ngons:ng.filter(f=>f.verts.length>4).length};}
+export function convertNgonsToTris(hem){const tris=[];for(const f of(hem.ngonFaces||[]))for(const t of triangulateNgon(f.verts))tris.push({verts:t,id:crypto.randomUUID(),type:"tri"});hem.triFaces=[...(hem.triFaces||[]),...tris];return hem;}
