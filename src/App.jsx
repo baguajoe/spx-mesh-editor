@@ -316,6 +316,8 @@ export default function App() {
   const [sculptFalloff, setSculptFalloff] = useState("smooth");
   const [sculptSymX, setSculptSymX] = useState(false);
   const sculptingRef = useRef(false);
+  const lazyMouseRef = useRef({ x: 0, y: 0 });
+  const sculptStrokeCountRef = useRef(0);
   // ── Session 8: Vertex color paint state ──────────────────────────────────
   const [vcPaintColor, setVcPaintColor] = useState("#ff6600");
   const [vcPaintColor2, setVcPaintColor2] = useState("#00ffc8");
@@ -924,16 +926,45 @@ export default function App() {
     const mesh = meshRef.current; if (!mesh) return;
     const camera = cameraRef.current; if (!camera) return;
     const canvas = canvasRef.current; if (!canvas) return;
-    const hit = getSculptHit(e, canvas, camera, mesh);
+
+    // Lazy mouse smoothing
+    const lazy = lazyMouseRef.current;
+    const rect = canvas.getBoundingClientRect();
+    lazy.x += ((e.clientX - rect.left) - lazy.x) * 0.4;
+    lazy.y += ((e.clientY - rect.top)  - lazy.y) * 0.4;
+
+    // Pressure sensitivity (tablet or fallback 1.0)
+    const pressure = (e.pressure > 0) ? e.pressure : 1.0;
+
+    const smoothedE = Object.assign({}, e, {
+      clientX: lazy.x + rect.left,
+      clientY: lazy.y + rect.top,
+    });
+    const hit = getSculptHit(smoothedE, canvas, camera, mesh);
     if (!hit) return;
+
     applySculptStroke(mesh, hit, {
       type: sculptBrush,
       radius: sculptRadius,
-      strength: sculptStrength,
+      strength: sculptStrength * pressure,
       falloffType: sculptFalloff,
       symmetryX: sculptSymX,
     });
-  }, [sculptBrush, sculptRadius, sculptStrength, sculptFalloff, sculptSymX]);
+
+    // DynaMesh auto-remesh every 8 strokes when dyntopo enabled
+    sculptStrokeCountRef.current += 1;
+    if (dyntopoEnabled && sculptStrokeCountRef.current % 8 === 0) {
+      try {
+        const settings = createDynaMeshSettings({ resolution: 64 });
+        dynaMeshRemesh(mesh, settings);
+      } catch(err) {}
+    }
+
+    if (mesh.geometry) {
+      mesh.geometry.attributes.position.needsUpdate = true;
+      mesh.geometry.computeVertexNormals();
+    }
+  }, [sculptBrush, sculptRadius, sculptStrength, sculptFalloff, sculptSymX, dyntopoEnabled]);
 
   // ── Session 8: Vertex color paint stroke ─────────────────────────────────
   const applyVertexPaint = useCallback((e) => {
