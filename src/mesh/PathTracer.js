@@ -1,254 +1,188 @@
 import * as THREE from "three";
 
-// ── Path tracer settings ──────────────────────────────────────────────────────
 export function createPathTracerSettings(options = {}) {
   return {
-    enabled:        false,
-    samples:        options.samples        || 1,
-    maxSamples:     options.maxSamples     || 256,
-    bounces:        options.bounces        || 4,
-    resolutionScale:options.resolutionScale|| 1.0,
-    progressive:    options.progressive    || true,
-    denoise:        options.denoise        || false,
-    toneMapping:    options.toneMapping    || THREE.ACESFilmicToneMapping,
-    exposure:       options.exposure       || 1.0,
-    background:     options.background     || new THREE.Color("#000010"),
-    envMapIntensity:options.envMapIntensity|| 1.0,
+    enabled:         false,
+    samples:         options.samples         || 1,
+    maxSamples:      options.maxSamples      || 512,
+    bounces:         options.bounces         || 8,
+    resolutionScale: options.resolutionScale || 0.5,
+    progressive:     options.progressive     ?? true,
+    denoise:         options.denoise         ?? true,
+    toneMapping:     options.toneMapping     || THREE.ACESFilmicToneMapping,
+    exposure:        options.exposure        || 1.0,
+    background:      options.background      || new THREE.Color("#000010"),
+    tiles:           options.tiles           || 2,
+    renderDelay:     options.renderDelay     || 8,
+    environmentIntensity: options.environmentIntensity || 1.0,
+    filterGlossyFactor:   options.filterGlossyFactor   || 0.5,
   };
 }
 
-// ── Detect three-gpu-pathtracer ───────────────────────────────────────────────
 export async function detectPathTracer() {
   try {
-    // three-gpu-pathtracer is an optional dependency
-    // Check if it's available
     const mod = await import(/* @vite-ignore */ "three-gpu-pathtracer").catch(() => null);
-    if (mod) {
-      return { available: true, version: mod.VERSION || "unknown", module: mod };
-    }
-    return { available: false, reason: "three-gpu-pathtracer not installed" };
-  } catch(e) {
+    if (mod?.WebGLPathTracer) return { available: true, version: mod.VERSION || "unknown", mod };
+    return { available: false, reason: "three-gpu-pathtracer not installed — run: npm install three-gpu-pathtracer" };
+  } catch (e) {
     return { available: false, reason: e.message };
   }
 }
 
-// ── WebGL path tracer (custom, no external dep) ───────────────────────────────
-export function createWebGLPathTracer(renderer, scene, camera, options = {}) {
+export async function createWebGLPathTracer(renderer, scene, camera, options = {}) {
   const settings = createPathTracerSettings(options);
-  const w = renderer.domElement.width  * settings.resolutionScale;
-  const h = renderer.domElement.height * settings.resolutionScale;
+  const detected = await detectPathTracer();
 
-  // Accumulation render target
-  const accumulationTarget = new THREE.WebGLRenderTarget(w, h, {
-    type:   THREE.FloatType,
-    format: THREE.RGBAFormat,
-    minFilter: THREE.LinearFilter,
-    magFilter: THREE.LinearFilter,
-  });
+  if (!detected.available) {
+    console.warn("[PathTracer] three-gpu-pathtracer not available — using fallback accumulation renderer");
+    return createFallbackAccumulator(renderer, scene, camera, settings);
+  }
 
-  const copyTarget = accumulationTarget.clone();
+  const { WebGLPathTracer, GradientEquirectTexture } = detected.mod;
 
-  // Full-screen quad for accumulation
-  const quadGeo = new THREE.PlaneGeometry(2, 2);
-  const quadMat = new THREE.ShaderMaterial({
-    uniforms: {
-      tPrevious: { value: accumulationTarget.texture },
-      tCurrent:  { value: null },
-      blend:     { value: 0.0 },
-    },
-    vertexShader: `
-      varying vec2 vUv;
-      void main() { vUv = uv; gl_Position = vec4(position, 1.0); }
-    `,
-    fragmentShader: `
-      uniform sampler2D tPrevious;
-      uniform sampler2D tCurrent;
-      uniform float blend;
-      varying vec2 vUv;
-      void main() {
-        vec4 prev = texture2D(tPrevious, vUv);
-        vec4 curr = texture2D(tCurrent,  vUv);
-        gl_FragColor = mix(prev, curr, blend);
-      }
-    `,
-    depthWrite: false,
-    depthTest:  false,
-  });
+  const pt = new WebGLPathTracer(renderer);
+  pt.setScene(scene, camera);
+  pt.bounces              = settings.bounces;
+  pt.tiles                = settings.tiles;
+  pt.filterGlossyFactor   = settings.filterGlossyFactor;
+  pt.environmentIntensity = settings.environmentIntensity;
+  pt.renderDelay          = settings.renderDelay;
 
-  const quad = new THREE.Mesh(quadGeo, quadMat);
-  const quadScene  = new THREE.Scene();
-  const quadCamera = new THREE.OrthographicCamera(-1,1,1,-1,0,1);
-  quadScene.add(quad);
+  renderer.toneMapping    = settings.toneMapping;
+  renderer.toneMappingExposure = settings.exposure;
 
   return {
-    settings,
-    accumulationTarget,
-    copyTarget,
-    quadMat,
-    quadScene,
-    quadCamera,
-    currentSample: 0,
-    isRendering:   false,
-    startTime:     null,
-    lastFrameTime: null,
+    _type:    "WebGLPathTracer",
+    _pt:      pt,
+    _settings: settings,
+    _renderer: renderer,
+    _scene:   scene,
+    _camera:  camera,
+    samples:  0,
+    running:  false,
+    _raf:     null,
   };
 }
 
-// ── Step path tracer ──────────────────────────────────────────────────────────
-export function stepPathTracer(pt, renderer, scene, camera) {
-  if (!pt.isRendering) return;
-  const { settings, accumulationTarget, copyTarget, quadMat, quadScene, quadCamera } = pt;
-
-  // Jitter camera for anti-aliasing
-  const aspect = renderer.domElement.width / renderer.domElement.height;
-  const jitterX = (Math.random()-0.5) * 0.001;
-  const jitterY = (Math.random()-0.5) * 0.001;
-  camera.setViewOffset(
-    renderer.domElement.width,  renderer.domElement.height,
-    jitterX * renderer.domElement.width,
-    jitterY * renderer.domElement.height,
-    renderer.domElement.width,  renderer.domElement.height,
+function createFallbackAccumulator(renderer, scene, camera, settings) {
+  const rt1 = new THREE.WebGLRenderTarget(
+    renderer.domElement.width  * settings.resolutionScale,
+    renderer.domElement.height * settings.resolutionScale,
+    { type: THREE.FloatType }
   );
+  const rt2 = rt1.clone();
 
-  // Render current sample to copy target
-  renderer.setRenderTarget(copyTarget);
-  renderer.render(scene, camera);
+  const blendMat = new THREE.MeshBasicMaterial();
+  const blendGeo = new THREE.PlaneGeometry(2, 2);
+  const blendMesh = new THREE.Mesh(blendGeo, blendMat);
+  const blendScene = new THREE.Scene();
+  const blendCam   = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  blendScene.add(blendMesh);
 
-  // Accumulate
-  quadMat.uniforms.tPrevious.value = accumulationTarget.texture;
-  quadMat.uniforms.tCurrent.value  = copyTarget.texture;
-  const blend = 1.0 / (pt.currentSample + 1);
-  quadMat.uniforms.blend.value     = blend;
-
-  renderer.setRenderTarget(accumulationTarget);
-  renderer.render(quadScene, quadCamera);
-
-  // Display to screen
-  renderer.setRenderTarget(null);
-  quadMat.uniforms.tPrevious.value = accumulationTarget.texture;
-  quadMat.uniforms.tCurrent.value  = accumulationTarget.texture;
-  quadMat.uniforms.blend.value     = 0.0;
-  renderer.render(quadScene, quadCamera);
-
-  // Reset camera jitter
-  camera.clearViewOffset();
-
-  pt.currentSample++;
-  pt.lastFrameTime = Date.now();
-
-  if (pt.currentSample >= settings.maxSamples) {
-    pt.isRendering = false;
-    return { done: true, samples: pt.currentSample };
-  }
-  return { done: false, samples: pt.currentSample, progress: pt.currentSample / settings.maxSamples };
-}
-
-// ── Start path tracing ────────────────────────────────────────────────────────
-export function startPathTracing(pt) {
-  pt.isRendering   = true;
-  pt.currentSample = 0;
-  pt.startTime     = Date.now();
-  return pt;
-}
-
-// ── Stop path tracing ─────────────────────────────────────────────────────────
-export function stopPathTracing(pt) {
-  pt.isRendering = false;
-  return pt;
-}
-
-// ── Reset accumulation ────────────────────────────────────────────────────────
-export function resetPathTracer(pt, renderer) {
-  pt.currentSample = 0;
-  if (renderer) {
-    renderer.setRenderTarget(pt.accumulationTarget);
-    renderer.clear();
-    renderer.setRenderTarget(null);
-  }
-}
-
-// ── Simple software ray marcher (preview quality) ─────────────────────────────
-export function createRayMarchPreview(width=64, height=64) {
-  const canvas = document.createElement("canvas");
-  canvas.width  = width;
-  canvas.height = height;
-  const ctx     = canvas.getContext("2d");
-  return { canvas, ctx, width, height };
-}
-
-export function renderRayMarchPreview(preview, scene, camera) {
-  const { ctx, width, height } = preview;
-  const img = ctx.createImageData(width, height);
-
-  const origin = new THREE.Vector3();
-  const dir    = new THREE.Vector3();
-  camera.getWorldPosition(origin);
-
-  const invProj = new THREE.Matrix4().copy(camera.projectionMatrix).invert();
-  const invView = new THREE.Matrix4().copy(camera.matrixWorldInverse).invert();
-
-  // Simple ray-scene intersection (boxes only for preview)
-  const boxes = [];
-  scene.traverse(obj => {
-    if (obj.isMesh) {
-      const box = new THREE.Box3().setFromObject(obj);
-      boxes.push({ box, color: obj.material?.color || new THREE.Color(0.8,0.8,0.8) });
-    }
-  });
-
-  for (let y=0; y<height; y++) for (let x=0; x<width; x++) {
-    const nx = (x/width)*2-1;
-    const ny = (y/height)*-2+1;
-
-    dir.set(nx, ny, -1).applyMatrix4(invProj).applyMatrix4(invView).sub(origin).normalize();
-
-    let minDist = Infinity;
-    let hitColor = new THREE.Color(0.1, 0.1, 0.15);
-
-    boxes.forEach(({ box, color }) => {
-      const ray = new THREE.Ray(origin, dir);
-      const hit = ray.intersectBox(box, new THREE.Vector3());
-      if (hit) {
-        const d = origin.distanceTo(hit);
-        if (d < minDist) { minDist = d; hitColor = color; }
-      }
-    });
-
-    const i = (y*width+x)*4;
-    const shade = minDist < Infinity ? Math.max(0, 1-minDist*0.1) : 0;
-    img.data[i]   = hitColor.r*255*shade;
-    img.data[i+1] = hitColor.g*255*shade;
-    img.data[i+2] = hitColor.b*255*shade;
-    img.data[i+3] = 255;
-  }
-
-  ctx.putImageData(img, 0, 0);
-  return canvas;
-}
-
-// ── Export rendered frame ─────────────────────────────────────────────────────
-export function exportPathTracedFrame(renderer, filename="pathtraced.png") {
-  const dataURL = renderer.domElement.toDataURL("image/png");
-  const a = document.createElement("a");
-  a.href     = dataURL;
-  a.download = filename;
-  a.click();
-  return dataURL;
-}
-
-// ── Path tracer stats ─────────────────────────────────────────────────────────
-export function getPathTracerStats(pt) {
-  const elapsed = pt.startTime ? (Date.now() - pt.startTime) / 1000 : 0;
-  const spp     = pt.currentSample;
-  const sps     = elapsed > 0 ? spp / elapsed : 0;
-  const eta     = sps > 0 ? (pt.settings.maxSamples - spp) / sps : 0;
   return {
-    samples:    spp,
-    maxSamples: pt.settings.maxSamples,
-    progress:   spp / pt.settings.maxSamples,
-    elapsed:    elapsed.toFixed(1),
-    sps:        sps.toFixed(1),
-    eta:        eta.toFixed(1),
-    isRendering:pt.isRendering,
+    _type:     "FallbackAccumulator",
+    _rt1:      rt1,
+    _rt2:      rt2,
+    _blendMat: blendMat,
+    _blendScene: blendScene,
+    _blendCam:   blendCam,
+    _renderer:   renderer,
+    _scene:      scene,
+    _camera:     camera,
+    _settings:   settings,
+    samples:     0,
+    running:     false,
+    _raf:        null,
   };
+}
+
+export function startPathTracing(pt) {
+  if (!pt) return;
+  pt.running = true;
+  pt.samples = 0;
+  if (pt._type === "WebGLPathTracer") {
+    pt._pt.renderSample();
+  }
+}
+
+export function stopPathTracing(pt) {
+  if (!pt) return;
+  pt.running = false;
+  if (pt._raf) { cancelAnimationFrame(pt._raf); pt._raf = null; }
+}
+
+export function stepPathTracer(pt, renderer, scene, camera) {
+  if (!pt || !pt.running) return;
+  if (pt.samples >= pt._settings.maxSamples) { pt.running = false; return; }
+
+  if (pt._type === "WebGLPathTracer") {
+    pt._pt.renderSample();
+    pt.samples++;
+    return;
+  }
+
+  // Fallback: progressive accumulation via alpha blend
+  const { _rt1, _rt2, _blendMat, _blendScene, _blendCam } = pt;
+  renderer.setRenderTarget(_rt1);
+  renderer.render(scene, camera);
+  renderer.setRenderTarget(null);
+
+  const alpha = 1 / (pt.samples + 1);
+  _blendMat.map     = _rt1.texture;
+  _blendMat.opacity = alpha;
+  _blendMat.transparent = true;
+
+  renderer.setRenderTarget(_rt2);
+  renderer.render(_blendScene, _blendCam);
+  renderer.setRenderTarget(null);
+
+  // Swap targets
+  const tmp = pt._rt1; pt._rt1 = pt._rt2; pt._rt2 = tmp;
+  pt.samples++;
+}
+
+export function resetPathTracer(pt, renderer) {
+  if (!pt) return;
+  pt.samples = 0;
+  if (pt._type === "WebGLPathTracer" && pt._pt?.reset) {
+    pt._pt.reset();
+  }
+}
+
+export function exportPathTracedFrame(renderer, filename = "pathtraced.png") {
+  const canvas = renderer.domElement;
+  const url    = canvas.toDataURL("image/png");
+  const a      = document.createElement("a");
+  a.href       = url;
+  a.download   = filename;
+  a.click();
+  return url;
+}
+
+export function getPathTracerStats(pt) {
+  if (!pt) return { samples: 0, running: false, type: "none" };
+  return {
+    samples:    pt.samples,
+    maxSamples: pt._settings?.maxSamples || 512,
+    running:    pt.running,
+    type:       pt._type,
+    progress:   pt.samples / (pt._settings?.maxSamples || 512),
+    bounces:    pt._settings?.bounces || 8,
+  };
+}
+
+export async function detectWebGPU() {
+  if (!navigator.gpu) return { available: false, reason: "navigator.gpu not present" };
+  try {
+    const adapter = await navigator.gpu.requestAdapter();
+    if (!adapter)  return { available: false, reason: "No WebGPU adapter found" };
+    const device   = await adapter.requestDevice();
+    return {
+      available: true,
+      adapter:   adapter.name || "unknown",
+      features:  [...adapter.features].map(f => f.toString()),
+    };
+  } catch (e) {
+    return { available: false, reason: e.message };
+  }
 }
