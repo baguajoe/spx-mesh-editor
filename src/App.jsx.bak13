@@ -43,14 +43,6 @@ import { CONSTRAINT_TYPES, createConstraint, applyConstraint, applyAllConstraint
 import { createBakeBuffer, bakeFrame, restoreFrame, createRigidBody, stepRigidBody, bakeRigidBodies, applyBakedFrame, fractureMesh } from "./mesh/PhysicsBake.js";
 import { WALK_STYLES, generateWalkCycle, applyWalkCycleFrame, generateIdleCycle, generateBreathingCycle } from "./mesh/WalkCycleGenerator.js";
 import { createDynaMeshSettings, dynaMeshRemesh, checkDynaMeshTrigger, getDynaMeshStats } from "./mesh/DynaMeshSystem.js";
-import { createHairStrand, emitHair, buildHairLines, buildHairTubes, clumpHair, HAIR_PRESETS, applyHairPreset, getHairStats, serializeHair } from "./mesh/HairSystem.js";
-import { GROOM_BRUSHES, applyGroomBrush } from "./mesh/HairGrooming.js";
-import { createHairPhysicsSettings, stepHairPhysics, addWindForce, addCollider, resetHairToRest, bakeHairPhysics } from "./mesh/HairPhysics.js";
-import { generateHairCards, buildHairCardMesh, mergeHairCards, getHairCardStats } from "./mesh/HairCards.js";
-import { HAIR_SHADER_PRESETS, createHairMaterial, createAnisotropicHairMaterial, applyHairPresetToMesh, createHairAlphaTexture } from "./mesh/HairShader.js";
-import { createCloth, stepCloth, CLOTH_PRESETS, applyClothPreset, resetCloth, getClothStats } from "./mesh/ClothSystem.js";
-import { pinVertex, unpinVertex, pinVerticesInRadius, pinTopRow, pinToBone, getPinnedVertices, visualizePins } from "./mesh/ClothPinning.js";
-import { createSphereCollider, createPlaneCollider, applyCollisions, applySelfCollision, createCollidersFromMesh, visualizeCollider } from "./mesh/ClothCollision.js";
 import { createRetopoSettings, quadDominantRetopo, detectHardEdges, getRetopoStats } from "./mesh/AutoRetopo.js";
 import { generateFibermesh, buildFibermeshLines, buildFibermeshTubes, combStrands, adjustLength, clumpStrands, puffStrands, smoothStrands, getFibermeshStats, serializeFibermesh } from "./mesh/FibermeshSystem.js";
 import { AnimationTimeline } from "./components/AnimationTimeline.jsx";
@@ -1331,127 +1323,6 @@ export default function App() {
   }, [matProps]);
 
 
-  // ── Sessions 78-87: Hair handlers ───────────────────────────────────────
-  const handleEmitHair = useCallback(() => {
-    const mesh = meshRef.current; if (!mesh) { setStatus("Select mesh first"); return; }
-    setStatus("Emitting hair...");
-    try {
-      const preset  = HAIR_PRESETS[hairPreset];
-      const strands = applyHairPreset(mesh, hairPreset);
-      hairStrandsRef.current = strands;
-      setHairStrands([...strands]);
-      if (hairGroup) sceneRef.current?.remove(hairGroup);
-      const group = hairDisplayMode === "tubes"
-        ? buildHairTubes(strands)
-        : buildHairLines(strands);
-      sceneRef.current?.add(group);
-      setHairGroup(group);
-      const stats = getHairStats(strands);
-      setStatus("Hair: " + stats.strands + " strands emitted");
-    } catch(e) { setStatus("Hair emit failed: " + e.message); }
-  }, [hairPreset, hairDisplayMode, hairGroup]);
-
-  const handleGroomHair = useCallback((hit) => {
-    const strands = hairStrandsRef.current;
-    if (!strands.length || !hit) return;
-    applyGroomBrush(hairGroomBrush, strands, hit.point,
-      hit.face?.normal || new THREE.Vector3(0,1,0), { radius:0.3, strength:0.05 });
-    if (hairGroup) sceneRef.current?.remove(hairGroup);
-    const group = hairDisplayMode === "tubes"
-      ? buildHairTubes(strands)
-      : buildHairLines(strands);
-    sceneRef.current?.add(group);
-    setHairGroup(group);
-  }, [hairGroomBrush, hairDisplayMode, hairGroup]);
-
-  const handleGenerateHairCards = useCallback(() => {
-    const strands = hairStrandsRef.current;
-    if (!strands.length) { setStatus("Emit hair first"); return; }
-    const cards = generateHairCards(strands);
-    const cardMesh = buildHairCardMesh(cards, createAnisotropicHairMaterial(hairShaderPreset));
-    if (hairCardMesh) sceneRef.current?.remove(hairCardMesh);
-    sceneRef.current?.add(cardMesh);
-    setHairCards(cards);
-    setHairCardMesh(cardMesh);
-    const stats = getHairCardStats(cards);
-    setStatus("Hair cards: " + stats.cards + " cards, " + stats.triangles + " tris");
-  }, [hairShaderPreset, hairCardMesh]);
-
-  const handleToggleHairPhysics = useCallback(() => {
-    setHairPhysSettings(prev => {
-      const next = { ...prev, enabled: !prev.enabled };
-      hairPhysRef.current = next;
-      return next;
-    });
-  }, []);
-
-  const handleResetHair = useCallback(() => {
-    resetHairToRest(hairStrandsRef.current);
-    if (hairGroup) sceneRef.current?.remove(hairGroup);
-    const group = buildHairLines(hairStrandsRef.current);
-    sceneRef.current?.add(group);
-    setHairGroup(group);
-    setStatus("Hair reset to rest");
-  }, [hairGroup]);
-
-  // ── Sessions 88-90: Cloth handlers ───────────────────────────────────────
-  const handleCreateCloth = useCallback(() => {
-    const mesh = meshRef.current; if (!mesh) { setStatus("Select mesh first"); return; }
-    try {
-      const cloth = createCloth(mesh, { stiffness:0.8, damping:0.99 });
-      if (!cloth) { setStatus("Cloth creation failed"); return; }
-      applyClothPreset(cloth, clothPreset);
-      clothSimRef.current = cloth;
-      setClothSim(cloth);
-      const colliders = [createPlaneCollider(new THREE.Vector3(0,1,0), 0)];
-      setClothColliders(colliders);
-      pinTopRow(cloth);
-      const stats = getClothStats(cloth);
-      setStatus("Cloth: " + stats.particles + " particles, " + stats.pinned + " pinned");
-    } catch(e) { setStatus("Cloth failed: " + e.message); }
-  }, [clothPreset]);
-
-  const handleStartCloth = useCallback(() => {
-    const cloth = clothSimRef.current; if (!cloth) { setStatus("Create cloth first"); return; }
-    setClothRunning(true);
-    const simulate = () => {
-      stepCloth(cloth, 1/60);
-      if (clothSelfCol) applySelfCollision(cloth);
-      applyCollisions(cloth, clothColliders);
-      clothRafRef.current = requestAnimationFrame(simulate);
-    };
-    clothRafRef.current = requestAnimationFrame(simulate);
-    setStatus("Cloth simulation running");
-  }, [clothColliders, clothSelfCol]);
-
-  const handleStopCloth = useCallback(() => {
-    if (clothRafRef.current) cancelAnimationFrame(clothRafRef.current);
-    setClothRunning(false);
-    setStatus("Cloth stopped");
-  }, []);
-
-  const handleResetCloth = useCallback(() => {
-    handleStopCloth();
-    const cloth = clothSimRef.current; if (!cloth) return;
-    resetCloth(cloth);
-    setStatus("Cloth reset");
-  }, [handleStopCloth]);
-
-  const handleAddClothCollider = useCallback(() => {
-    const mesh = meshRef.current;
-    if (mesh) {
-      const cols = createCollidersFromMesh(mesh);
-      setClothColliders(prev => [...prev, ...cols]);
-      cols.forEach(c => visualizeCollider(c, sceneRef.current));
-      setStatus("Colliders added from mesh");
-    } else {
-      const col = createSphereCollider(new THREE.Vector3(0,0,0), 0.5);
-      setClothColliders(prev => [...prev, col]);
-      visualizeCollider(col, sceneRef.current);
-      setStatus("Sphere collider added");
-    }
-  }, []);
-
   // ── Session 71-72: DynaMesh handlers ────────────────────────────────────
   const handleDynaMeshRemesh = useCallback(() => {
     const mesh = meshRef.current; if (!mesh) { setStatus("No mesh selected"); return; }
@@ -2446,28 +2317,6 @@ export default function App() {
   const [fiberMode,        setFiberMode]        = useState("tubes");
   const [fiberBrush,       setFiberBrush]       = useState("comb");
   const [showFiberPanel,   setShowFiberPanel]   = useState(false);
-  // ── Sessions 78-90: Hair + Cloth state ───────────────────────────────────
-  const [hairStrands,      setHairStrands]      = useState([]);
-  const hairStrandsRef     = useRef([]);
-  const [hairGroup,        setHairGroup]        = useState(null);
-  const [hairPreset,       setHairPreset]       = useState("medium");
-  const [hairDisplayMode,  setHairDisplayMode]  = useState("lines");
-  const [hairGroomBrush,   setHairGroomBrush]   = useState("comb");
-  const [hairShaderPreset, setHairShaderPreset] = useState("natural");
-  const [hairPhysSettings, setHairPhysSettings] = useState(createHairPhysicsSettings());
-  const hairPhysRef        = useRef(null);
-  const [hairCards,        setHairCards]        = useState([]);
-  const [hairCardMesh,     setHairCardMesh]     = useState(null);
-  const [showHairPanel,    setShowHairPanel]    = useState(false);
-  const [clothSim,         setClothSim]         = useState(null);
-  const clothSimRef        = useRef(null);
-  const [clothPreset,      setClothPreset]      = useState("cotton");
-  const [clothRunning,     setClothRunning]     = useState(false);
-  const clothRafRef        = useRef(null);
-  const [clothColliders,   setClothColliders]   = useState([]);
-  const [clothSelfCol,     setClothSelfCol]     = useState(false);
-  const [clothPinMode,     setClothPinMode]     = useState(false);
-  const [showClothPanel,   setShowClothPanel]   = useState(false);
 
   // ── Sessions 11-12: Procedural mesh handlers ────────────────────────────
   const addProceduralMesh = useCallback(() => {
@@ -2614,14 +2463,6 @@ export default function App() {
           style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:14,
             background:showTimeline?"#00ffc8":COLORS.border,
             color:showTimeline?"#06060f":"#888"}}>⏱</button>
-        <button title="Hair" onClick={()=>setShowHairPanel(h=>!h)}
-          style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:14,
-            background:showHairPanel?"#886644":COLORS.border,
-            color:showHairPanel?"#fff":"#888"}}>💇</button>
-        <button title="Cloth" onClick={()=>setShowClothPanel(c=>!c)}
-          style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:14,
-            background:showClothPanel?"#4488ff":COLORS.border,
-            color:showClothPanel?"#fff":"#888"}}>🧵</button>
         <button title="DynaMesh" onClick={()=>setShowDynaPanel(d=>!d)}
           style={{width:38,height:38,border:"none",borderRadius:4,cursor:"pointer",fontSize:11,
             background:showDynaPanel?"#00ffc8":COLORS.border,
@@ -3157,155 +2998,6 @@ export default function App() {
               )}
             </div>
 
-          </div>
-        </div>
-      )}
-
-      {/* Sessions 78-90: Hair + Cloth panel */}
-      {(showHairPanel || showClothPanel) && (
-        <div style={{width:210,background:"#0d1117",borderLeft:"1px solid #21262d",
-          display:"flex",flexDirection:"column",flexShrink:0,
-          fontFamily:"JetBrains Mono,monospace",fontSize:11,overflow:"hidden"}}>
-          <div style={{padding:"6px 10px",borderBottom:"1px solid #21262d"}}>
-            <span style={{color:"#00ffc8",fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:1}}>
-              Hair + Cloth
-            </span>
-          </div>
-          <div style={{flex:1,overflowY:"auto",padding:"8px 10px"}}>
-
-            {/* Hair — Sessions 78-87 */}
-            {showHairPanel && (
-              <div style={{marginBottom:10}}>
-                <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Hair System</div>
-                <div style={{color:"#555",fontSize:8,marginBottom:2}}>Preset</div>
-                <div style={{display:"flex",gap:2,flexWrap:"wrap",marginBottom:4}}>
-                  {Object.entries(HAIR_PRESETS).map(([k,v])=>(
-                    <button key={k} onClick={()=>setHairPreset(k)}
-                      style={{padding:"2px 4px",background:hairPreset===k?"#00ffc8":"#1a1f2e",
-                        border:"none",color:hairPreset===k?"#06060f":"#555",
-                        borderRadius:3,cursor:"pointer",fontSize:7}}>
-                      {v.label}
-                    </button>
-                  ))}
-                </div>
-                <div style={{display:"flex",gap:3,marginBottom:4}}>
-                  {["lines","tubes"].map(m=>(
-                    <button key={m} onClick={()=>setHairDisplayMode(m)}
-                      style={{flex:1,padding:"3px",border:"none",borderRadius:3,cursor:"pointer",
-                        fontSize:8,fontWeight:700,
-                        background:hairDisplayMode===m?"#FF6600":"#1a1f2e",
-                        color:hairDisplayMode===m?"#fff":"#666"}}>
-                      {m}
-                    </button>
-                  ))}
-                </div>
-                <button onClick={handleEmitHair}
-                  style={{width:"100%",padding:"5px",background:"#00ffc8",border:"none",color:"#06060f",
-                    borderRadius:3,cursor:"pointer",fontSize:9,fontWeight:700,marginBottom:4}}>
-                  💇 Emit Hair
-                </button>
-                <div style={{color:"#555",fontSize:8,marginBottom:2}}>Groom Brush</div>
-                <div style={{display:"flex",gap:2,flexWrap:"wrap",marginBottom:4}}>
-                  {Object.entries(GROOM_BRUSHES).map(([k,v])=>(
-                    <button key={k} onClick={()=>setHairGroomBrush(k)}
-                      title={v.description}
-                      style={{padding:"2px 5px",background:hairGroomBrush===k?"#8844ff":"#1a1f2e",
-                        border:"none",color:hairGroomBrush===k?"#fff":"#555",
-                        borderRadius:3,cursor:"pointer",fontSize:8}}>
-                      {v.icon}
-                    </button>
-                  ))}
-                </div>
-                <div style={{color:"#555",fontSize:8,marginBottom:2}}>Shader</div>
-                <div style={{display:"flex",gap:2,flexWrap:"wrap",marginBottom:4}}>
-                  {Object.entries(HAIR_SHADER_PRESETS).map(([k,v])=>(
-                    <button key={k} onClick={()=>setHairShaderPreset(k)}
-                      style={{padding:"2px 4px",background:hairShaderPreset===k?"#FF6600":"#1a1f2e",
-                        border:"none",color:hairShaderPreset===k?"#fff":"#555",
-                        borderRadius:3,cursor:"pointer",fontSize:7}}>
-                      {v.label}
-                    </button>
-                  ))}
-                </div>
-                <button onClick={handleGenerateHairCards}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
-                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:3}}>
-                  🃏 Generate Hair Cards
-                </button>
-                <label style={{display:"flex",gap:6,alignItems:"center",cursor:"pointer",marginBottom:4}}>
-                  <input type="checkbox" checked={hairPhysSettings.enabled} onChange={handleToggleHairPhysics}/>
-                  <span style={{color:hairPhysSettings.enabled?"#00ffc8":"#666",fontSize:9}}>Hair Physics</span>
-                </label>
-                <button onClick={handleResetHair}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
-                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:3}}>
-                  ↺ Reset Hair
-                </button>
-                <div style={{color:"#555",fontSize:8}}>Strands: {hairStrands.length}</div>
-              </div>
-            )}
-
-            {/* Cloth — Sessions 88-90 */}
-            {showClothPanel && (
-              <div style={{borderTop:showHairPanel?"1px solid #21262d":"none",paddingTop:showHairPanel?8:0}}>
-                <div style={{color:"#FF6600",fontSize:9,fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>Cloth Simulation</div>
-                <div style={{color:"#555",fontSize:8,marginBottom:2}}>Preset</div>
-                <div style={{display:"flex",gap:2,flexWrap:"wrap",marginBottom:4}}>
-                  {Object.entries(CLOTH_PRESETS).map(([k,v])=>(
-                    <button key={k} onClick={()=>setClothPreset(k)}
-                      style={{padding:"2px 4px",background:clothPreset===k?"#00ffc8":"#1a1f2e",
-                        border:"none",color:clothPreset===k?"#06060f":"#555",
-                        borderRadius:3,cursor:"pointer",fontSize:7}}>
-                      {v.label}
-                    </button>
-                  ))}
-                </div>
-                <button onClick={handleCreateCloth}
-                  style={{width:"100%",padding:"5px",background:"#00ffc8",border:"none",color:"#06060f",
-                    borderRadius:3,cursor:"pointer",fontSize:9,fontWeight:700,marginBottom:3}}>
-                  🧵 Create Cloth
-                </button>
-                <div style={{display:"flex",gap:3,marginBottom:4}}>
-                  <button onClick={handleStartCloth} disabled={clothRunning}
-                    style={{flex:1,padding:"4px",background:clothRunning?"#555":"#FF6600",
-                      border:"none",color:"#fff",borderRadius:3,cursor:"pointer",fontSize:9}}>
-                    ▶ Start
-                  </button>
-                  <button onClick={handleStopCloth}
-                    style={{flex:1,padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
-                      color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:9}}>
-                    ■ Stop
-                  </button>
-                  <button onClick={handleResetCloth}
-                    style={{flex:1,padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
-                      color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:9}}>
-                    ↺
-                  </button>
-                </div>
-                <label style={{display:"flex",gap:6,alignItems:"center",cursor:"pointer",marginBottom:4}}>
-                  <input type="checkbox" checked={clothSelfCol} onChange={e=>setClothSelfCol(e.target.checked)}/>
-                  <span style={{color:"#dde6ef",fontSize:9}}>Self Collision</span>
-                </label>
-                <label style={{display:"flex",gap:6,alignItems:"center",cursor:"pointer",marginBottom:4}}>
-                  <input type="checkbox" checked={clothPinMode} onChange={e=>setClothPinMode(e.target.checked)}/>
-                  <span style={{color:"#dde6ef",fontSize:9}}>Pin Mode</span>
-                </label>
-                <button onClick={handleAddClothCollider}
-                  style={{width:"100%",padding:"4px",background:"#1a1f2e",border:"1px solid #21262d",
-                    color:"#aaa",borderRadius:3,cursor:"pointer",fontSize:8,marginBottom:4}}>
-                  + Add Collider
-                </button>
-                {clothSim && (
-                  <div style={{color:"#555",fontSize:8,lineHeight:1.6}}>
-                    Particles: {getClothStats(clothSim).particles}<br/>
-                    Constraints: {getClothStats(clothSim).constraints}<br/>
-                    Pinned: {getClothStats(clothSim).pinned}<br/>
-                    Colliders: {clothColliders.length}<br/>
-                    {clothRunning && <span style={{color:"#00ffc8"}}>● Simulating</span>}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </div>
       )}
