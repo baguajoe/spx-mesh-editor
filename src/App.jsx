@@ -7717,6 +7717,7 @@ export default function App() {
 
       {/* LOD + Instancing panel — Sessions 14-15 */}
       <div style={{
+        display: "none",
         width: 190, background: "#2a2a2a", borderLeft: "1px solid #3a3a3a",
         display: "flex", flexDirection: "column", flexShrink: 0,
         fontFamily: "JetBrains Mono,monospace", fontSize: 11, overflow: "hidden"
@@ -7834,7 +7835,7 @@ export default function App() {
 
       {/* Procedural Mesh panel — Sessions 11-12 */}
       <div style={{
-        width: 200, background: "#2a2a2a", borderLeft: "1px solid #3a3a3a",
+        display: "none", width: 200, background: "#2a2a2a", borderLeft: "1px solid #3a3a3a",
         display: "flex", flexDirection: "column", flexShrink: 0,
         fontFamily: "JetBrains Mono,monospace", fontSize: 11, overflow: "hidden"
       }}>
