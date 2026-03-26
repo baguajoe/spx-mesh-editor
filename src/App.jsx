@@ -2250,6 +2250,72 @@ export default function App() {
     setStatus(next.enabled ? "Volumetric fog ON" : "Volumetric fog OFF");
   }, [volumetricSettings]);
 
+  const handleRenderVideo = useCallback(async () => {
+    const renderer = rendererRef.current;
+    const canvas   = canvasRef.current;
+    if (!renderer || !canvas) { setStatus("No renderer"); return; }
+
+    setVideoRendering(true);
+    setVideoProgress(0);
+    setStatus("Rendering video...");
+
+    const fps        = videoFps;
+    const startFrame = videoStartFrame;
+    const endFrame   = videoEndFrame;
+    const total      = endFrame - startFrame;
+
+    // Set up offscreen canvas at target resolution
+    const offscreen  = document.createElement("canvas");
+    offscreen.width  = videoWidth;
+    offscreen.height = videoHeight;
+    const octx       = offscreen.getContext("2d");
+
+    // MediaRecorder setup
+    const stream   = offscreen.captureStream(fps);
+    const recorder = new MediaRecorder(stream, {
+      mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+        ? "video/webm;codecs=vp9"
+        : "video/webm",
+      videoBitsPerSecond: 8_000_000,
+    });
+    const chunks = [];
+    recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+    recorder.start();
+
+    const msPerFrame = 1000 / fps;
+
+    for (let f = startFrame; f <= endFrame; f++) {
+      // Seek timeline to this frame
+      handleSeek(f, animKeys);
+      // Re-render scene
+      renderer.setSize(videoWidth, videoHeight, false);
+      renderer.render(sceneRef.current, cameraRef.current);
+      // Copy to offscreen canvas
+      octx.drawImage(canvas, 0, 0, videoWidth, videoHeight);
+      // Wait one frame interval so MediaRecorder samples it
+      await new Promise(res => setTimeout(res, msPerFrame));
+      setVideoProgress(Math.round(((f - startFrame) / total) * 100));
+    }
+
+    // Restore renderer size
+    renderer.setSize(canvas.offsetWidth, canvas.offsetHeight, false);
+
+    recorder.stop();
+    await new Promise(res => { recorder.onstop = res; });
+
+    const blob = new Blob(chunks, { type: "video/webm" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = "spx_render_" + Date.now() + ".webm";
+    a.click();
+    URL.revokeObjectURL(url);
+
+    setVideoRendering(false);
+    setVideoProgress(0);
+    setStatus("Video exported ✓");
+  }, [videoFps, videoStartFrame, videoEndFrame, videoWidth, videoHeight, animKeys, handleSeek]);
+
   const handleRenderPasses = useCallback(() => {
     if (!rendererRef.current || !sceneRef.current || !cameraRef.current) return;
     setStatus("Rendering passes...");
@@ -3452,6 +3518,14 @@ export default function App() {
   const [renderQueue, setRenderQueue] = useState(createRenderQueue());
   const [renderStats, setRenderStats] = useState(null);
   const [showRenderPanel, setShowRenderPanel] = useState(false);
+  const [showVideoPanel, setShowVideoPanel] = useState(false);
+  const [videoRendering, setVideoRendering] = useState(false);
+  const [videoProgress, setVideoProgress] = useState(0);
+  const [videoFps, setVideoFps] = useState(24);
+  const [videoStartFrame, setVideoStartFrame] = useState(0);
+  const [videoEndFrame, setVideoEndFrame] = useState(120);
+  const [videoWidth, setVideoWidth] = useState(1920);
+  const [videoHeight, setVideoHeight] = useState(1080);
   const [volumetricSettings, setVolumetricSettings] = useState(createVolumetricSettings());
   const [atmospherePreset, setAtmospherePreset] = useState("clear");
   const [showVolPanel, setShowVolPanel] = useState(false);
@@ -3946,6 +4020,12 @@ export default function App() {
             background: showRenderPanel ? "#FF6600" : COLORS.border,
             color: showRenderPanel ? "#fff" : "#888"
           }}>🎬</button>
+        <button title="Render Video" onClick={() => setShowVideoPanel(v => !v)}
+          style={{
+            width: 38, height: 38, border: "none", borderRadius: 4, cursor: "pointer", fontSize: 11,
+            background: showVideoPanel ? "#FF6600" : COLORS.border,
+            color: showVideoPanel ? "#fff" : "#888", fontWeight: 700
+          }}>VID</button>
         <button title="Volumetric" onClick={() => setShowVolPanel(v => !v)}
           style={{
             width: 38, height: 38, border: "none", borderRadius: 4, cursor: "pointer", fontSize: 14,
@@ -6080,6 +6160,57 @@ export default function App() {
               }}
             >Clear All</button>
           )}
+        </div>
+      )}
+
+      {showVideoPanel && (
+        <div style={{
+          position: "fixed", right: 8, top: 54, width: 220, background: "#0d1117",
+          border: "1px solid #21262d", borderRadius: 6, padding: 12, zIndex: 120
+        }}>
+          <div style={{ color: "#00ffc8", fontSize: 10, fontWeight: 700, marginBottom: 8 }}>🎬 Render Video</div>
+          {[
+            ["Start Frame", videoStartFrame, setVideoStartFrame, 0, 9999, 1],
+            ["End Frame",   videoEndFrame,   setVideoEndFrame,   1, 9999, 1],
+            ["FPS",         videoFps,        setVideoFps,        1, 60,   1],
+            ["Width",       videoWidth,      setVideoWidth,      320, 3840, 1],
+            ["Height",      videoHeight,     setVideoHeight,     240, 2160, 1],
+          ].map(([label, val, setter, min, max, step]) => (
+            <div key={label} style={{ marginBottom: 6 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                <span style={{ color: "#8fa8bf", fontSize: 9 }}>{label}</span>
+                <span style={{ color: "#00ffc8", fontSize: 9 }}>{val}</span>
+              </div>
+              <input type="range" min={min} max={max} step={step} value={val}
+                onChange={e => setter(Number(e.target.value))}
+                style={{ width: "100%" }} />
+            </div>
+          ))}
+          <div style={{ color: "#555", fontSize: 8, marginBottom: 6 }}>
+            {videoEndFrame - videoStartFrame + 1} frames @ {videoFps}fps = {((videoEndFrame - videoStartFrame + 1) / videoFps).toFixed(1)}s
+            {" · "}{videoWidth}×{videoHeight}
+          </div>
+          {videoRendering && (
+            <div style={{ marginBottom: 6 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                <span style={{ color: "#8fa8bf", fontSize: 9 }}>Progress</span>
+                <span style={{ color: "#00ffc8", fontSize: 9 }}>{videoProgress}%</span>
+              </div>
+              <div style={{ background: "#21262d", borderRadius: 3, height: 6 }}>
+                <div style={{ background: "#00ffc8", borderRadius: 3, height: 6, width: videoProgress + "%" }} />
+              </div>
+            </div>
+          )}
+          <button
+            onClick={handleRenderVideo}
+            disabled={videoRendering}
+            style={{
+              width: "100%", padding: "6px", borderRadius: 4, border: "none", cursor: videoRendering ? "not-allowed" : "pointer",
+              background: videoRendering ? "#1a1f2e" : "linear-gradient(135deg, #FF6600, #ff8833)",
+              color: videoRendering ? "#555" : "#fff", fontWeight: 700, fontSize: 10
+            }}>
+            {videoRendering ? "Rendering... " + videoProgress + "%" : "▶ Render Animation"}
+          </button>
         </div>
       )}
 
