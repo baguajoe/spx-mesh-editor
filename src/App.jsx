@@ -3397,6 +3397,73 @@ export default function App() {
   const probeManagerRef = useRef(createProbeManager());
   const [probes, setProbes] = useState([]);
   const [showProbePanel, setShowProbePanel] = useState(false);
+  const [showUDIMPanel, setShowUDIMPanel] = useState(false);
+  const [udimLayout, setUdimLayout] = useState(null);
+  const [udimTileCount, setUdimTileCount] = useState(4);
+  const [udimActiveTile, setUdimActiveTile] = useState(1001);
+  const [udimPaintColor, setUdimPaintColor] = useState('#00ffc8');
+  const [giResolution, setGiResolution] = useState(256);
+  const [giProbes, setGiProbes] = useState([]);
+  const [giBaked, setGiBaked] = useState(false);
+  // ── Session D: GI + UDIM handlers ──────────────────────────────────────
+  const handleBakeGI = useCallback(() => {
+    const renderer = rendererRef.current;
+    const scene    = sceneRef.current;
+    const camera   = cameraRef.current;
+    if (!renderer || !scene || !camera) { setStatus('No renderer'); return; }
+    setStatus('Baking GI...');
+    const envMap = bakeEnvironment(renderer, scene, camera, { resolution: giResolution });
+    if (envMap) {
+      applyIBLToScene(scene, envMap, { intensity: 1.0, background: false });
+      const probe = createIrradianceProbe(new THREE.Vector3(0,0,0), { resolution: giResolution });
+      setGiProbes(p => [...p, probe]);
+      setGiBaked(true);
+      setStatus('GI baked');
+    } else { setStatus('GI bake failed'); }
+  }, [giResolution]);
+
+  const handleCreateReflectionProbe = useCallback(() => {
+    const renderer = rendererRef.current;
+    const scene    = sceneRef.current;
+    const camera   = cameraRef.current;
+    if (!renderer || !scene || !camera) return;
+    const probe = createReflectionProbe(new THREE.Vector3(0,1,0), { resolution: giResolution });
+    updateReflectionProbe(probe, renderer, scene);
+    applyProbeToScene(scene, probe);
+    setGiProbes(p => [...p, probe]);
+    setStatus('Reflection probe created');
+  }, [giResolution]);
+
+  const handleInitUDIM = useCallback(() => {
+    const layout = createUDIMLayout(udimTileCount);
+    initUDIMLayout(layout, 1024, 1024);
+    setUdimLayout(layout);
+    setStatus('UDIM initialized: ' + udimTileCount + ' tiles');
+  }, [udimTileCount]);
+
+  const handleFillUDIMTile = useCallback(() => {
+    if (!udimLayout) { setStatus('Init UDIM first'); return; }
+    fillUDIMTile(udimLayout, udimActiveTile, udimPaintColor);
+    setUdimLayout({ ...udimLayout });
+    setStatus('Filled tile ' + udimActiveTile);
+  }, [udimLayout, udimActiveTile, udimPaintColor]);
+
+  const handleExportUDIMAtlas = useCallback(() => {
+    if (!udimLayout) { setStatus('Init UDIM first'); return; }
+    const atlas = buildUDIMAtlas(udimLayout, 4096, 4096);
+    const url   = atlas.canvas.toDataURL('image/png');
+    const a     = document.createElement('a');
+    a.href = url; a.download = 'udim_atlas.png'; a.click();
+    setStatus('UDIM atlas exported');
+  }, [udimLayout]);
+
+  const handleApplyUDIMToMesh = useCallback(() => {
+    const mesh = meshRef.current;
+    if (!mesh || !udimLayout) { setStatus('Need mesh + UDIM layout'); return; }
+    applyUDIMToMaterial(mesh.material, udimLayout);
+    setStatus('UDIM applied to mesh');
+  }, [udimLayout]);
+  // ── Session D END ─────────────────────────────────────────────────────
   // ── Sessions 108-121: VFX + Fluid + Asset + Procedural state ─────────────
   const [vfxEmitters, setVfxEmitters] = useState([]);
   const vfxEmittersRef = useRef([]);
@@ -5778,6 +5845,52 @@ export default function App() {
       )}
 
       {/* Sessions 91-107: Rendering panel */}
+      {showUDIMPanel && (
+        <div style={{position:'fixed',top:40,right:220,width:200,background:'#0d1117',
+          border:'1px solid #21262d',borderRadius:4,padding:8,zIndex:100,overflowY:'auto',maxHeight:'70vh'}}>
+          <div style={{color:'#00ffc8',fontSize:9,fontWeight:700,marginBottom:6}}>UDIM TEXTURES</div>
+          <div style={{marginBottom:4}}>
+            <span style={{color:'#888',fontSize:8}}>Tile Count</span>
+            <select value={udimTileCount} onChange={e=>setUdimTileCount(Number(e.target.value))}
+              style={{width:'100%',background:'#0d1117',border:'1px solid #21262d',color:'#dde6ef',fontSize:8,padding:2,marginTop:2}}>
+              {[1,2,4,6,8,10,16,20].map(n=><option key={n} value={n}>{n} tile{n>1?'s':''}</option>)}
+            </select>
+          </div>
+          <button onClick={handleInitUDIM} style={{width:'100%',padding:'4px',
+            background:udimLayout?'#003322':'#1a1f2e',
+            border:'1px solid '+(udimLayout?'#00ffc8':'#21262d'),
+            color:udimLayout?'#00ffc8':'#aaa',borderRadius:3,cursor:'pointer',fontSize:8,marginBottom:3}}>
+            {udimLayout ? 'Re-Init Layout' : 'Init UDIM Layout'}
+          </button>
+          {udimLayout && (<>
+            <div style={{marginBottom:4}}>
+              <span style={{color:'#888',fontSize:8}}>Active Tile</span>
+              <select value={udimActiveTile} onChange={e=>setUdimActiveTile(Number(e.target.value))}
+                style={{width:'100%',background:'#0d1117',border:'1px solid #21262d',color:'#dde6ef',fontSize:8,padding:2,marginTop:2}}>
+                {udimLayout.tiles.map(t=><option key={t.id} value={t.id}>UDIM {t.id}</option>)}
+              </select>
+            </div>
+            <div style={{marginBottom:4}}>
+              <span style={{color:'#888',fontSize:8}}>Paint Color</span>
+              <input type='color' value={udimPaintColor} onChange={e=>setUdimPaintColor(e.target.value)}
+                style={{width:'100%',height:24,border:'none',background:'none',cursor:'pointer',marginTop:2}} />
+            </div>
+            <button onClick={handleFillUDIMTile} style={{width:'100%',padding:'4px',background:'#1a1f2e',
+              border:'1px solid #21262d',color:'#aaa',borderRadius:3,cursor:'pointer',fontSize:8,marginBottom:3}}>
+              Fill Active Tile
+            </button>
+            <button onClick={handleApplyUDIMToMesh} style={{width:'100%',padding:'4px',background:'#1a1f2e',
+              border:'1px solid #21262d',color:'#aaa',borderRadius:3,cursor:'pointer',fontSize:8,marginBottom:3}}>
+              Apply to Mesh
+            </button>
+            <button onClick={handleExportUDIMAtlas} style={{width:'100%',padding:'4px',background:'#1a1f2e',
+              border:'1px solid #21262d',color:'#FF6600',borderRadius:3,cursor:'pointer',fontSize:8,marginBottom:3}}>
+              Export Atlas 4096px
+            </button>
+            <div style={{color:'#555',fontSize:7}}>Tiles: {getUDIMStats(udimLayout).initialized}/{getUDIMStats(udimLayout).tiles}</div>
+          </>)}
+        </div>
+      )}
       {(showRenderPanel || showVolPanel || showPassPanel || showProbePanel) && (
         <div style={{
           width: 210, background: "#0d1117", borderLeft: "1px solid #21262d",
@@ -5982,6 +6095,33 @@ export default function App() {
             )}
 
             {/* Environment Probes — Sessions 102-103 */}
+            {showProbePanel && (
+              <div style={{padding:'8px 0',borderBottom:'1px solid #21262d',marginBottom:6}}>
+                <div style={{color:'#00ffc8',fontSize:9,fontWeight:700,marginBottom:6}}>GI / ENVIRONMENT PROBES</div>
+                <div style={{marginBottom:4}}>
+                  <span style={{color:'#888',fontSize:8}}>Bake Resolution</span>
+                  <select value={giResolution} onChange={e=>setGiResolution(Number(e.target.value))}
+                    style={{width:'100%',background:'#0d1117',border:'1px solid #21262d',color:'#dde6ef',fontSize:8,padding:2,marginTop:2}}>
+                    <option value={64}>64 (fast)</option>
+                    <option value={128}>128</option>
+                    <option value={256}>256 (default)</option>
+                    <option value={512}>512 (high)</option>
+                  </select>
+                </div>
+                <button onClick={handleBakeGI} style={{width:'100%',padding:'4px',
+                  background:giBaked?'#003322':'#1a1f2e',
+                  border:'1px solid '+(giBaked?'#00ffc8':'#21262d'),
+                  color:giBaked?'#00ffc8':'#aaa',borderRadius:3,cursor:'pointer',fontSize:8,marginBottom:3}}>
+                  {giBaked ? 'Rebake GI' : 'Bake GI Probe'}
+                </button>
+                <button onClick={handleCreateReflectionProbe} style={{width:'100%',padding:'4px',
+                  background:'#1a1f2e',border:'1px solid #21262d',color:'#aaa',
+                  borderRadius:3,cursor:'pointer',fontSize:8,marginBottom:3}}>
+                  Add Reflection Probe
+                </button>
+                <div style={{color:'#555',fontSize:7}}>Probes: {giProbes.length}</div>
+              </div>
+            )}
             {showProbePanel && (
               <div style={{ borderTop: "1px solid #21262d", paddingTop: 8 }}>
                 <div style={{ color: "#FF6600", fontSize: 9, fontWeight: 700, marginBottom: 4, textTransform: "uppercase" }}>Environment Probes</div>
