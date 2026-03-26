@@ -463,13 +463,13 @@ export default function App() {
     if (meshRef.current) scene.remove(meshRef.current);
 
     let geo;
-    if (type === "box") geo = new THREE.BoxGeometry(1, 1, 1, 2, 2, 2);
-    else if (type === "sphere") geo = new THREE.SphereGeometry(0.7, 12, 8);
-    else if (type === "cylinder") geo = new THREE.CylinderGeometry(0.5, 0.5, 1.5, 12, 4);
-    else if (type === "torus") geo = new THREE.TorusGeometry(0.6, 0.25, 8, 24);
-    else if (type === "plane") geo = new THREE.PlaneGeometry(2, 2, 4, 4);
+    if (type === "box") geo = new THREE.BoxGeometry(1, 1, 1, 8, 8, 8);
+    else if (type === "sphere") geo = new THREE.SphereGeometry(0.7, 64, 48);
+    else if (type === "cylinder") geo = new THREE.CylinderGeometry(0.5, 0.5, 1.5, 48, 12);
+    else if (type === "torus") geo = new THREE.TorusGeometry(0.6, 0.25, 32, 80);
+    else if (type === "plane") geo = new THREE.PlaneGeometry(2, 2, 32, 32);
     else if (type === "icosphere") geo = new THREE.IcosahedronGeometry(0.7, 2);
-    else geo = new THREE.BoxGeometry(1, 1, 1, 2, 2, 2);
+    else geo = new THREE.BoxGeometry(1, 1, 1, 8, 8, 8);
 
     geo = geo.toNonIndexed();
     geo.computeVertexNormals();
@@ -1228,7 +1228,7 @@ export default function App() {
     if (!scene || !meshA) { setStatus("Add two meshes for boolean ops"); return; }
     if (!meshB) {
       // Add a second mesh offset to the right for demo
-      const geo = new THREE.SphereGeometry(0.6, 16, 12);
+      const geo = new THREE.SphereGeometry(0.6, 64, 48);
       const mat = new THREE.MeshStandardMaterial({ color: "#ff6600", roughness: 0.5, metalness: 0.1, wireframe: wireframe });
       const mb = new THREE.Mesh(geo, mat);
       mb.position.set(0.5, 0, 0);
