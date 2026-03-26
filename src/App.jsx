@@ -3881,14 +3881,108 @@ export default function App() {
 
   return (
     <div style={{
-      display: "flex", height: "100vh", background: COLORS.bg, color: "#dde6ef",
-      fontFamily: "JetBrains Mono,monospace", fontSize: 12, overflow: "hidden"
+      display: "flex", flexDirection: "column", height: "100vh",
+      background: "#1d1d1d", color: "#c8c8c8",
+      fontFamily: "JetBrains Mono,monospace", fontSize: 11, overflow: "hidden"
     }}>
+
+      {/* ── Top menu bar ── */}
+      <div style={{
+        height: 24, background: "#1a1a1a", borderBottom: "1px solid #3a3a3a",
+        display: "flex", alignItems: "center", flexShrink: 0, zIndex: 300
+      }}>
+        <div style={{ color: "#5b9bd5", fontSize: 10, fontWeight: 700, padding: "0 10px", borderRight: "1px solid #3a3a3a", height: "100%", display: "flex", alignItems: "center" }}>
+          SPX MESH
+        </div>
+        {["File","Edit","Add","Object","Mesh","Render","Window"].map(m => (
+          <div key={m} style={{ padding: "0 8px", height: "100%", display: "flex", alignItems: "center", cursor: "pointer", fontSize: 10, color: "#c8c8c8" }}
+            onMouseEnter={e => e.currentTarget.style.background="#2e2e2e"}
+            onMouseLeave={e => e.currentTarget.style.background="transparent"}>
+            {m}
+          </div>
+        ))}
+        <div style={{ flex: 1 }} />
+        <button onClick={handlePublishToSPX} style={{
+          marginRight: 8, padding: "2px 10px", background: "#4772b3", border: "none",
+          color: "#fff", borderRadius: 3, cursor: "pointer", fontSize: 10, fontWeight: 700
+        }}>▲ Publish to SPX</button>
+      </div>
+
+      {/* ── Mode selector bar ── */}
+      <div style={{
+        height: 26, background: "#252525", borderBottom: "1px solid #3a3a3a",
+        display: "flex", alignItems: "center", padding: "0 4px", gap: 2, flexShrink: 0, zIndex: 290
+      }}>
+        {[
+          {id:"object", label:"Object Mode"},
+          {id:"edit",   label:"Edit Mode"},
+          {id:"sculpt", label:"Sculpt Mode"},
+          {id:"paint",  label:"Paint Mode"},
+          {id:"uv",     label:"UV Editing"},
+        ].map(m => (
+          <button key={m.id}
+            onClick={() => setEditMode(m.id)}
+            style={{
+              padding: "1px 8px", border: "none", borderRadius: 3, cursor: "pointer", fontSize: 10,
+              background: editMode === m.id ? "#4772b3" : "transparent",
+              color: editMode === m.id ? "#fff" : "#888",
+              fontFamily: "JetBrains Mono,monospace"
+            }}>{m.label}</button>
+        ))}
+        <div style={{ width: 1, height: 14, background: "#3a3a3a", margin: "0 4px" }} />
+        {editMode === "edit" && (
+          <>
+            {[["1","Vert","vert"],["2","Edge","edge"],["3","Face","face"]].map(([key, label, mode]) => (
+              <button key={mode} onClick={() => setSelectMode(mode)}
+                style={{
+                  padding: "1px 8px", border: "none", borderRadius: 3, cursor: "pointer", fontSize: 10,
+                  background: selectMode === mode ? "#555" : "transparent",
+                  color: selectMode === mode ? "#fff" : "#888",
+                  fontFamily: "JetBrains Mono,monospace"
+                }}>{label}</button>
+            ))}
+            <div style={{ width: 1, height: 14, background: "#3a3a3a", margin: "0 4px" }} />
+          </>
+        )}
+        {editMode === "sculpt" && (
+          <>
+            {["Clay","Draw","Smooth","Pinch","Inflate","Crease","Flatten"].map(b => (
+              <button key={b} onClick={() => setSculptBrush(b.toLowerCase())}
+                style={{
+                  padding: "1px 7px", border: "none", borderRadius: 3, cursor: "pointer", fontSize: 10,
+                  background: sculptBrush === b.toLowerCase() ? "#4772b3" : "transparent",
+                  color: sculptBrush === b.toLowerCase() ? "#fff" : "#888",
+                  fontFamily: "JetBrains Mono,monospace"
+                }}>{b}</button>
+            ))}
+            <div style={{ width: 1, height: 14, background: "#3a3a3a", margin: "0 4px" }} />
+          </>
+        )}
+        <div style={{ flex: 1 }} />
+        {/* Viewport shading buttons */}
+        <div style={{ display: "flex", gap: 1, marginRight: 4 }}>
+          {[["◉","Solid"],["◈","Wire"],["◍","Rendered"]].map(([icon, label]) => (
+            <button key={label}
+              onClick={() => { if(label==="Wire") toggleWireframe(); }}
+              style={{ padding: "1px 6px", border: "1px solid #3a3a3a", borderRadius: 3, cursor: "pointer", fontSize: 11, background: "transparent", color: "#888" }}
+              title={label}>{icon}</button>
+          ))}
+        </div>
+        <button onClick={() => setShowTimeline(t => !t)}
+          style={{ padding: "1px 7px", border: "1px solid #3a3a3a", borderRadius: 3, cursor: "pointer", fontSize: 9,
+            background: showTimeline ? "#333" : "transparent", color: "#888", marginRight: 4 }}>
+          ⏱ Timeline
+        </button>
+        <div style={{ fontSize: 9, color: "#444", marginRight: 6 }}>N = panel</div>
+      </div>
+
+      {/* ── Main workspace ── */}
+      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
 
       {/* Left toolbar */}
       <div style={{
-        width: 52, background: COLORS.panel, borderRight: `1px solid ${COLORS.border}`,
-        display: "flex", flexDirection: "column", alignItems: "center", padding: "8px 0", gap: 4, flexShrink: 0
+        width: 36, background: "#1a1a1a", borderRight: "1px solid #3a3a3a",
+        display: "flex", flexDirection: "column", alignItems: "center", padding: "6px 0", gap: 2, flexShrink: 0
       }}>
         <div style={{ color: COLORS.teal, fontSize: 9, fontWeight: 700, marginBottom: 6, textAlign: "center", lineHeight: 1.3 }}>
           SPX<br />MESH
@@ -7859,6 +7953,7 @@ export default function App() {
         </div>
       )}
 
+      {/* Right N-panel — press N to toggle */}
       {/* Right panel — MeshEditorPanel */}
       <MeshEditorPanel
         stats={stats}
@@ -8065,6 +8160,8 @@ export default function App() {
           />
         </div>
       )}
+
+      </div>{/* end main workspace */}
 
       {/* Animation Timeline — Sessions 17-19 */}
       {showTimeline && (
