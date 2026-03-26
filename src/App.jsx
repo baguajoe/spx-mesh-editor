@@ -361,6 +361,8 @@ export default function App() {
   const [showPipelinePanel, setShowPipelinePanel] = useState(false);
   const [showPluginPanel, setShowPluginPanel] = useState(false);
   const [showMarketPanel, setShowMarketPanel] = useState(false);
+  const [showNPanel, setShowNPanel] = useState(false);
+  const [activeMode, setActiveMode] = useState("object");
   const [knifePoints, setKnifePoints] = useState([]);
   const [slideAmount, setSlideAmount] = useState(0);
   const [history, setHistory] = useState([]);
@@ -1045,7 +1047,16 @@ export default function App() {
   const [farmJobName, setFarmJobName] = useState("Render_001");
   const [exportFormat, setExportFormat] = useState("glb");
   const [pluginMarketplace, setPluginMarketplace] = useState({ presets: [] });
-  // ── Sessions 4-5: Sculpt stroke ───────────────────────────────────────────
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.key === 'n' || e.key === 'N') setShowNPanel(v => !v);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+    // ── Sessions 4-5: Sculpt stroke ───────────────────────────────────────────
   const applySculpt = useCallback((e) => {
     const mesh = meshRef.current; if (!mesh) return;
     const camera = cameraRef.current; if (!camera) return;
