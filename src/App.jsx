@@ -2279,42 +2279,58 @@ export default function App() {
             }
           }}
           onMouseUp={(e) => {
+            const wasDragging = orbitDragging.current;
+            const wasBox = boxSelectActive.current;
+            const boxSnap = boxSelect;
             orbitDragging.current = false;
             orbitButton.current = -1;
             sculptingRef.current = false;
             confirmEdgeSlide();
-            // If no drag, treat mouseup as click for selection
-            if (editModeRef.current === "object" && boxSelectStart.current && !boxSelectActive.current) {
-              onCanvasClick(e);
+            if (wasDragging || e.button !== 0) {
+              boxSelectStart.current = null;
+              boxSelectActive.current = false;
+              setBoxSelect(null);
+              return;
             }
-            // Finish box select
-            if (boxSelectActive.current && boxSelect) {
-              const canvas = canvasRef.current;
-              const camera = cameraRef.current;
-              if (canvas && camera) {
-                const rect = canvas.getBoundingClientRect();
-                const x1 = (boxSelect.x / rect.width) * 2 - 1;
-                const y1 = -((boxSelect.y / rect.height) * 2 - 1);
-                const x2 = ((boxSelect.x + boxSelect.w) / rect.width) * 2 - 1;
-                const y2 = -(((boxSelect.y + boxSelect.h) / rect.height) * 2 - 1);
-                const cx = (x1 + x2) / 2;
-                const cy = (y1 + y2) / 2;
-                let lastSelected = null;
-                sceneObjectsRef.current.forEach(o => {
-                  if (!o.mesh) return;
-                  const pos = new THREE.Vector3();
-                  pos.setFromMatrixPosition(o.mesh.matrixWorld);
-                  pos.project(camera);
-                  const bx1 = (boxSelect.x / rect.width) * 2 - 1;
-                  const by1 = -(((boxSelect.y) / rect.height) * 2 - 1);
-                  const bx2 = ((boxSelect.x + boxSelect.w) / rect.width) * 2 - 1;
-                  const by2 = -(((boxSelect.y + boxSelect.h) / rect.height) * 2 - 1);
-                  if (pos.x >= Math.min(bx1,bx2) && pos.x <= Math.max(bx1,bx2) &&
-                      pos.y >= Math.min(by1,by2) && pos.y <= Math.max(by1,by2)) {
-                    lastSelected = o.id;
-                  }
-                });
-                if (lastSelected) selectSceneObject(lastSelected);
+            const canvas = canvasRef.current;
+            const camera = cameraRef.current;
+            if (!canvas || !camera) { boxSelectStart.current=null; setBoxSelect(null); return; }
+            const rect = canvas.getBoundingClientRect();
+            if (wasBox && boxSnap) {
+              let picked = null;
+              sceneObjectsRef.current.forEach(o => {
+                if (!o.mesh) return;
+                const pos = new THREE.Vector3();
+                pos.setFromMatrixPosition(o.mesh.matrixWorld);
+                pos.project(camera);
+                const sx = (pos.x + 1) / 2 * rect.width;
+                const sy = (-pos.y + 1) / 2 * rect.height;
+                if (sx >= boxSnap.x && sx <= boxSnap.x + boxSnap.w && sy >= boxSnap.y && sy <= boxSnap.y + boxSnap.h) {
+                  picked = o.id;
+                }
+              });
+              if (picked) selectSceneObject(picked);
+            } else {
+              const mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+              const my = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+              const ray = new THREE.Raycaster();
+              ray.setFromCamera(new THREE.Vector2(mx, my), camera);
+              const candidates = [];
+              sceneRef.current?.traverse(c => { if (c.isMesh && c.type === "Mesh") candidates.push(c); });
+              const hits = ray.intersectObjects(candidates, false);
+              if (hits.length > 0) {
+                const hitMesh = hits[0].object;
+                const objs = sceneObjectsRef.current;
+                let matched = objs.find(o => o.mesh === hitMesh || o.mesh?.uuid === hitMesh.uuid);
+                if (!matched && objs.length > 0) {
+                  let minD = Infinity;
+                  objs.forEach(o => { if (!o.mesh) return; const d = o.mesh.position.distanceTo(hits[0].point); if (d < minD) { minD = d; matched = o; } });
+                }
+                if (matched) selectSceneObject(matched.id);
+              } else {
+                sceneObjectsRef.current.forEach(o => { if (o.mesh) o.mesh.traverse(m => { if (m.isMesh && m.material?.emissive) { m.material.emissive.set(0x000000); m.material.emissiveIntensity = 0; } }); });
+                setActiveObjId(null);
+                meshRef.current = null;
               }
             }
             boxSelectStart.current = null;
