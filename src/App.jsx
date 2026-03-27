@@ -1156,56 +1156,28 @@ export default function App() {
   // ── Add primitive ──────────────────────────────────────────────────────────
   const addPrimitive = useCallback(
     (type) => {
+      // addSceneObject handles everything — creates mesh, adds to scene, stores in sceneObjects
       addSceneObject(type);
-
-      const scene = sceneRef.current;
-      if (!scene) return;
       clearOverlays();
-      if (meshRef.current) scene.remove(meshRef.current);
-
-      let geo;
-      if (type === "box") geo = new THREE.BoxGeometry(1, 1, 1, 8, 8, 8);
-      else if (type === "sphere") geo = new THREE.SphereGeometry(0.7, 64, 48);
-      else if (type === "cylinder")
-        geo = new THREE.CylinderGeometry(0.5, 0.5, 1.5, 48, 12);
-      else if (type === "torus")
-        geo = new THREE.TorusGeometry(0.6, 0.25, 32, 80);
-      else if (type === "plane") geo = new THREE.PlaneGeometry(2, 2, 32, 32);
-      else if (type === "icosphere")
-        geo = new THREE.IcosahedronGeometry(0.7, 2);
-      else if (type === "gear") geo = buildProceduralMesh("gear");
-      else if (type === "pipe") geo = buildProceduralMesh("pipe");
-      else if (type === "helix") geo = buildProceduralMesh("helix");
-      else if (type === "staircase") geo = buildProceduralMesh("staircase");
-      else geo = new THREE.BoxGeometry(1, 1, 1, 8, 8, 8);
-
-      geo = geo.toNonIndexed();
-      geo.computeVertexNormals();
-
-      const mat = new THREE.MeshStandardMaterial({
-        color: "#888888",
-        roughness: 0.5,
-        metalness: 0.1,
-        wireframe: wireframe,
-      });
-
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.castShadow = true;
-      scene.add(mesh);
-      meshRef.current = mesh;
-
-      const heMesh = HalfEdgeMesh.fromBufferGeometry(geo);
-      heMeshRef.current = heMesh;
-      const s = heMesh.stats();
-      setStats(s);
-      setStatus(
-        `Added ${type} — ${s.vertices} verts · ${s.faces} faces · ${s.edges} edges`
-      );
-      setSelectedVerts(new Set());
-      setSelectedEdges(new Set());
-      setSelectedFaces(new Set());
-      setTimeout(() => gizmoRef.current?.attach(mesh), 100);
-      setGizmoActive(true);
+      // Build HalfEdge mesh for edit tools from meshRef (set by addSceneObject)
+      setTimeout(() => {
+        const mesh = meshRef.current;
+        if (!mesh || !mesh.geometry) return;
+        try {
+          const heMesh = HalfEdgeMesh.fromBufferGeometry(mesh.geometry);
+          heMeshRef.current = heMesh;
+          const s = heMesh.stats();
+          setStats(s);
+          setStatus(`Added ${type} — ${s.vertices} verts · ${s.faces} faces · ${s.edges} edges`);
+        } catch(e) {
+          setStatus(`Added ${type}`);
+        }
+        setSelectedVerts(new Set());
+        setSelectedEdges(new Set());
+        setSelectedFaces(new Set());
+        if (gizmoRef.current) gizmoRef.current.attach(mesh);
+        setGizmoActive(true);
+      }, 50);
     },
     [wireframe]
   );
