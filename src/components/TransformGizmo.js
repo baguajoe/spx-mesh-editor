@@ -123,9 +123,10 @@ export class TransformGizmo {
 
   update() {
     if (!this.target) return;
-    const box = new THREE.Box3().setFromObject(this.target);
-    const center = box.getCenter(new THREE.Vector3());
-    this.group.position.copy(center);
+    // Use mesh world position directly for accuracy
+    const pos = new THREE.Vector3();
+    this.target.getWorldPosition(pos);
+    this.group.position.copy(pos);
   }
 
   // Returns axis string if a handle was hit, null otherwise
