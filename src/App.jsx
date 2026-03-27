@@ -2156,18 +2156,17 @@ export default function App() {
       }
       centerPanel={
         <div className="mesh-editor-canvas"
-          style={{ cursor: activeWorkspace === "Sculpt" ? "crosshair" : "pointer" }}
+          style={{ cursor: activeWorkspace === "Sculpt" ? "crosshair" : "default" }}
           onMouseDown={e => {
             orbitButton.current = e.button;
             if (e.button === 1 || e.button === 2 || (e.button === 0 && e.altKey)) {
-              // Middle click or Alt+Left = orbit/pan
               orbitDragging.current = true;
               orbitLast.current = { x: e.clientX, y: e.clientY };
               e.preventDefault();
               return;
             }
+            if (e.button !== 0) return;
             if (activeWorkspace === "Sculpt") {
-              // In sculpt, use active object mesh
               if (!meshRef.current && sceneObjects.length > 0) {
                 const obj = sceneObjects.find(o => o.id === activeObjId) || sceneObjects[0];
                 if (obj?.mesh) meshRef.current = obj.mesh;
@@ -2177,9 +2176,9 @@ export default function App() {
                 editModeRef.current = "sculpt";
                 applySculpt(e);
               }
-            } else {
-              onKnifeClick(e);
+            } else if (editModeRef.current === "object" || editModeRef.current === "edit") {
               onCanvasClick(e);
+              if (editModeRef.current === "edit") onKnifeClick(e);
             }
           }}
           onMouseMove={e => {
