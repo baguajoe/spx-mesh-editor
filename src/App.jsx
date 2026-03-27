@@ -143,18 +143,7 @@ export default function App() {
   const sceneRef = useRef(null);
   const meshRef = useRef(null);
 
-    useEffect(() => {
-    if (sceneRef.current) {
-      const updateObjects = () => {
-        const meshes = [];
-        sceneRef.current.traverse((child) => {
-          if (child.isMesh) meshes.push(child);
-        });
-        setSceneObjects(meshes);
-      };
-      updateObjects();
-    }
-  }, [objectsAddedCounter]);
+  // sceneObjects managed directly via addSceneObject/deleteSceneObject
 
   const selectSceneObject = (id) => {
     const obj = sceneObjects.find((o) => o.id === id);
