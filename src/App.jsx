@@ -154,9 +154,15 @@ export default function App() {
       if (!o.mesh) return;
       o.mesh.traverse(m => {
         if (m.isMesh) {
-          if (!m.material.emissive) m.material = m.material.clone();
-          if (m.material.emissive) m.material.emissive.setHex(0x000000);
-          m.material.emissiveIntensity = 0;
+          const oldMat = m.material;
+          m.material = new THREE.MeshStandardMaterial({
+            color: oldMat.color || new THREE.Color(0x888888),
+            roughness: oldMat.roughness ?? 0.5,
+            metalness: oldMat.metalness ?? 0.1,
+            wireframe: oldMat.wireframe ?? false,
+          });
+          m.material.needsUpdate = true;
+          if (oldMat.dispose) oldMat.dispose();
         }
       });
     });
@@ -167,22 +173,20 @@ export default function App() {
         obj.mesh.geometry = obj.mesh.geometry.toNonIndexed();
         obj.mesh.geometry.computeVertexNormals();
       }
-      // Force orange highlight
+      // Force orange highlight by replacing material
       obj.mesh.traverse(m => {
         if (m.isMesh) {
-          if (!m.material.emissive) {
-            m.material = new THREE.MeshStandardMaterial({
-              color: m.material.color,
-              emissive: new THREE.Color(0xff6600),
-              emissiveIntensity: 0.3,
-              roughness: 0.5,
-              metalness: 0.1,
-            });
-          } else {
-            m.material.emissive.setHex(0xff6600);
-            m.material.emissiveIntensity = 0.3;
-          }
+          const oldMat = m.material;
+          m.material = new THREE.MeshStandardMaterial({
+            color: oldMat.color || new THREE.Color(0x888888),
+            emissive: new THREE.Color(0xff6600),
+            emissiveIntensity: 0.4,
+            roughness: oldMat.roughness ?? 0.5,
+            metalness: oldMat.metalness ?? 0.1,
+            wireframe: oldMat.wireframe ?? false,
+          });
           m.material.needsUpdate = true;
+          if (oldMat.dispose) oldMat.dispose();
         }
       });
       const box = new THREE.Box3().setFromObject(obj.mesh);
