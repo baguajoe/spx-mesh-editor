@@ -159,13 +159,33 @@ export default function App() {
   const selectSceneObject = (id) => {
     const obj = sceneObjects.find((o) => o.id === id);
     if (!obj) return;
+    // Deselect all — reset emissive
+    sceneObjects.forEach(o => {
+      if (o.mesh) o.mesh.traverse(m => {
+        if (m.isMesh && m.material) {
+          if (m.material.emissive) m.material.emissive.set(0x000000);
+          m.material.emissiveIntensity = 0;
+        }
+      });
+    });
     setActiveObjId(id);
     meshRef.current = obj.mesh;
     if (obj.mesh) {
+      // Convert to non-indexed for sculpting
+      if (obj.mesh.geometry?.index) {
+        obj.mesh.geometry = obj.mesh.geometry.toNonIndexed();
+        obj.mesh.geometry.computeVertexNormals();
+      }
+      // Orange emissive highlight like Blender
+      obj.mesh.traverse(m => {
+        if (m.isMesh && m.material) {
+          if (m.material.emissive) m.material.emissive.set(0xff6600);
+          m.material.emissiveIntensity = 0.2;
+        }
+      });
       const box = new THREE.Box3().setFromObject(obj.mesh);
       orbitState.current.radius = Math.max(
-        box.getSize(new THREE.Vector3()).length() * 2,
-        3
+        box.getSize(new THREE.Vector3()).length() * 2, 3
       );
     }
     setStatus(`Selected: ${obj.name}`);
