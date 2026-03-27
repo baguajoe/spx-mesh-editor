@@ -2272,7 +2272,20 @@ export default function App() {
               const my = -((e.clientY - rect.top) / rect.height) * 2 + 1;
               const ray = new THREE.Raycaster();
               ray.setFromCamera(new THREE.Vector2(mx, my), cameraRef.current);
-              const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+              const axis = gizmoRef.current.dragging?.axis;
+              // Choose plane normal based on axis being dragged
+              let planeNormal;
+              if (axis === "y") {
+                // For Y axis, use a plane facing the camera projected onto XZ
+                const camDir = cameraRef.current.position.clone().normalize();
+                planeNormal = new THREE.Vector3(camDir.x, 0, camDir.z).normalize();
+              } else if (axis === "x") {
+                planeNormal = new THREE.Vector3(0, 0, 1);
+              } else {
+                planeNormal = new THREE.Vector3(1, 0, 0);
+              }
+              const gizmoPos = gizmoRef.current.group.position;
+              const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(planeNormal, gizmoPos);
               const pt = new THREE.Vector3();
               ray.ray.intersectPlane(plane, pt);
               if (pt) gizmoRef.current.drag(pt);
