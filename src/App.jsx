@@ -460,6 +460,7 @@ export default function App() {
 
   // Keep refs in sync
   useEffect(() => { activeToolRef.current = activeTool; }, [activeTool]);
+  useEffect(() => { sceneObjectsRef.current = sceneObjects; }, [sceneObjects]);
   useEffect(() => { sculptBrushRef.current = sculptBrush; }, [sculptBrush]);
   useEffect(() => { sculptRadiusRef.current = sculptRadius; }, [sculptRadius]);
   useEffect(() => { sculptStrengthRef.current = sculptStrength; }, [sculptStrength]);
@@ -515,6 +516,7 @@ export default function App() {
   const orbitButton = useRef(-1);
   const boxSelectStart = useRef(null);
   const boxSelectActive = useRef(false);
+  const sceneObjectsRef = useRef([]);
 
   const fileInputRef = useRef(null);
   const gizmoRef = useRef(null);
@@ -1390,11 +1392,12 @@ export default function App() {
         const my = -((e.clientY - rect.top) / rect.height) * 2 + 1;
         const raycaster = new THREE.Raycaster();
         raycaster.setFromCamera({ x: mx, y: my }, camera);
-        const meshes = sceneObjects.map(o => o.mesh).filter(Boolean);
+        const objs = sceneObjectsRef.current;
+        const meshes = objs.map(o => o.mesh).filter(Boolean);
         const hits = raycaster.intersectObjects(meshes, true);
         if (hits.length > 0) {
           const hit = hits[0].object;
-          const obj = sceneObjects.find(o => {
+          const obj = objs.find(o => {
             if (!o.mesh) return false;
             let match = false;
             o.mesh.traverse(m => { if (m === hit) match = true; });
@@ -1402,8 +1405,7 @@ export default function App() {
           });
           if (obj) selectSceneObject(obj.id);
         } else {
-          // Click empty space — deselect
-          sceneObjects.forEach(o => {
+          objs.forEach(o => {
             if (o.mesh) o.mesh.traverse(m => {
               if (m.isMesh && m.material) {
                 if (m.material.emissive) m.material.emissive.set(0x000000);
