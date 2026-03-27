@@ -1,0 +1,32 @@
+
+.mesh-editor-layout {
+
+  display: flex;
+  flex-direction: column;
+
+  height: 100vh;
+
+  background: #18191c;
+
+}
+
+.mesh-editor-main {
+
+  display: flex;
+
+  flex: 1;
+
+  overflow: hidden;
+
+}
+
+.mesh-editor-canvas {
+
+  flex: 1;
+
+  background: #111214;
+
+  position: relative;
+
+}
+

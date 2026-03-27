@@ -1,48 +1,105 @@
-import { PropertyInspector } from './components/PropertyInspector';
-import React, { useEffect, useRef, useState, useCallback } from "react";
+
+import { useEffect, useRef, useState, useCallback } from "react";
+import React from "react";
 import * as THREE from "three";
-import ProfessionalShell from "./pro-ui/ProfessionalShell";
-import FeatureIndexPanel from "./pro-ui/FeatureIndexPanel";
-import WORKSPACE_FEATURES from "./pro-ui/workspaceMap";
-
 import { HalfEdgeMesh } from "./mesh/HalfEdgeMesh.js";
+import "./App.css";
+import WorkspaceTabs from "./mesh-editor/ui/WorkspaceTabs";
+import WorkspacePanels from "./mesh-editor/ui/WorkspacePanels";
 import { booleanUnion, booleanSubtract, booleanIntersect } from "./mesh/BooleanOps.js";
-import { uvBoxProject, uvSphereProject, uvPlanarProject } from "./mesh/UVUnwrap.js";
-import { applySculptStroke } from "./mesh/SculptEngine.js";
-import { createShapeKey, applyShapeKeys } from "./mesh/ShapeKeys.js";
-import { createPipe, createGear, buildProceduralMesh, createAssetLibrary, createTourState } from "./mesh/ProceduralMesh.js";
-import { generateLOD } from "./mesh/LODSystem.js";
-import { createArmature } from "./mesh/ArmatureSystem.js";
-import { enterPoseMode } from "./mesh/PoseMode.js";
-import { initWeights } from "./mesh/WeightPainting.js";
-import { applyDyntopo, createDynaMeshSettings } from "./mesh/DynamicTopology.js";
-import { createAction, createTrack, createStrip } from "./mesh/NLASystem.js";
-import { createStroke, createLayer } from "./mesh/GreasePencil.js";
-import { NODE_TYPES, createNode, createGraph, addNode, connectNodes, evaluateGraph } from "./mesh/GeometryNodes.js";
-import { createSpline } from "./mesh/CurveSystem.js";
-import { applyPreset } from "./mesh/SmartMaterials.js";
-import { createPaintTexture } from "./mesh/TexturePainter.js";
-import { bakeAO } from "./mesh/TextureBaker.js";
-import { createLight } from "./mesh/LightSystem.js";
-import { createCamera } from "./mesh/CameraSystem.js";
-import { applyColorGrade, createPassStack } from "./mesh/PostProcessing.js";
-import { DEFAULT_BONE_MAP, retargetFrame, bakeRetargetedAnimation, fixFootSliding, autoDetectBoneMap, getRetargetStats } from "./mesh/MocapRetarget.js";
-import { createIKChain } from "./mesh/IKSystem.js";
-import { createPathTracerSettings, createVolumetricSettings } from "./mesh/PathTracer.js";
-import { generateFibermesh } from "./mesh/FibermeshSystem.js";
-import { createInstances } from "./mesh/Instancing.js";
-import { fixNormals, createRetopoSettings } from "./mesh/MeshRepair.js";
-
+import { uvBoxProject, uvSphereProject, uvPlanarProject, getUVIslands } from "./mesh/UVUnwrap.js";
 import { MaterialEditor } from "./components/MaterialEditor.jsx";
 import { UVEditor } from "./components/UVEditor.jsx";
 import { TransformGizmo } from "./components/TransformGizmo.js";
-import { MeshEditorPanel } from "./components/MeshEditorPanel";
+import { MeshEditorPanel } from "./components/MeshEditorPanel.jsx";
 import { Outliner } from "./components/Outliner.jsx";
+import { getSculptHit, applySculptStroke } from "./mesh/SculptEngine.js";
+import { initVertexColors, paintVertexColor, fillVertexColor, gradientFillVertexColor } from "./mesh/VertexColorPainter.js";
+import { createShapeKey, applyShapeKeys, updateBasis, buildMorphTargets } from "./mesh/ShapeKeys.js";
+import { createPipe, createStaircase, createArch, createGear, createHelix, createLathe, buildProceduralMesh } from "./mesh/ProceduralMesh.js";
+import { generateLOD, getLODStats, setLODLevel, restoreAutoLOD } from "./mesh/LODSystem.js";
+import { createArmature, addBone, selectBone, buildBoneDisplay, moveBoneHead, moveBoneTail, parentBone, getArmatureStats, serializeArmature } from "./mesh/ArmatureSystem.js";
+import { enterPoseMode, exitPoseMode, capturePose, applyPose, resetToRestPose, poseBone, rotateFKChain, savePoseToLibrary, loadPoseFromLibrary } from "./mesh/PoseMode.js";
+import { initWeights, paintWeight, normalizeWeights, autoWeightByDistance, visualizeWeights } from "./mesh/WeightPainting.js";
+import { applyDyntopo, dyntopoFloodFill, smoothTopology, DYNTOPO_DEFAULTS } from "./mesh/DynamicTopology.js";
+import { createAction, createTrack, createStrip, evaluateNLA, pushDownAction, bakeNLA } from "./mesh/NLASystem.js";
+import { parseBVH, buildSkeletonFromBVH, applyBVHFrame, buildAnimationClip } from "./mesh/BVHImporter.js";
+import { bindMeshToArmature, createMixer, playClip } from "./mesh/SkinningSystem.js";
+import { BRUSHES, applyBrush } from "./mesh/SculptBrushes.js";
+import { voxelRemesh, quadRemesh, symmetrizeMesh, getRemeshStats } from "./mesh/RemeshSystem.js";
+import { createMultiresStack, subdivideLevel, setMultiresLevel, bakeDownLevel, applyMultires, getMultiresStats } from "./mesh/MultiresSystem.js";
+import { loadAlpha, applyAlphaBrush, generateProceduralAlpha } from "./mesh/AlphaBrush.js";
+import { createStroke, createLayer, addStrokeToFrame, buildStrokeMesh, buildFrameMeshes, strokeToMesh, buildOnionSkin, getStrokesAtFrame, clearFrame, duplicateFrame } from "./mesh/GreasePencil.js";
+import { NODE_TYPES, createNode, createGraph, addNode, connectNodes, evaluateGraph } from "./mesh/GeometryNodes.js";
+import { createSpline, getThreeCurve, meshToCurve, pipeAlongCurve, loftCurves, curveToMesh, addPoint, removePoint } from "./mesh/CurveSystem.js";
+import { MATERIAL_PRESETS, applyPreset, applyEdgeWear, applyCavityDirt, getPresetCategories } from "./mesh/SmartMaterials.js";
+import { createPaintCanvas, createPaintTexture, applyPaintTexture, paintAtUV, fillCanvas, createLayerStack, addLayer, flattenLayers, exportTexture } from "./mesh/TexturePainter.js";
+import { bakeAO, bakeNormalMap, bakeCurvature, downloadBakedMap, bakeAllMaps } from "./mesh/TextureBaker.js";
+import { LIGHT_TYPES, TEMPERATURE_PRESETS, createLight, createThreePointLighting, applyTemperature, createVolumericFog, removeFog, HDRI_PRESETS, applyHDRI, addLightHelper, getSceneLights, serializeLights } from "./mesh/LightSystem.js";
+import { createCamera, saveBookmark, restoreBookmark, animateCameraToBookmark, setDOF, applyCameraShake, rackFocus, dollyZoom, createCameraManager, serializeCamera } from "./mesh/CameraSystem.js";
+import { EFFECT_PRESETS, LUT_PRESETS, applyColorGrade, applyLUT, applyVignette, applyFilmGrain, applyToneMap, applyChromaticAberration, applySharpen, applyPostStack } from "./mesh/PostProcessing.js";
+import { DEFAULT_BONE_MAP, retargetFrame, bakeRetargetedAnimation, fixFootSliding, autoDetectBoneMap, getRetargetStats } from "./mesh/MocapRetarget.js";
+import { createIKChain, solveFABRIK, setIKTarget, setIKPoleTarget, getChainEnd, solveTwoBoneIK } from "./mesh/IKSystem.js";
+import { createPathTracerSettings, createWebGLPathTracer, startPathTracing, stopPathTracing, stepPathTracer, resetPathTracer, exportPathTracedFrame, getPathTracerStats, detectPathTracer } from "./mesh/PathTracer.js";
+import { exportOBJ, parseOBJ, importFBXFromBackend, exportFBXToBackend, exportAlembic, exportUSD, SUPPORTED_IMPORT_FORMATS, SUPPORTED_EXPORT_FORMATS } from "./mesh/FBXPipeline.js";
+import { registerPlugin, unregisterPlugin, getPlugins, getAllPlugins, initPluginAPI, loadPluginFromURL, loadPluginFromFile, BUILTIN_BRUSH_PLUGINS, PRESET_CATEGORIES, createPresetMarketplace, COMMUNITY_PRESETS, searchPresets, installPreset, uninstallPreset, isPresetInstalled, getInstalledPresets, saveCustomPreset, loadCustomPresets, getPluginStats } from "./mesh/PluginSystem.js";
+import { GraphEditor } from "./components/GraphEditor.jsx";
+import { DRIVER_TYPES, createDriver, createVariable, evaluateDriver, resolveVariable, applyDriver, applyAllDrivers, DRIVER_PRESETS } from "./mesh/DriverSystem.js";
+import { CONSTRAINT_TYPES, createConstraint, applyConstraint, applyAllConstraints, applyLookAt, applyFloor, applyStretchTo } from "./mesh/ConstraintSystem.js";
+import { createBakeBuffer, bakeFrame, restoreFrame, createRigidBody, stepRigidBody, bakeRigidBodies, applyBakedFrame, fractureMesh } from "./mesh/PhysicsBake.js";
+import { WALK_STYLES, generateWalkCycle, applyWalkCycleFrame, generateIdleCycle, generateBreathingCycle } from "./mesh/WalkCycleGenerator.js";
+import { createDynaMeshSettings, dynaMeshRemesh, checkDynaMeshTrigger, getDynaMeshStats } from "./mesh/DynaMeshSystem.js";
+import { createHairStrand, emitHair, buildHairLines, buildHairTubes, clumpHair, HAIR_PRESETS, applyHairPreset, getHairStats, serializeHair } from "./mesh/HairSystem.js";
+import { createPBRMaterial, applyPBRMaps, SSS_PRESETS, createSSSMaterial, TRANSMISSION_PRESETS, createTransmissionMaterial, createDisplacementTexture, denoiseCanvas, createRenderQueue, addRenderJob, runRenderQueue, RENDER_PRESETS, applyRenderPreset, TONE_MAP_MODES, applyToneMappingMode, captureFrame, downloadFrame, getRenderStats } from "./mesh/RenderSystem.js";
+import { EMITTER_TYPES, VFX_PRESETS, createEmitter, emitParticles, stepEmitter, buildParticleSystem, updateParticleSystem, createDestructionEffect, stepDestructionFrags, getEmitterStats } from "./mesh/VFXSystem.js";
+import { createSPHParticle, createFluidSettings, FLUID_PRESETS, stepSPH, emitFluid, buildFluidMesh, updateFluidMesh, createPyroEmitter, stepPyro, getFluidStats } from "./mesh/FluidSystem.js";
+import { SCENE_PRESETS, ENVIRONMENT_PRESETS, createScene, createSceneObject as createSCObject, addObjectToScene, removeObjectFromScene, duplicateObject, parentObjects, getObjectHierarchy, createCollection, applyLightingSetup, applyEnvironment, buildEnvironmentMesh, serializeScene, deserializeScene, getSceneStats as getSceneCreatorStats } from "./mesh/SceneCreator.js";
+import { ADVANCED_BRUSHES, createSculptLayer, addSculptLayer, applyLayerDelta, captureBasePositions, evaluateSculptLayers, flattenLayerToMesh, mergeLayers, getSculptLayerStats, applyClayBrush, applyScrapeBrush, applyFlattenBrush, applyMaskBrush, clearMask, invertMask, applySymmetryStroke } from "./mesh/SculptLayers.js";
+import { triangulateNgon, buildNgonGeometry, addNgonFace, getNgonFaces, dissolveEdge, bridgeFaces, gridFill, getNgonStats, convertNgonsToTris } from "./mesh/NgonSupport.js";
+import { VC_BLEND_MODES, initVCAdvanced, addVCLayer, removeVCLayer, paintVCAdvanced, fillVCLayer, flattenVCLayers, smearVC, getVCStats } from "./mesh/VertexColorAdvanced.js";
+import { createAdvancedShapeKey, addAdvancedShapeKey, evaluateShapeKeysAdvanced, mirrorShapeKey, blendShapeKeys, driverShapeKey, updateDriverKeys, exportShapeKeysGLTF, getShapeKeyStats } from "./mesh/ShapeKeysAdvanced.js";
+import { GLTF_EXTENSIONS, loadGLTFAdvanced, exportGLTFAdvanced, buildGLTFMorphTargets, applyGLTFMorphWeights, extractGLTFAnimations, getGLTFStats } from "./mesh/GLTFAdvanced.js";
+import { heatMapWeights, dualQuatFromBone, blendDualQuats, createBoneEnvelope, weighByEnvelope, bindSkeletonAdvanced, normalizeAllWeights, getBindingStats } from "./mesh/SkeletalBinding.js";
+import { DOPPELFLEX_LANDMARK_MAP, DOPPELFLEX_BONE_HIERARCHY, buildRigFromDoppelflex, applyDoppelflexFrame, retargetDoppelflexToSPX, buildThreeSkeletonFromRig, getRigStats } from "./mesh/DoppelflexRig.js";
+import { COMPOSITOR_NODE_TYPES, createCompositorNode, createCompositorGraph, addCompositorNode, connectCompositorNodes, removeCompositorNode, evaluateCompositorGraph, getCompositorStats, applyCompositorPreset } from "./mesh/NodeCompositor.js";
+import { ASSET_TYPES, createAssetLibrary, addAsset, searchAssets, removeAsset, toggleFavorite, generateThumbnail, PROCEDURAL_ANIMATIONS, applyProceduralAnimation, createAudioAnalyzer, applyAudioToMesh, optimizeScene, getSceneStats } from "./mesh/AssetLibrary.js";
+import { createUser, createCommentPin, createVersionSnapshot, restoreVersion, createCollabSession, connectSession, broadcastOperation, broadcastComment, disconnectSession, buildCommentPinMesh, getCollabStats } from "./mesh/CollaborationSystem.js";
+import { SHADER_PRESETS, createHairShaderMaterial, createToonMaterial, createPBRShaderMaterial, createHolographicMaterial, createDissolveMaterial, createOutlineMaterial, addOutlineToMesh, applyShaderPreset, updateHolographicTime, setDissolveAmount } from "./mesh/GLSLShaders.js";
+import { createPostPassManager, createBloomPass, createSSAOPass, createDOFPass, createChromaticAberrationPass } from "./mesh/PostPassShaders.js";
+import { createUDIMLayout, initUDIMLayout, paintUDIM, fillUDIMTile, exportUDIMTile, exportAllUDIMTiles, applyUDIMToMaterial, remapUVsToUDIM, buildUDIMAtlas, getUDIMStats, getUDIMTileFromUV, udimTileFromUV } from "./mesh/UDIMSystem.js";
+import { marchingCubes, meshToScalarField, marchingCubesRemesh, fluidSurfaceMesh, getMarchingCubesStats } from "./mesh/MarchingCubes.js";
+import { createGPUParticleSystem, emitGPUParticles, stepGPUParticles, FORCE_FIELD_TYPES, createForceField, burstEmit, continuousEmit, createSpriteSheet, updateSpriteSheet, getGPUParticleStats } from "./mesh/GPUParticles.js";
+import { detectWebGPU, getWebGLInfo, createPMREMFromScene, applyIBLToScene, setupCascadedShadows, enableShadowsOnScene, createNPROutlinePass, createRenderFarm, addRenderFarmJob, cancelRenderJob, removeRenderJob, runNextRenderJob, getRenderFarmStats, JOB_STATUS } from "./mesh/RenderFarm.js";
+import { createClothWorker, runClothWorker, createSPHWorker, runSPHWorker, createWorkerPool, getWorkerSupport } from "./mesh/WorkerBridge.js";
+import { THEMES, applyTheme, saveThemeToStorage, loadThemeFromStorage, SHORTCUT_CATEGORIES, TOUR_STEPS, createTourState, advanceTour, SPX_EXPORT_FORMATS, buildSPXExportPayload, exportToStreamPireX, downloadSPXFile } from "./mesh/UISystem.js";
+import { buildFullConstraints, createSpatialHash, applySelfCollisionHash, addSewingConstraint, applyWindTurbulence, stepClothUpgraded } from "./mesh/ClothUpgrade.js";
+import { applyStrandCollision, createDensityMap, sampleDensityMap, generateBraidPreset, generateBunPreset, generatePonytailPreset, emitHairFromUV, getHairUpgradeStats } from "./mesh/HairUpgrade.js";
+import { createSplineIK, solveSplineIK, createIKFKBlend, updateIKFKBlend, captureFKPose, captureIKPose, evaluateNLAAdvanced, buildGLTFAnimationClip, updateShapeKeyDrivers, computeEnvelopeWeights } from "./mesh/AnimationUpgrade.js";
+import { isElectron, isBrowser, openFile, saveFile, MENU_ITEMS, KEYBOARD_SHORTCUTS, registerShortcuts, checkForUpdates, isFeatureAvailable, getPlatformInfo, DESKTOP_ONLY_FEATURES } from "./mesh/ElectronBridge.js";
+import { createVolumetricSettings, applyVolumetricFog, applyHeightFog, createGodRayEffect, ATMOSPHERE_PRESETS, applyAtmospherePreset, createLightShaft } from "./mesh/VolumetricSystem.js";
+import { PASS_TYPES, createPassStack, renderAllPasses, downloadPass, compositePasses } from "./mesh/RenderPasses.js";
+import { createReflectionProbe, updateReflectionProbe, applyProbeToMaterial, applyProbeToScene, createAmbientProbe, createProbeManager, getProbeStats } from "./mesh/EnvironmentProbes.js";
+import { GROOM_BRUSHES, applyGroomBrush } from "./mesh/HairGrooming.js";
+import { createHairPhysicsSettings, stepHairPhysics, addWindForce, addCollider, resetHairToRest, bakeHairPhysics } from "./mesh/HairPhysics.js";
+import { generateHairCards, buildHairCardMesh, mergeHairCards, getHairCardStats } from "./mesh/HairCards.js";
+import { HAIR_SHADER_PRESETS, createHairMaterial, createAnisotropicHairMaterial, applyHairPresetToMesh, createHairAlphaTexture } from "./mesh/HairShader.js";
+import { createCloth, stepCloth, CLOTH_PRESETS, applyClothPreset, resetCloth, getClothStats } from "./mesh/ClothSystem.js";
+import { pinVertex, unpinVertex, pinVerticesInRadius, pinTopRow, pinToBone, getPinnedVertices, visualizePins } from "./mesh/ClothPinning.js";
+import { createSphereCollider, createPlaneCollider, applyCollisions, applySelfCollision, createCollidersFromMesh, visualizeCollider } from "./mesh/ClothCollision.js";
+import { createRetopoSettings, quadDominantRetopo, detectHardEdges, getRetopoStats } from "./mesh/AutoRetopo.js";
+import { generateFibermesh, buildFibermeshLines, buildFibermeshTubes, combStrands, adjustLength, clumpStrands, puffStrands, smoothStrands, getFibermeshStats, serializeFibermesh } from "./mesh/FibermeshSystem.js";
 import { AnimationTimeline } from "./components/AnimationTimeline.jsx";
-import { createSceneObject, buildPrimitiveMesh } from "./components/SceneManager.js";
+import { createInstances, flattenInstances } from "./mesh/Instancing.js";
+import { fixNormals, removeDoubles, removeDegenerates, fillHoles, fullRepair } from "./mesh/MeshRepair.js";
+import {
 
-import "./App.css";
-import "./styles/pro-dark.css";
+  createSceneObject,
+  buildPrimitiveMesh,
+  saveScene,
+  loadSceneData,
+  exportSceneGLB,
+  pushSceneToStreamPireX,
+} from "./components/SceneManager.js";
 
 const TOOLS = [
   { id: "select", icon: "↖", label: "Select (S)" },
@@ -55,18 +112,13 @@ const TOOLS = [
   { id: "scale", icon: "⤢", label: "Scale (S)" },
 ];
 
-
 const PRIMITIVES = [
-  { id: "box", label: "Cube" },
+  { id: "box", label: "Box" },
   { id: "sphere", label: "Sphere" },
   { id: "cylinder", label: "Cylinder" },
-  { id: "cone", label: "Cone" },
   { id: "torus", label: "Torus" },
   { id: "plane", label: "Plane" },
-  { id: "circle", label: "Circle" },
-  { id: "icosphere", label: "Icosphere" }
 ];
-
 
 const COLORS = {
   bg: "#1d1d1d",
@@ -86,6 +138,8 @@ const COLORS = {
 
 export default function App() {
 
+  const [activeWorkspace, setActiveWorkspace] = React.useState("Layout");
+
   const canvasRef = useRef(null);
   const sceneRef = useRef(null);
   const rendererRef = useRef(null);
@@ -103,7 +157,6 @@ export default function App() {
   const gizmoRef = useRef(null);
   const [gizmoMode, setGizmoMode] = useState("move"); // move|rotate|scale
   const [gizmoActive, setGizmoActive] = useState(false);
-  const [activeWorkspace, setActiveWorkspace] = useState("Modeling");
   const gizmoDragging = useRef(false);
   const [bevelAmt, setBevelAmt] = useState(0.1);
   const [insetAmt, setInsetAmt] = useState(0.15);
@@ -130,20 +183,6 @@ export default function App() {
   const meshBRef = useRef(null); // second mesh for boolean ops
 
   // ── Sessions 1-3: Scene state ────────────────────────────────────────────────
-  
-  useEffect(() => {
-    if (scene) {
-      const updateObjects = () => {
-        const meshes = [];
-        scene.traverse((child) => {
-          if (child.isMesh) meshes.push(child);
-        });
-        setSceneObjects(meshes);
-      };
-      updateObjects();
-    }
-  }, [scene, objectsAddedCounter]); // objectsAddedCounter triggers refresh on add/delete
-
   const [sceneObjects, setSceneObjects] = useState([]);
   const [activeObjId, setActiveObjId] = useState(null);
   const sceneLoadInput = useRef(null);
@@ -292,6 +331,7 @@ export default function App() {
     exportSceneGLB(sceneObjects).then(() => setStatus("Scene exported as GLB"));
   };
 
+
   // Selection overlays
   const vertDotsRef = useRef(null); // THREE.Points
   const edgeLinesRef = useRef(null); // THREE.LineSegments
@@ -304,11 +344,13 @@ export default function App() {
 
 });
 
+
   // Edge slide state
   const slideRef = useRef({ active: false, startX: 0, edge: null 
   
 
 });
+
 
   const [activeTool, setActiveTool] = useState("select");
   const [editMode, setEditMode] = useState("object");
@@ -358,64 +400,6 @@ export default function App() {
   const [instanceLayout, setInstanceLayout] = useState("scatter");
   const [instanceSpread, setInstanceSpread] = useState(5);
   const [selectMode, setSelectMode] = useState("vert");
-  
-  const [isAutoKey, setAutoKey] = useState(false);
-
-  const recordKeyframe = (obj, key, val) => {
-    if (!isAutoKey) return;
-    if (typeof window.addKeyframe === 'function') {
-      window.addKeyframe(obj.uuid, key, val, currentFrame);
-      console.log(`🔑 Keyframe: ${key} set at frame ${currentFrame}`);
-    }
-  };
-
-  
-  const exportSpxScene = () => {
-    const sceneData = {
-      version: "1.0",
-      timestamp: new Date().toISOString(),
-      objects: sceneObjects.map(obj => ({
-        name: obj.name,
-        type: obj.userData.type,
-        params: obj.userData.params,
-        position: obj.position.toArray(),
-        rotation: obj.rotation.toArray(),
-        scale: obj.scale.toArray(),
-        keyframes: window.animationData ? window.animationData[obj.uuid] : []
-      }))
-    };
-    
-    const blob = new Blob([JSON.stringify(sceneData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `spx_project_${Date.now()}.json`;
-    link.click();
-    console.log("💾 Scene exported to .json");
-  };
-
-  
-  // --- PRO DCC ENGINES ---
-  const importSpxScene = (file) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const data = JSON.parse(e.target.result);
-      sceneObjects.forEach(obj => scene.remove(obj));
-      data.objects.forEach(o => addPrimitive(o.type, o.params));
-      console.log("📂 Project Loaded");
-    };
-    reader.readAsText(file);
-  };
-
-  const takeSnapshot = () => {
-    const canvas = document.querySelector('canvas');
-    const link = document.createElement('a');
-    link.download = `spx_render_${Date.now()}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-    console.log("📸 Render Saved");
-  };
-
   const [stats, setStats] = useState({ vertices: 0, edges: 0, faces: 0, halfEdges: 0 
   
 
@@ -480,6 +464,7 @@ export default function App() {
     fill.position.set(-3, -2, -3);
     scene.add(fill);
 
+
     // Init transform gizmo
     setTimeout(() => {
       if (sceneRef.current && !gizmoRef.current) {
@@ -501,95 +486,7 @@ export default function App() {
     };
     window.addEventListener("resize", onResize);
 
-    
-  const updateMeshParam = (obj, key, val) => {
-    if (!obj) return;
-    obj.userData.params = { ...obj.userData.params, [key]: val };
-    const newGeo = buildProceduralMesh(obj.userData.type, obj.userData.params);
-    obj.geometry.dispose();
-    obj.geometry = newGeo;
-  };
-
-
-  // --- PROFESSIONAL ENGINE BRIDGE ---
-  window.HalfEdgeMesh = HalfEdgeMesh;
-  window.booleanUnion = booleanUnion;
-  window.booleanSubtract = booleanSubtract;
-  window.booleanIntersect = booleanIntersect;
-  window.uvBoxProject = uvBoxProject;
-  window.uvSphereProject = uvSphereProject;
-  window.uvPlanarProject = uvPlanarProject;
-  window.applySculptStroke = applySculptStroke;
-  window.createShapeKey = createShapeKey;
-  window.applyShapeKeys = applyShapeKeys;
-  window.createPipe = createPipe;
-  window.createGear = createGear;
-  window.buildProceduralMesh = buildProceduralMesh;
-  window.createAssetLibrary = createAssetLibrary;
-  window.createTourState = createTourState;
-  window.generateLOD = generateLOD;
-  window.createArmature = createArmature;
-  window.enterPoseMode = enterPoseMode;
-  window.initWeights = initWeights;
-  window.applyDyntopo = applyDyntopo;
-  window.createDynaMeshSettings = createDynaMeshSettings;
-  window.createAction = createAction;
-  window.createTrack = createTrack;
-  window.createStrip = createStrip;
-  window.createStroke = createStroke;
-  window.createLayer = createLayer;
-  window.createNode = createNode;
-  window.createGraph = createGraph;
-  window.addNode = addNode;
-  window.connectNodes = connectNodes;
-  window.evaluateGraph = evaluateGraph;
-  window.createSpline = createSpline;
-  window.applyPreset = applyPreset;
-  window.createPaintTexture = createPaintTexture;
-  window.bakeAO = bakeAO;
-  window.createLight = createLight;
-  window.createCamera = createCamera;
-  window.applyColorGrade = applyColorGrade;
-  window.createPassStack = createPassStack;
-  window.DEFAULT_BONE_MAP = DEFAULT_BONE_MAP;
-  window.retargetFrame = retargetFrame;
-  window.bakeRetargetedAnimation = bakeRetargetedAnimation;
-  window.fixFootSliding = fixFootSliding;
-  window.autoDetectBoneMap = autoDetectBoneMap;
-  window.getRetargetStats = getRetargetStats;
-  window.createIKChain = createIKChain;
-  window.createPathTracerSettings = createPathTracerSettings;
-  window.createVolumetricSettings = createVolumetricSettings;
-  window.generateFibermesh = generateFibermesh;
-  window.createInstances = createInstances;
-  window.fixNormals = fixNormals;
-  window.createRetopoSettings = createRetopoSettings;
-  
-  useEffect(() => {
-    let interval;
-    if (isPlaying) {
-      interval = setInterval(() => {
-        setFrame((prev) => (prev >= 250 ? 0 : prev + 1));
-      }, 1000 / 24); // Standard 24fps Cinematic Playback
-    }
-    window.importSpxScene = importSpxScene;
-  window.takeSnapshot = takeSnapshot;
-  return () => clearInterval(interval);
-  }, [isPlaying]);
-
-  // Hook into the 700-function engine every frame
-  useEffect(() => {
-    if (typeof window.evaluateNLA === 'function') {
-      window.evaluateNLA(currentFrame);
-    }
-    if (typeof window.retargetFrame === 'function') {
-      sceneObjects.forEach(obj => {
-        if (obj.userData.isMocap) window.retargetFrame(obj, currentFrame);
-      });
-    }
-  }, [currentFrame]);
-
-  return () => {
+    return () => {
       cancelAnimationFrame(rafRef.current);
       window.removeEventListener("resize", onResize);
       renderer.dispose();
@@ -641,10 +538,6 @@ export default function App() {
     else if (type === "torus") geo = new THREE.TorusGeometry(0.6, 0.25, 32, 80);
     else if (type === "plane") geo = new THREE.PlaneGeometry(2, 2, 32, 32);
     else if (type === "icosphere") geo = new THREE.IcosahedronGeometry(0.7, 2);
-    else if (type === "gear") geo = buildProceduralMesh("gear");
-    else if (type === "pipe") geo = buildProceduralMesh("pipe");
-    else if (type === "helix") geo = buildProceduralMesh("helix");
-    else if (type === "staircase") geo = buildProceduralMesh("staircase");
     else geo = new THREE.BoxGeometry(1, 1, 1, 8, 8, 8);
 
     geo = geo.toNonIndexed();
@@ -703,6 +596,7 @@ export default function App() {
 
 });
 
+
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
     geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
@@ -740,6 +634,7 @@ export default function App() {
   
 
 });
+
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
@@ -1335,110 +1230,93 @@ export default function App() {
 
   window.addEventListener('keydown', onKey);
 
-  
-  const updateMeshParam = (obj, key, val) => {
-    if (!obj) return;
-    obj.userData.params = { ...obj.userData.params, [key]: val };
-    const newGeo = buildProceduralMesh(obj.userData.type, obj.userData.params);
-    obj.geometry.dispose();
-    obj.geometry = newGeo;
-  };
-
-  
-  useEffect(() => {
-    let interval;
-    if (isPlaying) {
-      interval = setInterval(() => {
-        setFrame((prev) => (prev >= 250 ? 0 : prev + 1));
-      }, 1000 / 24); // Standard 24fps Cinematic Playback
-    }
-    return () => clearInterval(interval);
-  }, [isPlaying]);
-
-  // Hook into the 700-function engine every frame
-  useEffect(() => {
-    if (typeof window.evaluateNLA === 'function') {
-      window.evaluateNLA(currentFrame);
-    }
-    if (typeof window.retargetFrame === 'function') {
-      sceneObjects.forEach(obj => {
-        if (obj.userData.isMocap) window.retargetFrame(obj, currentFrame);
-      });
-    }
-  }, [currentFrame]);
-
   return () => {
     window.removeEventListener('keydown', onKey);
   };
 }, []);
 
-  
-  const updateMeshParam = (obj, key, val) => {
-    if (!obj) return;
-    obj.userData.params = { ...obj.userData.params, [key]: val };
-    const newGeo = buildProceduralMesh(obj.userData.type, obj.userData.params);
-    obj.geometry.dispose();
-    obj.geometry = newGeo;
-  };
-
-  
-  useEffect(() => {
-    let interval;
-    if (isPlaying) {
-      interval = setInterval(() => {
-        setFrame((prev) => (prev >= 250 ? 0 : prev + 1));
-      }, 1000 / 24); // Standard 24fps Cinematic Playback
-    }
-    return () => clearInterval(interval);
-  }, [isPlaying]);
-
-  // Hook into the 700-function engine every frame
-  useEffect(() => {
-    if (typeof window.evaluateNLA === 'function') {
-      window.evaluateNLA(currentFrame);
-    }
-    if (typeof window.retargetFrame === 'function') {
-      sceneObjects.forEach(obj => {
-        if (obj.userData.isMocap) window.retargetFrame(obj, currentFrame);
-      });
-    }
-  }, [currentFrame]);
-
   return (
-    <ProfessionalShell
-      activeWorkspace={activeWorkspace}
-      setActiveWorkspace={setActiveWorkspace}
-      leftPanel={
-        activeWorkspace === "Modeling" ? ( <div 
-          <MeshEditorPanel stats={stats} onApplyFunction={(fn) => typeof window[fn] === "function" ? window[fn]() : console.warn("Function " + fn + " not found")} onAddPrimitive={addPrimitive} />
-            onKnife={() => {}} />
-            onEdgeSlide={() => {}}
-            onSubdivide={() => {}}
-            onExtrude={() => {}}
-            onMerge={() => {}}
-            onUndo={undo}
-            onExportGLB={() => {}}
-            onImportGLB={() => {}}
-            onMirror={() => {}}
-            onBevel={() => {}}
-            onInset={() => {}}
-            onBoolean={() => {}}
-            onUVUnwrap={() => {}}
-            onOpenUVEditor={() => {}}
-            onOpenMatEditor={() => {}}
-          />
-        ) : (
-          <FeatureIndexPanel title={`${activeWorkspace} Tools`} features={WORKSPACE_FEATURES[activeWorkspace] || []} />
-        )
-      }
-      centerPanel={
+    <div className="mesh-editor-layout">
+
+      <WorkspaceTabs
+        activeWorkspace={activeWorkspace}
+        setWorkspace={setActiveWorkspace}
+      />
+
+      <div className="mesh-editor-main">
+
         <div className="mesh-editor-canvas">
           <canvas ref={canvasRef} />
         </div>
-      }
-      rightPanel={
-        <FeatureIndexPanel title={`${activeWorkspace} Systems`} features={WORKSPACE_FEATURES[activeWorkspace] || []} />
-      }
-    />
+
+        
+        <MeshEditorPanel
+          stats={stats}
+          history={history}
+          selectedFaces={selectedFaces}
+          selectedVerts={selectedVerts}
+          selectedEdges={selectedEdges}
+
+          loopCutT={loopCutT}
+          setLoopCutT={setLoopCutT}
+
+          knifePoints={0}
+          slideAmount={slideAmount}
+
+          onAddPrimitive={addPrimitive}
+          onLoopCut={() => {}}
+          onKnife={() => {}}
+          onEdgeSlide={() => {}}
+
+          onSubdivide={() => {}}
+          onExtrude={() => {}}
+          onMerge={() => {}}
+
+          onUndo={undo}
+          onExportGLB={() => {}}
+          onImportGLB={() => {}}
+
+          onMirror={() => {}}
+          onBevel={() => {}}
+          onInset={() => {}}
+
+          bevelAmt={bevelAmt}
+          setBevelAmt={setBevelAmt}
+
+          insetAmt={insetAmt}
+          setInsetAmt={setInsetAmt}
+
+          mirrorAxis={mirrorAxis}
+          setMirrorAxis={setMirrorAxis}
+
+          booleanMode={booleanMode}
+          setBooleanMode={setBooleanMode}
+          onBoolean={() => {}}
+
+          uvProjection={uvProjection}
+          setUVProjection={setUVProjection}
+          onUVUnwrap={() => {}}
+          onOpenUVEditor={() => {}}
+
+          onOpenMatEditor={() => {}}
+
+          propEdit={propEdit}
+          setPropEdit={setPropEdit}
+
+          propRadius={propRadius}
+          setPropRadius={setPropRadius}
+
+          snapEnabled={snapEnabled}
+          setSnapEnabled={setSnapEnabled}
+
+          snapSize={snapSize}
+          setSnapSize={setSnapSize}
+        />
+
+
+      </div>
+
+    </div>
   );
 }
+

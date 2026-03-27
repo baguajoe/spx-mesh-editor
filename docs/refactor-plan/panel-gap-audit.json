@@ -1,0 +1,264 @@
+[
+  {
+    "feature": "ClothCollision",
+    "status": "IMPORT_ONLY",
+    "workspace": "Simulation",
+    "action": "CREATE_PANEL",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/ClothCollision.js"
+    ]
+  },
+  {
+    "feature": "ClothPinning",
+    "status": "IMPORT_ONLY",
+    "workspace": "Simulation",
+    "action": "CREATE_PANEL",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/ClothPinning.js"
+    ]
+  },
+  {
+    "feature": "DoppelflexRig",
+    "status": "IMPORT_ONLY",
+    "workspace": "Rig",
+    "action": "CREATE_PANEL",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/DoppelflexRig.js"
+    ]
+  },
+  {
+    "feature": "ElectronBridge",
+    "status": "IMPORT_ONLY",
+    "workspace": "Layout",
+    "action": "CREATE_PANEL",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/ElectronBridge.js"
+    ]
+  },
+  {
+    "feature": "FBXPipeline",
+    "status": "IMPORT_ONLY",
+    "workspace": "Export",
+    "action": "CREATE_PANEL",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/FBXPipeline.js"
+    ]
+  },
+  {
+    "feature": "GLTFAdvanced",
+    "status": "IMPORT_ONLY",
+    "workspace": "Export",
+    "action": "CREATE_PANEL",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/GLTFAdvanced.js"
+    ]
+  },
+  {
+    "feature": "HairCards",
+    "status": "PARTIAL_UI_WIRING",
+    "workspace": "Hair",
+    "action": "ADD_TO_EXISTING_WORKSPACE",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/HairCards.js"
+    ]
+  },
+  {
+    "feature": "HairGrooming",
+    "status": "IMPORT_ONLY",
+    "workspace": "Hair",
+    "action": "CREATE_PANEL",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/HairGrooming.js"
+    ]
+  },
+  {
+    "feature": "HairShader",
+    "status": "PARTIAL_UI_WIRING",
+    "workspace": "Hair",
+    "action": "ADD_TO_EXISTING_WORKSPACE",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/HairShader.js"
+    ]
+  },
+  {
+    "feature": "HalfEdgeMesh",
+    "status": "PARTIAL_UI_WIRING",
+    "workspace": "Modeling",
+    "action": "ADD_TO_EXISTING_WORKSPACE",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/HalfEdgeMesh.js"
+    ]
+  },
+  {
+    "feature": "MocapRetarget",
+    "status": "IMPORT_ONLY",
+    "workspace": "Animate",
+    "action": "CREATE_PANEL",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/MocapRetarget.js"
+    ]
+  },
+  {
+    "feature": "NgonSupport",
+    "status": "IMPORT_ONLY",
+    "workspace": "Modeling",
+    "action": "CREATE_PANEL",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/NgonSupport.js"
+    ]
+  },
+  {
+    "feature": "NodeCompositor",
+    "status": "IMPORT_ONLY",
+    "workspace": "GeoNodes",
+    "action": "CREATE_PANEL",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/NodeCompositor.js"
+    ]
+  },
+  {
+    "feature": "PhysicsBake",
+    "status": "IMPORT_ONLY",
+    "workspace": "Simulation",
+    "action": "CREATE_PANEL",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/PhysicsBake.js"
+    ]
+  },
+  {
+    "feature": "PostPassShaders",
+    "status": "IMPORT_ONLY",
+    "workspace": "Render",
+    "action": "CREATE_PANEL",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/PostPassShaders.js"
+    ]
+  },
+  {
+    "feature": "ProceduralMesh",
+    "status": "PARTIAL_UI_WIRING",
+    "workspace": "Modeling",
+    "action": "ADD_TO_EXISTING_WORKSPACE",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/ProceduralMesh.js"
+    ]
+  },
+  {
+    "feature": "SculptEngine",
+    "status": "IMPORT_ONLY",
+    "workspace": "Sculpt",
+    "action": "CREATE_PANEL",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/SculptEngine.js"
+    ]
+  },
+  {
+    "feature": "SculptLayers",
+    "status": "IMPORT_ONLY",
+    "workspace": "Sculpt",
+    "action": "CREATE_PANEL",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/SculptLayers.js"
+    ]
+  },
+  {
+    "feature": "ShapeKeys",
+    "status": "PARTIAL_UI_WIRING",
+    "workspace": "Rig",
+    "action": "ADD_TO_EXISTING_WORKSPACE",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/ShapeKeys.js",
+      "src/mesh/ShapeKeysAdvanced.js"
+    ]
+  },
+  {
+    "feature": "ShapeKeysAdvanced",
+    "status": "IMPORT_ONLY",
+    "workspace": "Rig",
+    "action": "CREATE_PANEL",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/ShapeKeys.js",
+      "src/mesh/ShapeKeysAdvanced.js"
+    ]
+  },
+  {
+    "feature": "SkeletalBinding",
+    "status": "IMPORT_ONLY",
+    "workspace": "Rig",
+    "action": "CREATE_PANEL",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/SkeletalBinding.js"
+    ]
+  },
+  {
+    "feature": "SmartMaterials",
+    "status": "IMPORT_ONLY",
+    "workspace": "Paint",
+    "action": "CREATE_PANEL",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/SmartMaterials.js"
+    ]
+  },
+  {
+    "feature": "UVUnwrap",
+    "status": "PARTIAL_UI_WIRING",
+    "workspace": "Paint",
+    "action": "ADD_TO_EXISTING_WORKSPACE",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/UVUnwrap.js"
+    ]
+  },
+  {
+    "feature": "VertexColorPainter",
+    "status": "IMPORT_ONLY",
+    "workspace": "Paint",
+    "action": "CREATE_PANEL",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/VertexColorPainter.js"
+    ]
+  },
+  {
+    "feature": "WalkCycleGenerator",
+    "status": "IMPORT_ONLY",
+    "workspace": "Animate",
+    "action": "CREATE_PANEL",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/WalkCycleGenerator.js"
+    ]
+  },
+  {
+    "feature": "WeightPainting",
+    "status": "PARTIAL_UI_WIRING",
+    "workspace": "Paint",
+    "action": "ADD_TO_EXISTING_WORKSPACE",
+    "panel_matches": [],
+    "component_matches": [
+      "src/mesh/WeightPainting.js"
+    ]
+  }
+]

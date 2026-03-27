@@ -116,3 +116,19 @@ export function buildProceduralMesh(geo, color = "#888888") {
   mesh.castShadow = true;
   return mesh;
 }
+
+export function createAssetLibrary() {
+    return {
+        categories: ['Primitives', 'Characters', 'Architecture', 'Nature'],
+        assets: [],
+        lastSync: Date.now()
+    };
+}
+
+export function createTourState() {
+    return {
+        isActive: false,
+        currentStep: 0,
+        anchors: []
+    };
+}

@@ -1,0 +1,303 @@
+[
+  {
+    "feature": "ClothCollision",
+    "status": "IMPORT_ONLY",
+    "import_hits": 1,
+    "non_import_hits": 0,
+    "sample_non_import_hits": []
+  },
+  {
+    "feature": "ClothPinning",
+    "status": "IMPORT_ONLY",
+    "import_hits": 1,
+    "non_import_hits": 0,
+    "sample_non_import_hits": []
+  },
+  {
+    "feature": "DoppelflexRig",
+    "status": "IMPORT_ONLY",
+    "import_hits": 1,
+    "non_import_hits": 0,
+    "sample_non_import_hits": []
+  },
+  {
+    "feature": "ElectronBridge",
+    "status": "IMPORT_ONLY",
+    "import_hits": 1,
+    "non_import_hits": 0,
+    "sample_non_import_hits": []
+  },
+  {
+    "feature": "FBXPipeline",
+    "status": "IMPORT_ONLY",
+    "import_hits": 1,
+    "non_import_hits": 0,
+    "sample_non_import_hits": []
+  },
+  {
+    "feature": "GLTFAdvanced",
+    "status": "IMPORT_ONLY",
+    "import_hits": 1,
+    "non_import_hits": 0,
+    "sample_non_import_hits": []
+  },
+  {
+    "feature": "HairCards",
+    "status": "PARTIAL_UI_WIRING",
+    "import_hits": 1,
+    "non_import_hits": 5,
+    "sample_non_import_hits": [
+      {
+        "line": 2558,
+        "text": "const handleGenerateHairCards = useCallback(() => {"
+      },
+      {
+        "line": 2561,
+        "text": "const cards = generateHairCards(strands);"
+      },
+      {
+        "line": 2565,
+        "text": "setHairCards(cards);"
+      },
+      {
+        "line": 3563,
+        "text": "const [hairCards, setHairCards] = useState([]);"
+      },
+      {
+        "line": 6664,
+        "text": "<button onClick={handleGenerateHairCards}"
+      }
+    ]
+  },
+  {
+    "feature": "HairGrooming",
+    "status": "IMPORT_ONLY",
+    "import_hits": 1,
+    "non_import_hits": 0,
+    "sample_non_import_hits": []
+  },
+  {
+    "feature": "HairShader",
+    "status": "PARTIAL_UI_WIRING",
+    "import_hits": 2,
+    "non_import_hits": 3,
+    "sample_non_import_hits": [
+      {
+        "line": 1001,
+        "text": "const [hairShaderPreset, setHairShaderPreset] = useState(\"natural\");"
+      },
+      {
+        "line": 1575,
+        "text": "if (obj.isMesh) obj.material = createHairShaderMaterial({"
+      },
+      {
+        "line": 6654,
+        "text": "<button key={k} onClick={() => setHairShaderPreset(k)}"
+      }
+    ]
+  },
+  {
+    "feature": "HalfEdgeMesh",
+    "status": "PARTIAL_UI_WIRING",
+    "import_hits": 1,
+    "non_import_hits": 4,
+    "sample_non_import_hits": [
+      {
+        "line": 459,
+        "text": "heMeshRef.current = HalfEdgeMesh.fromBufferGeometry(geo);"
+      },
+      {
+        "line": 495,
+        "text": "const heMesh = HalfEdgeMesh.fromBufferGeometry(geo);"
+      },
+      {
+        "line": 846,
+        "text": "heMeshRef.current = HalfEdgeMesh.fromBufferGeometry(child.geometry);"
+      },
+      {
+        "line": 1387,
+        "text": "heMeshRef.current = HalfEdgeMesh.fromBufferGeometry(result.geometry);"
+      }
+    ]
+  },
+  {
+    "feature": "MocapRetarget",
+    "status": "IMPORT_ONLY",
+    "import_hits": 1,
+    "non_import_hits": 0,
+    "sample_non_import_hits": []
+  },
+  {
+    "feature": "NgonSupport",
+    "status": "IMPORT_ONLY",
+    "import_hits": 1,
+    "non_import_hits": 0,
+    "sample_non_import_hits": []
+  },
+  {
+    "feature": "NodeCompositor",
+    "status": "IMPORT_ONLY",
+    "import_hits": 1,
+    "non_import_hits": 0,
+    "sample_non_import_hits": []
+  },
+  {
+    "feature": "PhysicsBake",
+    "status": "IMPORT_ONLY",
+    "import_hits": 1,
+    "non_import_hits": 0,
+    "sample_non_import_hits": []
+  },
+  {
+    "feature": "PostPassShaders",
+    "status": "IMPORT_ONLY",
+    "import_hits": 1,
+    "non_import_hits": 0,
+    "sample_non_import_hits": []
+  },
+  {
+    "feature": "ProceduralMesh",
+    "status": "PARTIAL_UI_WIRING",
+    "import_hits": 1,
+    "non_import_hits": 4,
+    "sample_non_import_hits": [
+      {
+        "line": 3783,
+        "text": "const addProceduralMesh = useCallback(() => {"
+      },
+      {
+        "line": 3795,
+        "text": "const mesh = buildProceduralMesh(geo);"
+      },
+      {
+        "line": 7874,
+        "text": "<button onClick={addProceduralMesh}"
+      },
+      {
+        "line": 8082,
+        "text": "<button onClick={addProceduralMesh} style={{width:\"100%\",padding:\"4px\",background:\"#3d5a80\",border:\"none\",color:\"#fff\",borderRadius:2,cursor:\"pointer\",fontSize:9,fontWeight:700}}>+ Generate {procType}</button>"
+      }
+    ]
+  },
+  {
+    "feature": "SculptEngine",
+    "status": "IMPORT_ONLY",
+    "import_hits": 1,
+    "non_import_hits": 0,
+    "sample_non_import_hits": []
+  },
+  {
+    "feature": "SculptLayers",
+    "status": "IMPORT_ONLY",
+    "import_hits": 1,
+    "non_import_hits": 0,
+    "sample_non_import_hits": []
+  },
+  {
+    "feature": "ShapeKeys",
+    "status": "PARTIAL_UI_WIRING",
+    "import_hits": 2,
+    "non_import_hits": 11,
+    "sample_non_import_hits": [
+      {
+        "line": 333,
+        "text": "const [shapeKeys, setShapeKeys] = useState([]);"
+      },
+      {
+        "line": 3852,
+        "text": "setShapeKeys([...next]);"
+      },
+      {
+        "line": 3862,
+        "text": "setShapeKeys([...next]);"
+      },
+      {
+        "line": 3870,
+        "text": "setShapeKeys([...next]);"
+      },
+      {
+        "line": 3871,
+        "text": "const mesh = meshRef.current; if (mesh) applyShapeKeys(mesh, next);"
+      }
+    ]
+  },
+  {
+    "feature": "ShapeKeysAdvanced",
+    "status": "IMPORT_ONLY",
+    "import_hits": 1,
+    "non_import_hits": 0,
+    "sample_non_import_hits": []
+  },
+  {
+    "feature": "SkeletalBinding",
+    "status": "IMPORT_ONLY",
+    "import_hits": 1,
+    "non_import_hits": 0,
+    "sample_non_import_hits": []
+  },
+  {
+    "feature": "SmartMaterials",
+    "status": "IMPORT_ONLY",
+    "import_hits": 1,
+    "non_import_hits": 0,
+    "sample_non_import_hits": []
+  },
+  {
+    "feature": "UVUnwrap",
+    "status": "PARTIAL_UI_WIRING",
+    "import_hits": 1,
+    "non_import_hits": 4,
+    "sample_non_import_hits": [
+      {
+        "line": 1394,
+        "text": "const applyUVUnwrap = useCallback((projection) => {"
+      },
+      {
+        "line": 1416,
+        "text": "applyUVUnwrap(\"box\");"
+      },
+      {
+        "line": 1421,
+        "text": "}, [applyUVUnwrap]);"
+      },
+      {
+        "line": 8192,
+        "text": "onUVUnwrap={applyUVUnwrap}"
+      }
+    ]
+  },
+  {
+    "feature": "VertexColorPainter",
+    "status": "IMPORT_ONLY",
+    "import_hits": 1,
+    "non_import_hits": 0,
+    "sample_non_import_hits": []
+  },
+  {
+    "feature": "WalkCycleGenerator",
+    "status": "IMPORT_ONLY",
+    "import_hits": 1,
+    "non_import_hits": 0,
+    "sample_non_import_hits": []
+  },
+  {
+    "feature": "WeightPainting",
+    "status": "PARTIAL_UI_WIRING",
+    "import_hits": 1,
+    "non_import_hits": 3,
+    "sample_non_import_hits": [
+      {
+        "line": 3266,
+        "text": "setWeightPainting(true);"
+      },
+      {
+        "line": 3490,
+        "text": "const [weightPainting, setWeightPainting] = useState(false);"
+      },
+      {
+        "line": 4263,
+        "text": "<button title=\"Weight Paint\" onClick={() => { handleEnterWeightPaint(); setWeightPainting(w => !w); }}"
+      }
+    ]
+  }
+]

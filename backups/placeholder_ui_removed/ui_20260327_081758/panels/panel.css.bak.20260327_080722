@@ -1,0 +1,98 @@
+.workspace-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: linear-gradient(180deg, #151b24 0%, #10151d 100%);
+  border-bottom: 1px solid #232a36;
+  flex-wrap: wrap;
+}
+
+.workspace-tab {
+  appearance: none;
+  border: 1px solid #2a3342;
+  background: #1a2230;
+  color: #aeb8c8;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+
+.workspace-tab:hover {
+  background: #202a39;
+  color: #e3e9f3;
+  border-color: #3a4659;
+}
+
+.workspace-tab.active {
+  background: #2d6cdf;
+  color: #ffffff;
+  border-color: #2d6cdf;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.04) inset;
+}
+
+.workspace-panels {
+  width: 280px;
+  min-width: 280px;
+  max-width: 280px;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #0f141d;
+  padding: 10px;
+}
+
+.mesh-panel {
+  background: #161d28;
+  border: 1px solid #252f3d;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.mesh-panel-header {
+  background: #121924;
+  border-bottom: 1px solid #252f3d;
+  padding: 8px 10px;
+  color: #e6ebf2;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mesh-panel-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mesh-panel-body {
+  padding: 10px;
+}
+
+.mesh-panel-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.mesh-panel-help {
+  color: #95a0b1;
+  font-size: 11px;
+  line-height: 1.4;
+  margin: 0 0 8px 0;
+}
+
+.panel-missing {
+  background: #2a1616;
+  border: 1px solid #5a2a2a;
+  color: #ffbaba;
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}

@@ -1,0 +1,66 @@
+// Auto-generated from panel-gap-audit.json
+import ClothCollisionPanel from "../panels/ClothCollisionPanel";
+import ClothPinningPanel from "../panels/ClothPinningPanel";
+import DoppelflexRigPanel from "../panels/DoppelflexRigPanel";
+import ElectronBridgePanel from "../panels/ElectronBridgePanel";
+import FBXPipelinePanel from "../panels/FBXPipelinePanel";
+import GLTFAdvancedPanel from "../panels/GLTFAdvancedPanel";
+import HairGroomingPanel from "../panels/HairGroomingPanel";
+import MocapRetargetPanel from "../panels/MocapRetargetPanel";
+import NgonSupportPanel from "../panels/NgonSupportPanel";
+import NodeCompositorPanel from "../panels/NodeCompositorPanel";
+import PhysicsBakePanel from "../panels/PhysicsBakePanel";
+import PostPassShadersPanel from "../panels/PostPassShadersPanel";
+import SculptEnginePanel from "../panels/SculptEnginePanel";
+import SculptLayersPanel from "../panels/SculptLayersPanel";
+import ShapeKeysAdvancedPanel from "../panels/ShapeKeysAdvancedPanel";
+import SkeletalBindingPanel from "../panels/SkeletalBindingPanel";
+import SmartMaterialsPanel from "../panels/SmartMaterialsPanel";
+import VertexColorPainterPanel from "../panels/VertexColorPainterPanel";
+import WalkCycleGeneratorPanel from "../panels/WalkCycleGeneratorPanel";
+
+export const WORKSPACE_PANELS = {
+  "Animate": [
+    "MocapRetargetPanel",
+    "WalkCycleGeneratorPanel",
+  ],
+  "Export": [
+    "FBXPipelinePanel",
+    "GLTFAdvancedPanel",
+  ],
+  "GeoNodes": [
+    "NodeCompositorPanel",
+  ],
+  "Hair": [
+    "HairGroomingPanel",
+  ],
+  "Layout": [
+    "ElectronBridgePanel",
+  ],
+  "Modeling": [
+    "NgonSupportPanel",
+  ],
+  "Paint": [
+    "SmartMaterialsPanel",
+    "VertexColorPainterPanel",
+  ],
+  "Render": [
+    "PostPassShadersPanel",
+  ],
+  "Rig": [
+    "DoppelflexRigPanel",
+    "ShapeKeysAdvancedPanel",
+    "SkeletalBindingPanel",
+  ],
+  "Sculpt": [
+    "SculptEnginePanel",
+    "SculptLayersPanel",
+  ],
+  "Simulation": [
+    "ClothCollisionPanel",
+    "ClothPinningPanel",
+    "PhysicsBakePanel",
+  ],
+};
+
+export default WORKSPACE_PANELS;

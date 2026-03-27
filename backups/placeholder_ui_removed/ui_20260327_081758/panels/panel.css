@@ -1,0 +1,75 @@
+.workspace-panels {
+  width: 310px;
+  min-width: 310px;
+  max-width: 310px;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #111720;
+  border-left: 1px solid #202935;
+  padding: 10px;
+  scrollbar-width: thin;
+}
+
+.workspace-panels::-webkit-scrollbar {
+  width: 10px;
+}
+.workspace-panels::-webkit-scrollbar-track {
+  background: #0f141c;
+}
+.workspace-panels::-webkit-scrollbar-thumb {
+  background: #283244;
+  border-radius: 10px;
+}
+
+.mesh-panel {
+  background: #171e29;
+  border: 1px solid #273242;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.mesh-panel-header {
+  background: linear-gradient(180deg, #1d2531 0%, #171e28 100%);
+  border-bottom: 1px solid #273242;
+  padding: 9px 11px;
+  color: #e7edf7;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .4px;
+}
+
+.mesh-panel-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mesh-panel-body {
+  padding: 10px;
+}
+
+.mesh-panel-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.mesh-panel-help {
+  color: #91a0b2;
+  font-size: 11px;
+  line-height: 1.45;
+  margin: 0 0 8px 0;
+}
+
+.panel-missing {
+  background: #2a1717;
+  border: 1px solid #5d2d2d;
+  color: #ffc0c0;
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}

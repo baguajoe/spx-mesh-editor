@@ -163,3 +163,14 @@ export function smoothTopology(mesh, iterations = 1) {
   }
   geo.computeVertexNormals();
 }
+
+export function createDynaMeshSettings() {
+    return {
+        enabled: false,
+        resolution: 128,
+        constantDetail: 10.0,
+        subdivisionMethod: 'linear',
+        smoothShading: true,
+        preserveVolume: true
+    };
+}

@@ -143,3 +143,13 @@ export function fullRepair(mesh, threshold = 0.001) {
   fixNormals(mesh);
   return { doubles, degenerates, holes };
 }
+
+export function createRetopoSettings() {
+    return {
+        targetPolyCount: 5000,
+        method: 'quadriflow',
+        adaptiveSize: 0.5,
+        symmetry: 'x',
+        preserveSharpEdges: true
+    };
+}

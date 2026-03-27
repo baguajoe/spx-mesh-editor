@@ -1,0 +1,78 @@
+.mesh-panel {
+  background: #2a2b2f;
+  border: 1px solid #3a3b40;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.mesh-panel-header {
+  background: #232428;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #d7d7d7;
+  border-bottom: 1px solid #3a3b40;
+}
+
+.mesh-panel-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mesh-panel-body {
+  padding: 10px;
+}
+
+.mesh-panel-row {
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mesh-panel-help {
+  color: #9a9a9a;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.workspace-panels {
+  width: 320px;
+  overflow-y: auto;
+  height: 100%;
+  background: #1e1f22;
+  padding: 6px;
+}
+
+.workspace-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  background: #1a1b1e;
+  flex-wrap: wrap;
+}
+
+.workspace-tab {
+  background: #2a2b2f;
+  border: 1px solid #3a3b40;
+  padding: 4px 10px;
+  color: #aaa;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.workspace-tab.active {
+  background: #4a8cff;
+  color: white;
+}
+
+.panel-missing {
+  background: #2a1f1f;
+  border: 1px solid #6b2c2c;
+  color: #ffb4b4;
+  padding: 10px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
