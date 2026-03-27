@@ -302,6 +302,7 @@ export default function App() {
 
   const [activeTool, setActiveTool] = useState("select");
   const [editMode, setEditMode] = useState("object");
+  // Always start in object mode
 
   // ── Sessions 4-5: Sculpt state ────────────────────────────────────────────
   const [sculptBrush, setSculptBrush] = useState("push");
@@ -452,6 +453,7 @@ export default function App() {
     if (activeWorkspace === "Sculpt") {
       setEditMode("sculpt");
       editModeRef.current = "sculpt";
+      sceneObjectsRef.current = sceneObjects;
     } else if (activeWorkspace === "Modeling") {
       setEditMode("object");
       editModeRef.current = "object";
@@ -460,7 +462,15 @@ export default function App() {
 
   // Keep refs in sync
   useEffect(() => { activeToolRef.current = activeTool; }, [activeTool]);
-  useEffect(() => { sceneObjectsRef.current = sceneObjects; }, [sceneObjects]);
+  useEffect(() => {
+    sceneObjectsRef.current = sceneObjects;
+    console.log("[SYNC] sceneObjectsRef updated:", sceneObjects.length);
+  }, [sceneObjects]);
+  // Force object mode on mount
+  useEffect(() => {
+    editModeRef.current = "object";
+    console.log("[INIT] editModeRef set to object");
+  }, []);
   useEffect(() => { sculptBrushRef.current = sculptBrush; }, [sculptBrush]);
   useEffect(() => { sculptRadiusRef.current = sculptRadius; }, [sculptRadius]);
   useEffect(() => { sculptStrengthRef.current = sculptStrength; }, [sculptStrength]);
@@ -1382,11 +1392,12 @@ export default function App() {
   // ── Click for selection ────────────────────────────────────────────────────
   const onCanvasClick = useCallback(
     (e) => {
+      console.log("[SELECT] mode:", editModeRef.current, "sceneObjectsRef:", sceneObjectsRef.current.length);
       if (editModeRef.current !== "edit" && editModeRef.current !== "object") return;
       if (editModeRef.current === "object") {
         const canvas = canvasRef.current;
         const camera = cameraRef.current;
-        if (!canvas || !camera) return;
+        if (!canvas || !camera) { console.log("[SELECT] no canvas/camera"); return; }
         const rect = canvas.getBoundingClientRect();
         const mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
         const my = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -1394,7 +1405,9 @@ export default function App() {
         raycaster.setFromCamera({ x: mx, y: my }, camera);
         const objs = sceneObjectsRef.current;
         const meshes = objs.map(o => o.mesh).filter(Boolean);
+        console.log("[SELECT] objs:", objs.length, "meshes:", meshes.length, "NDC:", mx.toFixed(2), my.toFixed(2));
         const hits = raycaster.intersectObjects(meshes, true);
+        console.log("[SELECT] hits:", hits.length, hits.map(h => h.object.type));
         if (hits.length > 0) {
           const hit = hits[0].object;
           const obj = objs.find(o => {
@@ -1403,6 +1416,7 @@ export default function App() {
             o.mesh.traverse(m => { if (m === hit) match = true; });
             return match;
           });
+          console.log("[SELECT] matched obj:", obj?.name);
           if (obj) selectSceneObject(obj.id);
         } else {
           objs.forEach(o => {
@@ -2204,14 +2218,13 @@ export default function App() {
                 applySculpt(e);
               }
             } else if (editModeRef.current === "object") {
-              // Start box select drag
+              // Start box select drag — click handled on mouseup
               const canvas = canvasRef.current;
               if (canvas) {
                 const rect = canvas.getBoundingClientRect();
                 boxSelectStart.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
                 boxSelectActive.current = false;
               }
-              onCanvasClick(e);
             } else if (editModeRef.current === "edit") {
               onCanvasClick(e);
               onKnifeClick(e);
@@ -2270,6 +2283,10 @@ export default function App() {
             orbitButton.current = -1;
             sculptingRef.current = false;
             confirmEdgeSlide();
+            // If no drag, treat mouseup as click for selection
+            if (editModeRef.current === "object" && boxSelectStart.current && !boxSelectActive.current) {
+              onCanvasClick(e);
+            }
             // Finish box select
             if (boxSelectActive.current && boxSelect) {
               const canvas = canvasRef.current;
