@@ -2299,17 +2299,22 @@ export default function App() {
                 const y2 = -(((boxSelect.y + boxSelect.h) / rect.height) * 2 - 1);
                 const cx = (x1 + x2) / 2;
                 const cy = (y1 + y2) / 2;
-                // Select all objects whose center is inside box
-                sceneObjects.forEach(o => {
+                let lastSelected = null;
+                sceneObjectsRef.current.forEach(o => {
                   if (!o.mesh) return;
                   const pos = new THREE.Vector3();
-                  o.mesh.getWorldPosition(pos);
+                  pos.setFromMatrixPosition(o.mesh.matrixWorld);
                   pos.project(camera);
-                  if (pos.x >= Math.min(x1,x2) && pos.x <= Math.max(x1,x2) &&
-                      pos.y >= Math.min(y1,y2) && pos.y <= Math.max(y1,y2)) {
-                    selectSceneObject(o.id);
+                  const bx1 = (boxSelect.x / rect.width) * 2 - 1;
+                  const by1 = -(((boxSelect.y) / rect.height) * 2 - 1);
+                  const bx2 = ((boxSelect.x + boxSelect.w) / rect.width) * 2 - 1;
+                  const by2 = -(((boxSelect.y + boxSelect.h) / rect.height) * 2 - 1);
+                  if (pos.x >= Math.min(bx1,bx2) && pos.x <= Math.max(bx1,bx2) &&
+                      pos.y >= Math.min(by1,by2) && pos.y <= Math.max(by1,by2)) {
+                    lastSelected = o.id;
                   }
                 });
+                if (lastSelected) selectSceneObject(lastSelected);
               }
             }
             boxSelectStart.current = null;
