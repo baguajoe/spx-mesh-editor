@@ -435,6 +435,7 @@ export default function App() {
   const [showPluginPanel, setShowPluginPanel] = useState(false);
   const [showMarketPanel, setShowMarketPanel] = useState(false);
   const [showNPanel, setShowNPanel] = useState(false);
+  const [boxSelect, setBoxSelect] = useState(null);
   const [activeMode, setActiveMode] = useState("object");
   
   const [knifePoints, setKnifePoints] = useState([]);
@@ -512,6 +513,8 @@ export default function App() {
   const orbitDragging = useRef(false);
   const orbitLast = useRef({ x: 0, y: 0 });
   const orbitButton = useRef(-1);
+  const boxSelectStart = useRef(null);
+  const boxSelectActive = useRef(false);
 
   const fileInputRef = useRef(null);
   const gizmoRef = useRef(null);
@@ -1379,15 +1382,37 @@ export default function App() {
     (e) => {
       if (editModeRef.current !== "edit" && editModeRef.current !== "object") return;
       if (editModeRef.current === "object") {
-        const raycaster = raycast(e);
-        if (raycaster) {
-          const meshes = sceneObjects.map(o => o.mesh).filter(Boolean);
-          const hits = raycaster.intersectObjects(meshes, true);
-          if (hits.length > 0) {
-            const hit = hits[0].object;
-            const obj = sceneObjects.find(o => o.mesh === hit || o.mesh === hit.parent);
-            if (obj) selectSceneObject(obj.id);
-          }
+        const canvas = canvasRef.current;
+        const camera = cameraRef.current;
+        if (!canvas || !camera) return;
+        const rect = canvas.getBoundingClientRect();
+        const mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        const my = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera({ x: mx, y: my }, camera);
+        const meshes = sceneObjects.map(o => o.mesh).filter(Boolean);
+        const hits = raycaster.intersectObjects(meshes, true);
+        if (hits.length > 0) {
+          const hit = hits[0].object;
+          const obj = sceneObjects.find(o => {
+            if (!o.mesh) return false;
+            let match = false;
+            o.mesh.traverse(m => { if (m === hit) match = true; });
+            return match;
+          });
+          if (obj) selectSceneObject(obj.id);
+        } else {
+          // Click empty space — deselect
+          sceneObjects.forEach(o => {
+            if (o.mesh) o.mesh.traverse(m => {
+              if (m.isMesh && m.material) {
+                if (m.material.emissive) m.material.emissive.set(0x000000);
+                m.material.emissiveIntensity = 0;
+              }
+            });
+          });
+          setActiveObjId(null);
+          meshRef.current = null;
         }
         return;
       }
@@ -2176,9 +2201,18 @@ export default function App() {
                 editModeRef.current = "sculpt";
                 applySculpt(e);
               }
-            } else if (editModeRef.current === "object" || editModeRef.current === "edit") {
+            } else if (editModeRef.current === "object") {
+              // Start box select drag
+              const canvas = canvasRef.current;
+              if (canvas) {
+                const rect = canvas.getBoundingClientRect();
+                boxSelectStart.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+                boxSelectActive.current = false;
+              }
               onCanvasClick(e);
-              if (editModeRef.current === "edit") onKnifeClick(e);
+            } else if (editModeRef.current === "edit") {
+              onCanvasClick(e);
+              onKnifeClick(e);
             }
           }}
           onMouseMove={e => {
@@ -2208,15 +2242,60 @@ export default function App() {
             }
             if (activeWorkspace === "Sculpt" && sculptingRef.current && meshRef.current) {
               applySculpt(e);
+            } else if (editModeRef.current === "object" && boxSelectStart.current && !orbitDragging.current) {
+              const canvas = canvasRef.current;
+              if (canvas) {
+                const rect = canvas.getBoundingClientRect();
+                const cx = e.clientX - rect.left;
+                const cy = e.clientY - rect.top;
+                const dx = Math.abs(cx - boxSelectStart.current.x);
+                const dy = Math.abs(cy - boxSelectStart.current.y);
+                if (dx > 5 || dy > 5) {
+                  boxSelectActive.current = true;
+                  setBoxSelect({
+                    x: Math.min(cx, boxSelectStart.current.x),
+                    y: Math.min(cy, boxSelectStart.current.y),
+                    w: dx, h: dy
+                  });
+                }
+              }
             } else {
               onSlideMouse(e);
             }
           }}
-          onMouseUp={() => {
+          onMouseUp={(e) => {
             orbitDragging.current = false;
             orbitButton.current = -1;
             sculptingRef.current = false;
             confirmEdgeSlide();
+            // Finish box select
+            if (boxSelectActive.current && boxSelect) {
+              const canvas = canvasRef.current;
+              const camera = cameraRef.current;
+              if (canvas && camera) {
+                const rect = canvas.getBoundingClientRect();
+                const x1 = (boxSelect.x / rect.width) * 2 - 1;
+                const y1 = -((boxSelect.y / rect.height) * 2 - 1);
+                const x2 = ((boxSelect.x + boxSelect.w) / rect.width) * 2 - 1;
+                const y2 = -(((boxSelect.y + boxSelect.h) / rect.height) * 2 - 1);
+                const cx = (x1 + x2) / 2;
+                const cy = (y1 + y2) / 2;
+                // Select all objects whose center is inside box
+                sceneObjects.forEach(o => {
+                  if (!o.mesh) return;
+                  const pos = new THREE.Vector3();
+                  o.mesh.getWorldPosition(pos);
+                  pos.project(camera);
+                  if (pos.x >= Math.min(x1,x2) && pos.x <= Math.max(x1,x2) &&
+                      pos.y >= Math.min(y1,y2) && pos.y <= Math.max(y1,y2)) {
+                    selectSceneObject(o.id);
+                  }
+                });
+              }
+            }
+            boxSelectStart.current = null;
+            boxSelectActive.current = false;
+            setBoxSelect(null);
           }}
           onMouseLeave={() => {
             orbitDragging.current = false;
@@ -2235,6 +2314,16 @@ export default function App() {
           onContextMenu={e => e.preventDefault()}
         >
           <canvas ref={canvasRef} />
+          {boxSelect && (
+            <div style={{
+              position: "absolute",
+              left: boxSelect.x, top: boxSelect.y,
+              width: boxSelect.w, height: boxSelect.h,
+              border: "1px solid #ff6600",
+              background: "rgba(255,102,0,0.08)",
+              pointerEvents: "none"
+            }} />
+          )}
         </div>
       }
       rightPanel={
