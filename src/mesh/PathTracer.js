@@ -65,14 +65,21 @@ export async function createWebGLPathTracer(renderer, scene, camera, options = {
 }
 
 function createFallbackAccumulator(renderer, scene, camera, settings) {
+  const width = Math.max(1, Math.floor(renderer.domElement.width * settings.resolutionScale));
+  const height = Math.max(1, Math.floor(renderer.domElement.height * settings.resolutionScale));
+
   const rt1 = new THREE.WebGLRenderTarget(
-    renderer.domElement.width  * settings.resolutionScale,
-    renderer.domElement.height * settings.resolutionScale,
+    width,
+    height,
     { type: THREE.FloatType }
   );
   const rt2 = rt1.clone();
 
-  const blendMat = new THREE.MeshBasicMaterial();
+  const blendMat = new THREE.MeshBasicMaterial({
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+  });
   const blendGeo = new THREE.PlaneGeometry(2, 2);
   const blendMesh = new THREE.Mesh(blendGeo, blendMat);
   const blendScene = new THREE.Scene();
@@ -100,8 +107,13 @@ export function startPathTracing(pt) {
   if (!pt) return;
   pt.running = true;
   pt.samples = 0;
+
   if (pt._type === "WebGLPathTracer") {
+    if (pt._pt?.reset) pt._pt.reset();
     pt._pt.renderSample();
+    pt.samples = 1;
+  } else if (pt._type === "FallbackAccumulator") {
+    resetPathTracer(pt);
   }
 }
 
@@ -123,29 +135,59 @@ export function stepPathTracer(pt, renderer, scene, camera) {
 
   // Fallback: progressive accumulation via alpha blend
   const { _rt1, _rt2, _blendMat, _blendScene, _blendCam } = pt;
+
+  // render current scene sample into _rt1
   renderer.setRenderTarget(_rt1);
+  renderer.clear();
   renderer.render(scene, camera);
-  renderer.setRenderTarget(null);
 
-  const alpha = 1 / (pt.samples + 1);
-  _blendMat.map     = _rt1.texture;
-  _blendMat.opacity = alpha;
-  _blendMat.transparent = true;
+  // blend previous accumulation (_rt2) with new sample (_rt1) into _rt1
+  renderer.setRenderTarget(_rt1);
+  renderer.autoClear = false;
 
-  renderer.setRenderTarget(_rt2);
+  if (pt.samples > 0) {
+    _blendMat.map = _rt2.texture;
+    _blendMat.opacity = pt.samples / (pt.samples + 1);
+    renderer.render(_blendScene, _blendCam);
+  }
+
+  _blendMat.map = _rt1.texture;
+  _blendMat.opacity = 1 / (pt.samples + 1);
   renderer.render(_blendScene, _blendCam);
+
+  renderer.autoClear = true;
   renderer.setRenderTarget(null);
 
-  // Swap targets
-  const tmp = pt._rt1; pt._rt1 = pt._rt2; pt._rt2 = tmp;
+  // present accumulated result to screen
+  _blendMat.map = _rt1.texture;
+  _blendMat.opacity = 1;
+  renderer.render(_blendScene, _blendCam);
+
+  // swap targets so previous accumulation is preserved for next frame
+  const tmp = pt._rt2;
+  pt._rt2 = pt._rt1;
+  pt._rt1 = tmp;
+
   pt.samples++;
 }
 
 export function resetPathTracer(pt, renderer) {
   if (!pt) return;
   pt.samples = 0;
+
   if (pt._type === "WebGLPathTracer" && pt._pt?.reset) {
     pt._pt.reset();
+  }
+
+  if (pt._type === "FallbackAccumulator") {
+    const activeRenderer = renderer || pt._renderer;
+    if (activeRenderer) {
+      activeRenderer.setRenderTarget(pt._rt1);
+      activeRenderer.clear();
+      activeRenderer.setRenderTarget(pt._rt2);
+      activeRenderer.clear();
+      activeRenderer.setRenderTarget(null);
+    }
   }
 }
 
@@ -180,14 +222,13 @@ export async function detectWebGPU() {
     return {
       available: true,
       adapter:   adapter.name || "unknown",
-      features:  [...adapter.features].map(f => f.toString()),
+      features:  Array.from(adapter.features || []).map(f => f.toString()),
     };
   } catch (e) {
     return { available: false, reason: e.message };
   }
 }
-export function createVolumetricSettings() {
-    return { enabled: false, density: 0.02, anisotropy: 0.7, absorption: "#1a1a1a", scattering: "#ffffff", stepSize: 0.1 };
-}
-  
 
+export function createVolumetricSettings() {
+  return { enabled: false, density: 0.02, anisotropy: 0.7, absorption: "#1a1a1a", scattering: "#ffffff", stepSize: 0.1 };
+}
