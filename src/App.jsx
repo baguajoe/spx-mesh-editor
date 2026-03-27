@@ -1052,18 +1052,27 @@ export default function App() {
   // ── N panel keyboard shortcut ─────────────────────────────────────────────
   useEffect(() => {
     const onKey = (e) => {
-      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")
-        return;
-      const key = e.key.toLowerCase();
-      if (key === "n") setShowNPanel((v) => !v);
-      if (key === "g") window.SPX?.toggleViewport("grid");
-      if (key === "w") window.SPX?.toggleViewport("wireframe");
-      if (key === "x") window.SPX?.toggleViewport("xray");
-      if (key === "r") window.takeSnapshot?.();
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      const key = e.key;
+      if (key === "n" || key === "N") setShowNPanel((v) => !v);
+      if (key === "g" || key === "G") window.SPX?.toggleViewport("grid");
+      if (key === "w" || key === "W") window.SPX?.toggleViewport("wireframe");
+      if (key === "r" || key === "R") window.takeSnapshot?.();
+      // Delete selected object
+      if (key === "Delete" || key === "Backspace" || key === "x" || key === "X") {
+        if (activeObjId) deleteSceneObject(activeObjId);
+      }
+      // Undo
+      if ((e.ctrlKey || e.metaKey) && key === "z") undo();
+      // Add primitives
+      if (key === "Tab") {
+        e.preventDefault();
+        setShowNPanel(v => !v);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [activeObjId, deleteSceneObject, undo]);
 
   // ── Push history ───────────────────────────────────────────────────────────
   const pushHistory = useCallback(() => {
