@@ -146,13 +146,16 @@ export default function App() {
   // sceneObjects managed directly via addSceneObject/deleteSceneObject
 
   const selectSceneObject = (id) => {
-    const obj = sceneObjects.find((o) => o.id === id);
+    const obj = sceneObjectsRef.current.find((o) => o.id === id);
     if (!obj) return;
-    // Deselect all — reset emissive
-    sceneObjects.forEach(o => {
-      if (o.mesh) o.mesh.traverse(m => {
-        if (m.isMesh && m.material) {
-          if (m.material.emissive) m.material.emissive.set(0x000000);
+    console.log("[SELECT_OBJ] selecting", id, obj.name, "mesh:", obj.mesh?.type);
+    // Deselect all
+    sceneObjectsRef.current.forEach(o => {
+      if (!o.mesh) return;
+      o.mesh.traverse(m => {
+        if (m.isMesh) {
+          if (!m.material.emissive) m.material = m.material.clone();
+          if (m.material.emissive) m.material.emissive.setHex(0x000000);
           m.material.emissiveIntensity = 0;
         }
       });
@@ -160,24 +163,32 @@ export default function App() {
     setActiveObjId(id);
     meshRef.current = obj.mesh;
     if (obj.mesh) {
-      // Convert to non-indexed for sculpting
       if (obj.mesh.geometry?.index) {
         obj.mesh.geometry = obj.mesh.geometry.toNonIndexed();
         obj.mesh.geometry.computeVertexNormals();
       }
-      // Orange emissive highlight like Blender
+      // Force orange highlight
       obj.mesh.traverse(m => {
-        if (m.isMesh && m.material) {
-          if (m.material.emissive) m.material.emissive.set(0xff6600);
-          m.material.emissiveIntensity = 0.2;
+        if (m.isMesh) {
+          if (!m.material.emissive) {
+            m.material = new THREE.MeshStandardMaterial({
+              color: m.material.color,
+              emissive: new THREE.Color(0xff6600),
+              emissiveIntensity: 0.3,
+              roughness: 0.5,
+              metalness: 0.1,
+            });
+          } else {
+            m.material.emissive.setHex(0xff6600);
+            m.material.emissiveIntensity = 0.3;
+          }
+          m.material.needsUpdate = true;
         }
       });
       const box = new THREE.Box3().setFromObject(obj.mesh);
-      orbitState.current.radius = Math.max(
-        box.getSize(new THREE.Vector3()).length() * 2, 3
-      );
+      orbitState.current.radius = Math.max(box.getSize(new THREE.Vector3()).length() * 2, 3);
     }
-    setStatus(`Selected: ${obj.name}`);
+    setStatus("Selected: " + obj.name);
   };
 
   const renameSceneObject = (id, name) => {
@@ -2286,6 +2297,7 @@ export default function App() {
             orbitButton.current = -1;
             sculptingRef.current = false;
             confirmEdgeSlide();
+            console.log("[MOUSEUP] wasDragging:", wasDragging, "button:", e.button, "wasBox:", wasBox);
             if (wasDragging || e.button !== 0) {
               boxSelectStart.current = null;
               boxSelectActive.current = false;
@@ -2317,7 +2329,9 @@ export default function App() {
               ray.setFromCamera(new THREE.Vector2(mx, my), camera);
               const candidates = [];
               sceneRef.current?.traverse(c => { if (c.isMesh && c.type === "Mesh") candidates.push(c); });
+              console.log("[RAY] candidates:", candidates.length, "NDC:", mx.toFixed(2), my.toFixed(2));
               const hits = ray.intersectObjects(candidates, false);
+              console.log("[RAY] hits:", hits.length);
               if (hits.length > 0) {
                 const hitMesh = hits[0].object;
                 const objs = sceneObjectsRef.current;
@@ -2326,7 +2340,9 @@ export default function App() {
                   let minD = Infinity;
                   objs.forEach(o => { if (!o.mesh) return; const d = o.mesh.position.distanceTo(hits[0].point); if (d < minD) { minD = d; matched = o; } });
                 }
+                console.log("[MATCH] matched:", matched?.id, matched?.name, "objs:", sceneObjectsRef.current.length);
                 if (matched) selectSceneObject(matched.id);
+                else console.log("[MATCH] FAILED - hitMesh uuid:", hitMesh.uuid, "objs uuids:", sceneObjectsRef.current.map(o => o.mesh?.uuid));
               } else {
                 sceneObjectsRef.current.forEach(o => { if (o.mesh) o.mesh.traverse(m => { if (m.isMesh && m.material?.emissive) { m.material.emissive.set(0x000000); m.material.emissiveIntensity = 0; } }); });
                 setActiveObjId(null);
