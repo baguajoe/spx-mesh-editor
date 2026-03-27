@@ -1,3 +1,4 @@
+import { ViewportHeader } from "./components/ViewportHeader";
 import { MeshEditorPanel } from "./components/MeshEditorPanel";
 import { PropertyInspector } from "./components/PropertyInspector";
 import { Outliner } from "./components/Outliner";
@@ -39,7 +40,8 @@ import { fixNormals, createRetopoSettings } from "./mesh/MeshRepair.js";
 import { MaterialEditor } from "./components/MaterialEditor.jsx";
 import { UVEditor } from "./components/UVEditor.jsx";
 import { TransformGizmo } from "./components/TransformGizmo.js";
-        <MeshEditorPanel stats={stats} onApplyFunction={(fn) => typeof window[fn] === "function" ? window[fn]() : console.warn("Function " + fn + " not found")} onAddPrimitive={addPrimitive} />
+        <ViewportHeader onToggle={window.SPX.toggleViewport} />
+          <MeshEditorPanel stats={stats} onApplyFunction={(fn) => typeof window[fn] === "function" ? window[fn]() : console.warn("Function " + fn + " not found")} onAddPrimitive={addPrimitive} />
 import { createSceneObject, buildPrimitiveMesh } from "./components/SceneManager.js";
 
 import "./App.css";
@@ -608,6 +610,18 @@ export default function App() {
 
   
   window.SPX = {
+    window.SPX.toggleViewport = (type) => {
+      scene.traverse(obj => {
+        if (obj.isMesh) {
+          if (type === 'wireframe') obj.material.wireframe = !obj.material.wireframe;
+          if (type === 'xray') obj.material.opacity = obj.material.opacity === 1 ? 0.3 : 1;
+          if (type === 'xray') obj.material.transparent = true;
+        }
+        if (type === 'grid' && obj.type === 'GridHelper') obj.visible = !obj.visible;
+      });
+      console.log(`👁️ Viewport: ${type} toggled.`);
+    };
+    
     clearScene: () => { 
       scene.children.filter(c => c.isMesh).forEach(m => scene.remove(m));
       setSceneObjects([]);

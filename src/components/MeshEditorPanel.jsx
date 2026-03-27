@@ -57,5 +57,7 @@ export const MeshEditorPanel = ({ stats, onApplyFunction, onAddPrimitive }) => {
         ))}
       </div>
     </div>
-  )    </div>    </div>;
+};
+    </div>
+  );
 };
