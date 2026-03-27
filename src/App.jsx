@@ -1387,7 +1387,6 @@ export default function App() {
         const canvas = canvasRef.current;
         const camera = cameraRef.current;
         if (!canvas || !camera) { console.log("[SELECT] no canvas/camera"); return; }
-        // Use the canvas element directly for accurate NDC
         const actualCanvas = canvasRef.current;
         const rect = actualCanvas.getBoundingClientRect();
         const mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -1395,22 +1394,30 @@ export default function App() {
         const raycaster = new THREE.Raycaster();
         raycaster.setFromCamera(new THREE.Vector2(mx, my), camera);
         const objs = sceneObjectsRef.current;
-        const meshes = objs.map(o => o.mesh).filter(Boolean);
-        // Also raycast against scene directly as fallback
-        const sceneHits = raycaster.intersectObjects(sceneRef.current?.children || [], true);
-        console.log("[SELECT] objs:", objs.length, "meshes:", meshes.length, "NDC:", mx.toFixed(2), my.toFixed(2), "sceneHits:", sceneHits.length);
-        const hits = raycaster.intersectObjects(meshes, true);
-        console.log("[SELECT] hits:", hits.length, "sceneHits:", sceneHits.map(h => h.object.type));
-        if (hits.length > 0) {
-          const hit = hits[0].object;
-          const obj = objs.find(o => {
+        // Raycast directly against scene, filter to only real Mesh objects
+        const sceneHits = raycaster.intersectObjects(sceneRef.current?.children || [], true)
+          .filter(h => h.object.type === "Mesh" && h.object.isMesh);
+        if (sceneHits.length > 0) {
+          const hitMesh = sceneHits[0].object;
+          // Find which sceneObject owns this mesh
+          let matched = objs.find(o => o.mesh === hitMesh);
+          if (!matched) matched = objs.find(o => o.mesh?.uuid === hitMesh.uuid);
+          if (!matched) matched = objs.find(o => {
             if (!o.mesh) return false;
-            let match = false;
-            o.mesh.traverse(m => { if (m === hit) match = true; });
-            return match;
+            let found = false;
+            o.mesh.traverse(m => { if (m === hitMesh) found = true; });
+            return found;
           });
-          console.log("[SELECT] matched obj:", obj?.name);
-          if (obj) selectSceneObject(obj.id);
+          // Position-based fallback
+          if (!matched && objs.length > 0) {
+            let minDist = Infinity;
+            objs.forEach(o => {
+              if (!o.mesh) return;
+              const d = o.mesh.position.distanceTo(sceneHits[0].point);
+              if (d < minDist) { minDist = d; matched = o; }
+            });
+          }
+          if (matched) selectSceneObject(matched.id);
         } else {
           objs.forEach(o => {
             if (o.mesh) o.mesh.traverse(m => {
