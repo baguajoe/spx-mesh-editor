@@ -1878,7 +1878,7 @@ export default function App() {
     if (fn.startsWith("prim_"))       { addPrimitive(fn.replace("prim_","")); return; }
 
     // ── Edit tools ────────────────────────────────────────────────────────────
-    if (fn === "select")              { setActiveTool("select"); setEditMode("edit"); setStatus("Select mode"); return; }
+    if (fn === "select")              { setActiveTool("select"); setStatus("Select mode"); return; }
     if (fn === "grab")                { setActiveTool("grab"); setStatus("Grab — G"); return; }
     if (fn === "rotate")              { setActiveTool("rotate"); setStatus("Rotate — R"); return; }
     if (fn === "scale")               { setActiveTool("scale"); setStatus("Scale — S"); return; }
