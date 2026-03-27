@@ -541,6 +541,11 @@ export default function App() {
 
   const addSceneObject = (type) => {
     const mesh = buildPrimitiveMesh(type);
+    // Convert to non-indexed geometry so sculpt engine can deform all vertices
+    if (mesh.geometry && mesh.geometry.index) {
+      mesh.geometry = mesh.geometry.toNonIndexed();
+      mesh.geometry.computeVertexNormals();
+    }
     mesh.position.set(
       (Math.random() - 0.5) * 2,
       0,
@@ -1477,7 +1482,15 @@ export default function App() {
   const applySculpt = useCallback((e) => {
     const canvas = canvasRef.current;
     const camera = cameraRef.current;
-    const mesh   = meshRef.current;
+    // Use active scene object mesh if meshRef not set
+    let mesh = meshRef.current;
+    if (!mesh && sceneObjects.length > 0) {
+      const activeObj = sceneObjects.find(o => o.id === activeObjId) || sceneObjects[0];
+      if (activeObj?.mesh) {
+        mesh = activeObj.mesh;
+        meshRef.current = mesh;
+      }
+    }
     if (!canvas) { console.warn("sculpt: no canvas"); return; }
     if (!camera) { console.warn("sculpt: no camera"); return; }
     if (!mesh)   { console.warn("sculpt: no mesh"); return; }
