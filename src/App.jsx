@@ -131,7 +131,19 @@ const COLORS = {
 };
 
 export default function App() {
-  useEffect(() => {
+  const [objectsAddedCounter, setObjectsAddedCounter] = useState(0);
+  const [stats, setStats] = useState({ vertices: 0, edges: 0, faces: 0, halfEdges: 0 });
+  const [activeWorkspace, setActiveWorkspace] = useState(DEFAULT_WORKSPACE);
+  const [sceneObjects, setSceneObjects] = useState([]);
+  const [selectedObject, setSelectedObject] = useState(null);
+  const [activeObjId, setActiveObjId] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentFrame, setCurrentFrame] = useState(0);
+  const canvasRef = useRef(null);
+  const sceneRef = useRef(null);
+  const meshRef = useRef(null);
+
+    useEffect(() => {
     if (sceneRef.current) {
       const updateObjects = () => {
         const meshes = [];
@@ -404,7 +416,7 @@ export default function App() {
   const [showMarketPanel, setShowMarketPanel] = useState(false);
   const [showNPanel, setShowNPanel] = useState(false);
   const [activeMode, setActiveMode] = useState("object");
-  const [objectsAddedCounter, setObjectsAddedCounter] = useState(0);
+  
   const [knifePoints, setKnifePoints] = useState([]);
   const [slideAmount, setSlideAmount] = useState(0);
   const [history, setHistory] = useState([]);
@@ -441,39 +453,39 @@ export default function App() {
     if (isPlaying) {
       interval = setInterval(() => {
         setCurrentFrame((prev) => (prev >= 250 ? 0 : prev + 1));
-      }, 1000 / 24); // 24fps cinematic playback
+      }, 1000 / 24);
     }
-    
-  
+    return () => clearInterval(interval);
+  }, [isPlaying]);
 
-    useEffect(() => {
-      const handleGlobalKeys = (e) => {
-        if (e.key === 'Delete' || e.key === 'Backspace') {
-          if (document.activeElement.tagName !== 'INPUT') window.deleteSelected();
-        }
-      };
-      window.addEventListener('keydown', handleGlobalKeys);
-      
+  useEffect(() => {
+    const handleGlobalKeys = (e) => {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (document.activeElement.tagName !== 'INPUT') window.deleteSelected();
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeys);
+    return () => window.removeEventListener('keydown', handleGlobalKeys);
+  }, [selectedObject, sceneObjects]);
+
   useEffect(() => {
     window.deleteSelected = () => {
       if (selectedObject) {
         if (selectedObject.parent) selectedObject.parent.remove(selectedObject);
         setSelectedObject(null);
         if (typeof setSceneObjects === 'function') {
-           setSceneObjects(prev => prev.filter(o => o.uuid !== selectedObject.uuid));
+          setSceneObjects(prev => prev.filter(o => o.uuid !== selectedObject.uuid));
         }
         console.log("🗑️ Object Deleted.");
       }
     };
     window.setSelectedObject = (obj) => setSelectedObject(obj);
   }, [selectedObject]);
-  
-  
-  
+
   const rendererRef = useRef(null);
   const cameraRef = useRef(null);
   const rafRef = useRef(null);
-  
+
   const heMeshRef = useRef(null);
   const orbitRef = useRef(null);
   const orbitState = useRef({ theta: 0.6, phi: 1.1, radius: 5 });
@@ -558,11 +570,7 @@ export default function App() {
     }
   }, [selectedObject]);
 
-    return () => window.removeEventListener('keydown', handleGlobalKeys);
-    }, [selectedObject, sceneObjects]);
 
-    return () => clearInterval(interval);
-  }, [isPlaying]);
 
   // ── NLA + MoCap frame hook ────────────────────────────────────────────────
   useEffect(() => {
@@ -1012,21 +1020,7 @@ export default function App() {
       rendererRef.current = null;
     };
   }, []);
-  const [stats, setStats] = useState({
-    vertices: 0,
-    edges: 0,
-    faces: 0,
-    halfEdges: 0,
-  });
-  const [activeWorkspace, setActiveWorkspace] = useState(DEFAULT_WORKSPACE);
-  const [sceneObjects, setSceneObjects] = useState([]);
-  const [selectedObject, setSelectedObject] = useState(null);
-  const [activeObjId, setActiveObjId] = useState(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentFrame, setCurrentFrame] = useState(0);
-  const canvasRef = useRef(null);
-  const sceneRef = useRef(null);
-  const meshRef = useRef(null);
+
 
   
   
@@ -1346,7 +1340,20 @@ export default function App() {
   // ── Click for selection ────────────────────────────────────────────────────
   const onCanvasClick = useCallback(
     (e) => {
-      if (editModeRef.current !== "edit") return;
+      if (editModeRef.current !== "edit" && editModeRef.current !== "object") return;
+      if (editModeRef.current === "object") {
+        const raycaster = raycast(e);
+        if (raycaster) {
+          const meshes = sceneObjects.map(o => o.mesh).filter(Boolean);
+          const hits = raycaster.intersectObjects(meshes, true);
+          if (hits.length > 0) {
+            const hit = hits[0].object;
+            const obj = sceneObjects.find(o => o.mesh === hit || o.mesh === hit.parent);
+            if (obj) selectSceneObject(obj.id);
+          }
+        }
+        return;
+      }
       if (activeToolRef.current === "knife") return;
       const raycaster = raycast(e);
       if (!raycaster) return;
@@ -2104,7 +2111,7 @@ export default function App() {
       }
       centerPanel={
         <div className="mesh-editor-canvas"
-          style={{ cursor: activeWorkspace === "Sculpt" ? "crosshair" : "default" }}
+          style={{ cursor: activeWorkspace === "Sculpt" ? "crosshair" : "pointer" }}
           onMouseDown={e => {
             if (activeWorkspace === "Sculpt" && meshRef.current) {
               sculptingRef.current = true;
