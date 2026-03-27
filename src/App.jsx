@@ -1072,7 +1072,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [activeObjId, deleteSceneObject, undo]);
+  }, [activeObjId]);
 
   // ── Push history ───────────────────────────────────────────────────────────
   const pushHistory = useCallback(() => {
