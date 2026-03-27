@@ -1,4 +1,7 @@
-import { PropertyInspector } from './components/PropertyInspector';
+import { MeshEditorPanel } from "./components/MeshEditorPanel";
+import { PropertyInspector } from "./components/PropertyInspector";
+import { Outliner } from "./components/Outliner";
+import { AnimationTimeline } from "./components/AnimationTimeline";
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import * as THREE from "three";
 import ProfessionalShell from "./pro-ui/ProfessionalShell";
@@ -36,9 +39,7 @@ import { fixNormals, createRetopoSettings } from "./mesh/MeshRepair.js";
 import { MaterialEditor } from "./components/MaterialEditor.jsx";
 import { UVEditor } from "./components/UVEditor.jsx";
 import { TransformGizmo } from "./components/TransformGizmo.js";
-import { MeshEditorPanel } from "./components/MeshEditorPanel";
-import { Outliner } from "./components/Outliner.jsx";
-import { AnimationTimeline } from "./components/AnimationTimeline.jsx";
+        <MeshEditorPanel stats={stats} onApplyFunction={(fn) => typeof window[fn] === "function" ? window[fn]() : console.warn("Function " + fn + " not found")} onAddPrimitive={addPrimitive} />
 import { createSceneObject, buildPrimitiveMesh } from "./components/SceneManager.js";
 
 import "./App.css";
@@ -574,6 +575,54 @@ export default function App() {
     }
     window.importSpxScene = importSpxScene;
   window.takeSnapshot = takeSnapshot;
+  
+  window.runBenchmark = () => {
+    console.log("🏗️ Building Mechanical Benchmark...");
+    
+    // 1. Central Drive Gear
+    addPrimitive('Gear', { teeth: 24, radius: 2, height: 0.5 });
+    
+    // 2. Secondary Reduction Gear (Offset)
+    setTimeout(() => {
+      addPrimitive('Gear', { teeth: 12, radius: 1, height: 0.5 });
+      // We'll assume the last added object is available for positioning
+      const gears = scene.children.filter(c => c.userData.type === 'Gear');
+      if (gears[1]) gears[1].position.set(3, 0, 0);
+    }, 100);
+
+    // 3. The Path-Tracer Stress Test: Glass Helix
+    setTimeout(() => {
+      addPrimitive('Helix', { radius: 1, height: 5, turns: 3, radialSegments: 32 });
+      const helix = scene.children.find(c => c.userData.type === 'Helix');
+      if (helix) {
+        helix.position.set(-3, 2.5, 0);
+        helix.material.transparent = true;
+        helix.material.opacity = 0.5;
+        helix.material.color.set('#00ffff');
+      }
+    }, 200);
+
+    console.log("✅ Benchmark Scene Populated. Testing Timeline...");
+    setIsPlaying(true);
+  };
+
+  
+  window.SPX = {
+    clearScene: () => { 
+      scene.children.filter(c => c.isMesh).forEach(m => scene.remove(m));
+      setSceneObjects([]);
+      console.log("🧹 Scene Cleared.");
+    },
+    runBenchmark: () => {
+      window.SPX.clearScene();
+      console.log("🏗️ Building Mechanical Benchmark...");
+      addPrimitive('Gear', { teeth: 24, radius: 2, height: 0.5 });
+      setTimeout(() => addPrimitive('Gear', { teeth: 12, radius: 1, height: 0.5 }), 200);
+      setTimeout(() => addPrimitive('Helix', { radius: 1, height: 5, turns: 3 }), 400);
+      setIsPlaying(true);
+    }
+  };
+
   return () => clearInterval(interval);
   }, [isPlaying]);
 
@@ -1410,7 +1459,6 @@ export default function App() {
       setActiveWorkspace={setActiveWorkspace}
       leftPanel={
         activeWorkspace === "Modeling" ? ( <div 
-        <MeshEditorPanel stats={stats} onApplyFunction={(fn) => typeof window[fn] === "function" ? window[fn]() : console.warn("Function " + fn + " not found")} onAddPrimitive={addPrimitive} />
             onEdgeSlide={() => {}}
             onSubdivide={() => {}}
             onExtrude={() => {}}

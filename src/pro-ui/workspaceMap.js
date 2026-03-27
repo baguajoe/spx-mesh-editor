@@ -14,4 +14,6 @@ export const WORKSPACE_PANELS = {
   [WORKSPACES.PHYSICS]: ["MeshEditorPanel", "PropertyInspector"]
 };
 
-export const DEFAULT_WORKSPACE = WORKSPACES.MODELING;\n
+export const DEFAULT_WORKSPACE = WORKSPACES.MODELING;
+
+export default { WORKSPACES, WORKSPACE_PANELS, DEFAULT_WORKSPACE };
