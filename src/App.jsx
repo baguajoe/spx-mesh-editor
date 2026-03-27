@@ -10,7 +10,7 @@ import WORKSPACE_FEATURES from "./pro-ui/workspaceMap";
 import { HalfEdgeMesh } from "./mesh/HalfEdgeMesh.js";
 import { booleanUnion, booleanSubtract, booleanIntersect } from "./mesh/BooleanOps.js";
 import { uvBoxProject, uvSphereProject, uvPlanarProject } from "./mesh/UVUnwrap.js";
-import { applySculptStroke } from "./mesh/SculptEngine.js";
+import { applySculptStroke, getSculptHit } from "./mesh/SculptEngine.js";
 import { createShapeKey, applyShapeKeys } from "./mesh/ShapeKeys.js";
 import { createPipe, createGear, buildProceduralMesh, createAssetLibrary, createTourState } from "./mesh/ProceduralMesh.js";
 import { generateLOD } from "./mesh/LODSystem.js";
@@ -83,6 +83,9 @@ import { TransformGizmo } from "./components/TransformGizmo.js";
 import { createSceneObject, buildPrimitiveMesh } from "./components/SceneManager.js";
 import { MeshEditorPanel, PropertiesPanel } from "./components/MeshEditorPanel.jsx";
 import { SceneOutliner } from "./components/SceneOutliner.jsx";
+import { SculptPanel } from "./components/SculptPanel.jsx";
+import { ShadingPanel } from "./components/ShadingPanel.jsx";
+import { AnimationPanel } from "./components/AnimationPanel.jsx";
 import { AnimationTimeline } from "./components/AnimationTimeline.jsx";
 
 import "./App.css";
@@ -350,10 +353,15 @@ export default function App() {
   // ── Sessions 4-5: Sculpt state ────────────────────────────────────────────
   const [sculptBrush, setSculptBrush] = useState("push");
   const [sculptRadius, setSculptRadius] = useState(0.8);
-  const [sculptStrength, setSculptStrength] = useState(0.02);
+  const [sculptStrength, setSculptStrength] = useState(0.5);
   const [sculptFalloff, setSculptFalloff] = useState("smooth");
   const [sculptSymX, setSculptSymX] = useState(false);
   const sculptingRef = useRef(false);
+  const sculptBrushRef = useRef("draw");
+  const sculptRadiusRef = useRef(0.8);
+  const sculptStrengthRef = useRef(0.02);
+  const sculptFalloffRef = useRef("smooth");
+  const sculptSymXRef = useRef(false);
   const [dyntopoEnabled, setDyntopoEnabled] = useState(false);
   const lazyMouseRef = useRef({ x: 0, y: 0 });
   const sculptStrokeCountRef = useRef(0);
@@ -489,8 +497,24 @@ export default function App() {
   const editModeRef = useRef("object");
   const selectModeRef = useRef("vert");
 
+  // Sync editMode with active workspace
+  useEffect(() => {
+    if (activeWorkspace === "Sculpt") {
+      setEditMode("sculpt");
+      editModeRef.current = "sculpt";
+    } else if (activeWorkspace === "Modeling") {
+      setEditMode("object");
+      editModeRef.current = "object";
+    }
+  }, [activeWorkspace]);
+
   // Keep refs in sync
   useEffect(() => { activeToolRef.current = activeTool; }, [activeTool]);
+  useEffect(() => { sculptBrushRef.current = sculptBrush; }, [sculptBrush]);
+  useEffect(() => { sculptRadiusRef.current = sculptRadius; }, [sculptRadius]);
+  useEffect(() => { sculptStrengthRef.current = sculptStrength; }, [sculptStrength]);
+  useEffect(() => { sculptFalloffRef.current = sculptFalloff; }, [sculptFalloff]);
+  useEffect(() => { sculptSymXRef.current = sculptSymX; }, [sculptSymX]);
   useEffect(() => { editModeRef.current = editMode; }, [editMode]);
   useEffect(() => { selectModeRef.current = selectMode; }, [selectMode]);
 
@@ -866,6 +890,9 @@ export default function App() {
     window.addBone = (armature, opts) => { if (armature && typeof armature.addBone === 'function') return armature.addBone(opts); };
     window.importSpxScene = importSpxScene;
     window.takeSnapshot = takeSnapshot;
+    window.addPrimitive = addPrimitive;
+    window.selectSceneObject = selectSceneObject;
+    window.deleteSceneObject = deleteSceneObject;
 
     window.runBenchmark = () => {
       console.log("🏗️ Building Mechanical Benchmark...");
@@ -1354,6 +1381,50 @@ export default function App() {
       `Knife: ${knife.points.length} point(s) — press Enter to cut, Esc to cancel`
     );
   }, []);
+
+  // ── Sculpt stroke handler ─────────────────────────────────────────────────
+  const applySculpt = useCallback((e) => {
+    const canvas = canvasRef.current;
+    const camera = cameraRef.current;
+    const mesh   = meshRef.current;
+    if (!canvas) { console.warn("sculpt: no canvas"); return; }
+    if (!camera) { console.warn("sculpt: no camera"); return; }
+    if (!mesh)   { console.warn("sculpt: no mesh"); return; }
+
+    const hit = getSculptHit(e, canvas, camera, mesh);
+    if (!hit) { console.warn("sculpt: no hit — click directly on the mesh"); return; }
+    console.log("sculpt hit:", hit.point, "brush:", sculptBrush);
+
+    pushHistory();
+    applySculptStroke(mesh, hit, {
+      type:       sculptBrushRef.current,
+      radius:     sculptRadiusRef.current,
+      strength:   sculptStrengthRef.current,
+      falloffType: sculptFalloffRef.current,
+      symmetryX:  sculptSymXRef.current,
+      symmetryY:  false,
+      symmetryZ:  false,
+    });
+
+    // Force Three.js to re-render the updated geometry
+    mesh.geometry.attributes.position.needsUpdate = true;
+    mesh.geometry.computeVertexNormals();
+    if (mesh.geometry.attributes.normal) {
+      mesh.geometry.attributes.normal.needsUpdate = true;
+    }
+    mesh.geometry.computeBoundingSphere();
+
+    // Dyntopo after every N strokes
+    sculptStrokeCountRef.current += 1;
+    if (dyntopoEnabled && sculptStrokeCountRef.current % 3 === 0 && typeof window.applyDyntopo === "function") {
+      window.applyDyntopo(mesh, hit, { detailSize: 0.05 });
+    }
+
+    // Update stats
+    if (mesh.geometry?.attributes?.position) {
+      setStats(s => ({ ...s, vertices: mesh.geometry.attributes.position.count }));
+    }
+  }, [sculptBrush, sculptRadius, sculptStrength, sculptFalloff, sculptSymX, dyntopoEnabled, pushHistory]);
 
   const executeKnifeCut = useCallback(() => {
     const knife = knifeRef.current;
@@ -1913,14 +1984,66 @@ export default function App() {
       setActiveWorkspace={setActiveWorkspace}
       onMenuAction={handleApplyFunction}
       leftPanel={
-        <MeshEditorPanel
-          stats={stats}
-          onApplyFunction={handleApplyFunction}
-          onAddPrimitive={addPrimitive}
-        />
+        activeWorkspace === "Sculpt" ? (
+          <SculptPanel
+            onApplyFunction={handleApplyFunction}
+            sculptBrush={sculptBrush} setSculptBrush={setSculptBrush}
+            sculptRadius={sculptRadius} setSculptRadius={setSculptRadius}
+            sculptStrength={sculptStrength} setSculptStrength={setSculptStrength}
+            sculptFalloff={sculptFalloff} setSculptFalloff={setSculptFalloff}
+            sculptSymX={sculptSymX} setSculptSymX={setSculptSymX}
+            dyntopoEnabled={dyntopoEnabled} setDyntopoEnabled={setDyntopoEnabled}
+            vcPaintColor={vcPaintColor} setVcPaintColor={setVcPaintColor}
+            vcRadius={vcRadius} setVcRadius={setVcRadius}
+            vcStrength={vcStrength} setVcStrength={setVcStrength}
+            gpColor={gpColor} setGpColor={setGpColor}
+            gpThickness={gpThickness} setGpThickness={setGpThickness}
+          />
+        ) : activeWorkspace === "Shading" ? (
+          <ShadingPanel onApplyFunction={handleApplyFunction} />
+        ) : activeWorkspace === "Animation" ? (
+          <AnimationPanel
+            onApplyFunction={handleApplyFunction}
+            isAutoKey={isAutoKey} setAutoKey={setAutoKey}
+            currentFrame={currentFrame}
+            shapeKeys={shapeKeys}
+            nlaActions={nlaActions}
+            nlaTracks={nlaTracks}
+          />
+        ) : (
+          <MeshEditorPanel
+            stats={stats}
+            onApplyFunction={handleApplyFunction}
+            onAddPrimitive={addPrimitive}
+          />
+        )
       }
       centerPanel={
-        <div className="mesh-editor-canvas">
+        <div className="mesh-editor-canvas"
+          style={{ cursor: activeWorkspace === "Sculpt" ? "crosshair" : "default" }}
+          onMouseDown={e => {
+            if (activeWorkspace === "Sculpt" && meshRef.current) {
+              sculptingRef.current = true;
+              editModeRef.current = "sculpt";
+              applySculpt(e);
+            } else {
+              onKnifeClick(e);
+              onCanvasClick(e);
+            }
+          }}
+          onMouseMove={e => {
+            if (activeWorkspace === "Sculpt" && sculptingRef.current && meshRef.current) {
+              applySculpt(e);
+            } else {
+              onSlideMouse(e);
+            }
+          }}
+          onMouseUp={() => {
+            sculptingRef.current = false;
+            confirmEdgeSlide();
+          }}
+          onMouseLeave={() => { sculptingRef.current = false; }}
+        >
           <canvas ref={canvasRef} />
         </div>
       }
