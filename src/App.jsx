@@ -191,6 +191,10 @@ export default function App() {
       });
       const box = new THREE.Box3().setFromObject(obj.mesh);
       orbitState.current.radius = Math.max(box.getSize(new THREE.Vector3()).length() * 2, 3);
+      // Force immediate render
+      if (rendererRef.current && sceneRef.current && cameraRef.current) {
+        rendererRef.current.render(sceneRef.current, cameraRef.current);
+      }
     }
     setStatus("Selected: " + obj.name);
   };
