@@ -2199,6 +2199,25 @@ export default function App() {
               return;
             }
             if (e.button !== 0) return;
+            // Check gizmo handle click first
+            if (gizmoRef.current && cameraRef.current && canvasRef.current) {
+              const rect = canvasRef.current.getBoundingClientRect();
+              const mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+              const my = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+              const ray = new THREE.Raycaster();
+              ray.setFromCamera(new THREE.Vector2(mx, my), cameraRef.current);
+              const handles = Object.values(gizmoRef.current.handles || {}).flat();
+              const hits = ray.intersectObjects(handles, true);
+              if (hits.length > 0) {
+                const axis = hits[0].object.userData.axis;
+                if (axis) {
+                  gizmoRef.current.startDrag(axis, hits[0].point);
+                  gizmoDragging.current = true;
+                  e.stopPropagation();
+                  return;
+                }
+              }
+            }
             if (activeWorkspace === "Sculpt") {
               if (!meshRef.current && sceneObjects.length > 0) {
                 const obj = sceneObjects.find(o => o.id === activeObjId) || sceneObjects[0];
@@ -2247,6 +2266,18 @@ export default function App() {
               camera.lookAt(0, 0, 0);
               return;
             }
+            if (gizmoDragging.current && gizmoRef.current && cameraRef.current && canvasRef.current) {
+              const rect = canvasRef.current.getBoundingClientRect();
+              const mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+              const my = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+              const ray = new THREE.Raycaster();
+              ray.setFromCamera(new THREE.Vector2(mx, my), cameraRef.current);
+              const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+              const pt = new THREE.Vector3();
+              ray.ray.intersectPlane(plane, pt);
+              if (pt) gizmoRef.current.drag(pt);
+              return;
+            }
             if (activeWorkspace === "Sculpt" && sculptingRef.current && meshRef.current) {
               applySculpt(e);
             } else if (editModeRef.current === "object" && boxSelectStart.current && !orbitDragging.current) {
@@ -2271,6 +2302,11 @@ export default function App() {
             }
           }}
           onMouseUp={(e) => {
+            if (gizmoDragging.current) {
+              gizmoDragging.current = false;
+              if (gizmoRef.current) gizmoRef.current.endDrag?.();
+              return;
+            }
             const wasDragging = orbitDragging.current;
             const wasBox = boxSelectActive.current;
             const boxSnap = boxSelect;
