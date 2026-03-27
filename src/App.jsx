@@ -148,7 +148,6 @@ export default function App() {
   const selectSceneObject = (id) => {
     const obj = sceneObjectsRef.current.find((o) => o.id === id);
     if (!obj) return;
-    console.log("[SELECT_OBJ] selecting", id, obj.name, "mesh:", obj.mesh?.type);
     // Deselect all
     sceneObjectsRef.current.forEach(o => {
       if (!o.mesh) return;
@@ -191,6 +190,11 @@ export default function App() {
       });
       const box = new THREE.Box3().setFromObject(obj.mesh);
       orbitState.current.radius = Math.max(box.getSize(new THREE.Vector3()).length() * 2, 3);
+      // Attach gizmo to selected mesh
+      if (gizmoRef.current) {
+        gizmoRef.current.attach(obj.mesh);
+        gizmoRef.current.group.visible = true;
+      }
       // Force immediate render
       if (rendererRef.current && sceneRef.current && cameraRef.current) {
         rendererRef.current.render(sceneRef.current, cameraRef.current);
@@ -472,12 +476,10 @@ export default function App() {
   useEffect(() => { activeToolRef.current = activeTool; }, [activeTool]);
   useEffect(() => {
     sceneObjectsRef.current = sceneObjects;
-    console.log("[SYNC] sceneObjectsRef updated:", sceneObjects.length);
   }, [sceneObjects]);
   // Force object mode on mount
   useEffect(() => {
     editModeRef.current = "object";
-    console.log("[INIT] editModeRef set to object");
   }, []);
   useEffect(() => { sculptBrushRef.current = sculptBrush; }, [sculptBrush]);
   useEffect(() => { sculptRadiusRef.current = sculptRadius; }, [sculptRadius]);
@@ -1372,7 +1374,6 @@ export default function App() {
   // ── Click for selection ────────────────────────────────────────────────────
   const onCanvasClick = useCallback(
     (e) => {
-      console.log("[SELECT] mode:", editModeRef.current, "sceneObjectsRef:", sceneObjectsRef.current.length);
       if (editModeRef.current !== "edit" && editModeRef.current !== "object") return;
       if (editModeRef.current === "object") {
         const canvas = canvasRef.current;
@@ -2277,7 +2278,6 @@ export default function App() {
             orbitButton.current = -1;
             sculptingRef.current = false;
             confirmEdgeSlide();
-            console.log("[MOUSEUP] wasDragging:", wasDragging, "button:", e.button, "wasBox:", wasBox);
             if (wasDragging || e.button !== 0) {
               boxSelectStart.current = null;
               boxSelectActive.current = false;
@@ -2309,9 +2309,7 @@ export default function App() {
               ray.setFromCamera(new THREE.Vector2(mx, my), camera);
               const candidates = [];
               sceneRef.current?.traverse(c => { if (c.isMesh && c.type === "Mesh") candidates.push(c); });
-              console.log("[RAY] candidates:", candidates.length, "NDC:", mx.toFixed(2), my.toFixed(2));
               const hits = ray.intersectObjects(candidates, false);
-              console.log("[RAY] hits:", hits.length);
               if (hits.length > 0) {
                 const hitMesh = hits[0].object;
                 const objs = sceneObjectsRef.current;
@@ -2320,9 +2318,8 @@ export default function App() {
                   let minD = Infinity;
                   objs.forEach(o => { if (!o.mesh) return; const d = o.mesh.position.distanceTo(hits[0].point); if (d < minD) { minD = d; matched = o; } });
                 }
-                console.log("[MATCH] matched:", matched?.id, matched?.name, "objs:", sceneObjectsRef.current.length);
                 if (matched) selectSceneObject(matched.id);
-                else console.log("[MATCH] FAILED - hitMesh uuid:", hitMesh.uuid, "objs uuids:", sceneObjectsRef.current.map(o => o.mesh?.uuid));
+                else
               } else {
                 sceneObjectsRef.current.forEach(o => { if (o.mesh) o.mesh.traverse(m => { if (m.isMesh && m.material?.emissive) { m.material.emissive.set(0x000000); m.material.emissiveIntensity = 0; } }); });
                 setActiveObjId(null);
