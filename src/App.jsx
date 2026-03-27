@@ -1387,16 +1387,20 @@ export default function App() {
         const canvas = canvasRef.current;
         const camera = cameraRef.current;
         if (!canvas || !camera) { console.log("[SELECT] no canvas/camera"); return; }
-        const rect = canvas.getBoundingClientRect();
+        // Use the canvas element directly for accurate NDC
+        const actualCanvas = canvasRef.current;
+        const rect = actualCanvas.getBoundingClientRect();
         const mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
         const my = -((e.clientY - rect.top) / rect.height) * 2 + 1;
         const raycaster = new THREE.Raycaster();
-        raycaster.setFromCamera({ x: mx, y: my }, camera);
+        raycaster.setFromCamera(new THREE.Vector2(mx, my), camera);
         const objs = sceneObjectsRef.current;
         const meshes = objs.map(o => o.mesh).filter(Boolean);
-        console.log("[SELECT] objs:", objs.length, "meshes:", meshes.length, "NDC:", mx.toFixed(2), my.toFixed(2));
+        // Also raycast against scene directly as fallback
+        const sceneHits = raycaster.intersectObjects(sceneRef.current?.children || [], true);
+        console.log("[SELECT] objs:", objs.length, "meshes:", meshes.length, "NDC:", mx.toFixed(2), my.toFixed(2), "sceneHits:", sceneHits.length);
         const hits = raycaster.intersectObjects(meshes, true);
-        console.log("[SELECT] hits:", hits.length, hits.map(h => h.object.type));
+        console.log("[SELECT] hits:", hits.length, "sceneHits:", sceneHits.map(h => h.object.type));
         if (hits.length > 0) {
           const hit = hits[0].object;
           const obj = objs.find(o => {
@@ -2322,6 +2326,31 @@ export default function App() {
           onContextMenu={e => e.preventDefault()}
         >
           <canvas ref={canvasRef} />
+          {/* XYZ orientation gizmo — top right corner */}
+          <div style={{
+            position:"absolute", top:8, right:8,
+            width:64, height:64, pointerEvents:"none", zIndex:10
+          }}>
+            <svg viewBox="0 0 64 64" width="64" height="64">
+              <line x1="32" y1="32" x2="54" y2="44" stroke="#e44" strokeWidth="2"/>
+              <line x1="32" y1="32" x2="32" y2="8"  stroke="#4e4" strokeWidth="2"/>
+              <line x1="32" y1="32" x2="12" y2="44" stroke="#44e" strokeWidth="2"/>
+              <circle cx="54" cy="44" r="5" fill="#e44"/>
+              <circle cx="32" cy="8"  r="5" fill="#4e4"/>
+              <circle cx="12" cy="44" r="5" fill="#44e"/>
+              <text x="57" y="47" fontSize="8" fill="#e44" fontFamily="monospace">X</text>
+              <text x="29" y="6"  fontSize="8" fill="#4e4" fontFamily="monospace">Y</text>
+              <text x="4"  y="47" fontSize="8" fill="#44e" fontFamily="monospace">Z</text>
+            </svg>
+          </div>
+          {/* Viewport label */}
+          <div style={{
+            position:"absolute", top:8, left:8,
+            fontSize:10, color:"#888", fontFamily:"monospace",
+            pointerEvents:"none", zIndex:10
+          }}>
+            User Perspective
+          </div>
           {boxSelect && (
             <div style={{
               position: "absolute",
