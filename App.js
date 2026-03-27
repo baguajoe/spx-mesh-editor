@@ -1,6 +1,8 @@
 import { ViewportHeader } from "./components/ViewportHeader";
+import { MeshEditorPanel } from "./components/MeshEditorPanel";
 import { PropertyInspector } from "./components/PropertyInspector";
 import { Outliner } from "./components/Outliner";
+import { AnimationTimeline } from "./components/AnimationTimeline";
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import * as THREE from "three";
 import ProfessionalShell from "./pro-ui/ProfessionalShell";
@@ -33,7 +35,7 @@ import { createIKChain } from "./mesh/IKSystem.js";
 import { createPathTracerSettings, createVolumetricSettings } from "./mesh/PathTracer.js";
 import { generateFibermesh } from "./mesh/FibermeshSystem.js";
 import { createInstances } from "./mesh/Instancing.js";
-import { fixNormals, createRetopoSettings, removeDoubles, removeDegenerates, fillHoles, fullRepair } from "./mesh/MeshRepair.js";
+import { fixNormals, createRetopoSettings } from "./mesh/MeshRepair.js";
 import { createPBRMaterial, applyPBRMaps, createSSSMaterial, createTransmissionMaterial, createDisplacementTexture, denoiseCanvas, createRenderQueue, addRenderJob, runRenderQueue, applyRenderPreset, applyToneMappingMode, captureFrame, downloadFrame, getRenderStats, RENDER_PRESETS, TONE_MAP_MODES, SSS_PRESETS, TRANSMISSION_PRESETS } from "./mesh/RenderSystem.js";
 import { initVCAdvanced, addVCLayer, removeVCLayer, setVCLayerBlendMode, paintVCAdvanced, fillVCLayer, flattenVCLayers, smearVC, blurVCLayer, getVCStats } from "./mesh/VertexColorAdvanced.js";
 import { buildRigFromDoppelflex, applyDoppelflexFrame, retargetDoppelflexToSPX, buildThreeSkeletonFromRig, serializeRig, getRigStats, DOPPELFLEX_LANDMARK_MAP } from "./mesh/DoppelflexRig.js";
@@ -82,8 +84,6 @@ import { UVEditor } from "./components/UVEditor.jsx";
 import { TransformGizmo } from "./components/TransformGizmo.js";
 import { createSceneObject, buildPrimitiveMesh } from "./components/SceneManager.js";
 import { MeshEditorPanel, PropertiesPanel } from "./components/MeshEditorPanel.jsx";
-import { SceneOutliner } from "./components/SceneOutliner.jsx";
-import { AnimationTimeline } from "./components/AnimationTimeline.jsx";
 
 import "./App.css";
 import "./styles/pro-dark.css";
@@ -508,7 +508,7 @@ export default function App() {
   // ── NLA + MoCap frame hook ────────────────────────────────────────────────
   useEffect(() => {
     if (typeof window.evaluateNLA === "function") {
-      if (nlaTracks?.length > 0) window.evaluateNLA(nlaTracks, nlaActions, currentFrame);
+      window.evaluateNLA(currentFrame);
     }
     if (typeof window.retargetFrame === "function") {
       sceneObjects.forEach((obj) => {
@@ -1925,49 +1925,17 @@ export default function App() {
         </div>
       }
       rightPanel={
-        <div style={{ display:"flex", flexDirection:"column", height:"100%", overflow:"hidden" }}>
-          <SceneOutliner
-            sceneObjects={sceneObjects}
-            activeObjId={activeObjId}
-            onSelect={selectSceneObject}
-            onRename={renameSceneObject}
-            onDelete={deleteSceneObject}
-            onToggleVisible={toggleSceneObjectVisible}
-            onAddPrimitive={addPrimitive}
+        showNPanel || activeWorkspace !== "Modeling" ? (
+          <FeatureIndexPanel
+            activeWorkspace={activeWorkspace}
+            onApplyFunction={handleApplyFunction}
           />
-          <div style={{ flex:1, overflow:"auto", borderTop:"1px solid #202020" }}>
-            {showNPanel || activeWorkspace !== "Modeling" ? (
-              <FeatureIndexPanel
-                activeWorkspace={activeWorkspace}
-                onApplyFunction={handleApplyFunction}
-              />
-            ) : (
-              <PropertiesPanel
-                stats={stats}
-                activeObj={meshRef.current}
-              />
-            )}
-          </div>
-        </div>
-      }
-      bottomPanel={
-        <AnimationTimeline
-          currentFrame={currentFrame}
-          setCurrentFrame={setCurrentFrame}
-          isPlaying={isPlaying}
-          setIsPlaying={setIsPlaying}
-          isAutoKey={isAutoKey}
-          setAutoKey={setAutoKey}
-          videoStartFrame={videoStartFrame}
-          videoEndFrame={videoEndFrame}
-          setVideoStartFrame={setVideoStartFrame}
-          setVideoEndFrame={setVideoEndFrame}
-          videoFps={videoFps}
-          setVideoFps={setVideoFps}
-          sceneObjects={sceneObjects}
-          animKeys={animKeys}
-          onAddKeyframe={() => handleApplyFunction("add_keyframe")}
-        />
+        ) : (
+          <PropertiesPanel
+            stats={stats}
+            activeObj={meshRef.current}
+          />
+        )
       }
     />
   );
