@@ -1410,8 +1410,7 @@ export default function App() {
       setActiveWorkspace={setActiveWorkspace}
       leftPanel={
         activeWorkspace === "Modeling" ? ( <div 
-          <MeshEditorPanel stats={stats} onApplyFunction={(fn) => typeof window[fn] === "function" ? window[fn]() : console.warn("Function " + fn + " not found")} onAddPrimitive={addPrimitive} />
-            onKnife={() => {}} />
+          <MeshEditorPanel stats={stats} onApplyFunction={(fn) => typeof window[fn] === "function" ? window[fn]() : console.warn(fn)} onAddPrimitive={addPrimitive} />onKnife={() => {}} />
             onEdgeSlide={() => {}}
             onSubdivide={() => {}}
             onExtrude={() => {}}
