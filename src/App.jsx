@@ -1,7 +1,8 @@
+import { WORKSPACES, DEFAULT_WORKSPACE } from "./pro-ui/workspaceMap";
 import { ViewportHeader } from "./components/ViewportHeader";
 import { PropertyInspector } from "./components/PropertyInspector";
 import { Outliner } from "./components/Outliner";
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import * as THREE from "three";
 import ProfessionalShell from "./pro-ui/ProfessionalShell";
 import FeatureIndexPanel from "./pro-ui/FeatureIndexPanel";
@@ -130,86 +131,6 @@ const COLORS = {
 };
 
 export default function App() {
-  const canvasRef = useRef(null);
-  const sceneRef = useRef(null);
-  const rendererRef = useRef(null);
-  const cameraRef = useRef(null);
-  const rafRef = useRef(null);
-  const meshRef = useRef(null);
-  const heMeshRef = useRef(null);
-  const orbitRef = useRef(null);
-  const orbitState = useRef({ theta: 0.6, phi: 1.1, radius: 5 });
-
-  const fileInputRef = useRef(null);
-  const gizmoRef = useRef(null);
-  const [gizmoMode, setGizmoMode] = useState("move"); // move|rotate|scale
-  const [gizmoActive, setGizmoActive] = useState(false);
-  const [activeWorkspace, setActiveWorkspace] = useState("Modeling");
-  const gizmoDragging = useRef(false);
-  const [bevelAmt, setBevelAmt] = useState(0.1);
-  const [insetAmt, setInsetAmt] = useState(0.15);
-  const [mirrorAxis, setMirrorAxis] = useState("x");
-
-  // ── Sessions 13-15 state ──────────────────────────────────────────────────
-  const [showMatEditor, setShowMatEditor] = useState(false);
-  const [matProps, setMatProps] = useState({
-    color: "#888888",
-    roughness: 0.5,
-    metalness: 0.1,
-    opacity: 1,
-    emissive: "#000000",
-    emissiveIntensity: 0,
-    wireframe: false,
-    transparent: false,
-    side: "front",
-  });
-  const [propEdit, setPropEdit] = useState(false);
-  const [propRadius, setPropRadius] = useState(1.0);
-  const [propFalloff, setPropFalloff] = useState("smooth"); // smooth|linear|sharp
-  const [snapEnabled, setSnapEnabled] = useState(false);
-  const [snapSize, setSnapSize] = useState(0.25);
-
-  // ── Boolean + UV state ─────────────────────────────────────────────────────
-  const [booleanMode, setBooleanMode] = useState("union");
-  const [showUVEditor, setShowUVEditor] = useState(false);
-  const [uvTriangles, setUVTriangles] = useState([]);
-  const [uvProjection, setUVProjection] = useState("box");
-
-  const meshBRef = useRef(null); // second mesh for boolean ops
-
-  // ── Playback / Timeline state ─────────────────────────────────────────────
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentFrame, setCurrentFrame] = useState(0);
-
-  // ── Sessions 1-3: Scene state ─────────────────────────────────────────────
-  const [objectsAddedCounter, setObjectsAddedCounter] = useState(0);
-  const [sceneObjects, setSceneObjects] = useState([]);
-  const [activeObjId, setActiveObjId] = useState(null);
-  const sceneLoadInput = useRef(null);
-
-  // helpers
-  const getActiveObj = () => sceneObjects.find((o) => o.id === activeObjId) || null;
-
-  const addSceneObject = (type) => {
-    const mesh = buildPrimitiveMesh(type);
-    mesh.position.set(
-      (Math.random() - 0.5) * 2,
-      0,
-      (Math.random() - 0.5) * 2
-    );
-    sceneRef.current?.add(mesh);
-    const obj = createSceneObject(type, null, mesh);
-    setSceneObjects((prev) => {
-      const next = [...prev, obj];
-      meshRef.current = mesh;
-      heMeshRef.current = null;
-      setActiveObjId(obj.id);
-      return next;
-    });
-    setObjectsAddedCounter((c) => c + 1);
-    setStatus(`Added ${type}`);
-  };
-
   useEffect(() => {
     if (sceneRef.current) {
       const updateObjects = () => {
@@ -470,12 +391,7 @@ export default function App() {
     obj.geometry = newGeo;
   };
 
-  const [stats, setStats] = useState({
-    vertices: 0,
-    edges: 0,
-    faces: 0,
-    halfEdges: 0,
-  });
+  
   const [status, setStatus] = useState("Add a primitive to start");
   const [loopCutT, setLoopCutT] = useState(0.5);
   const [wireframe, setWireframe] = useState(false);
@@ -488,6 +404,7 @@ export default function App() {
   const [showMarketPanel, setShowMarketPanel] = useState(false);
   const [showNPanel, setShowNPanel] = useState(false);
   const [activeMode, setActiveMode] = useState("object");
+  const [objectsAddedCounter, setObjectsAddedCounter] = useState(0);
   const [knifePoints, setKnifePoints] = useState([]);
   const [slideAmount, setSlideAmount] = useState(0);
   const [history, setHistory] = useState([]);
@@ -526,6 +443,124 @@ export default function App() {
         setCurrentFrame((prev) => (prev >= 250 ? 0 : prev + 1));
       }, 1000 / 24); // 24fps cinematic playback
     }
+    
+  
+
+    useEffect(() => {
+      const handleGlobalKeys = (e) => {
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          if (document.activeElement.tagName !== 'INPUT') window.deleteSelected();
+        }
+      };
+      window.addEventListener('keydown', handleGlobalKeys);
+      
+  useEffect(() => {
+    window.deleteSelected = () => {
+      if (selectedObject) {
+        if (selectedObject.parent) selectedObject.parent.remove(selectedObject);
+        setSelectedObject(null);
+        if (typeof setSceneObjects === 'function') {
+           setSceneObjects(prev => prev.filter(o => o.uuid !== selectedObject.uuid));
+        }
+        console.log("🗑️ Object Deleted.");
+      }
+    };
+    window.setSelectedObject = (obj) => setSelectedObject(obj);
+  }, [selectedObject]);
+  
+  
+  
+  const rendererRef = useRef(null);
+  const cameraRef = useRef(null);
+  const rafRef = useRef(null);
+  
+  const heMeshRef = useRef(null);
+  const orbitRef = useRef(null);
+  const orbitState = useRef({ theta: 0.6, phi: 1.1, radius: 5 });
+
+  const fileInputRef = useRef(null);
+  const gizmoRef = useRef(null);
+  const [gizmoMode, setGizmoMode] = useState("move"); // move|rotate|scale
+  const [gizmoActive, setGizmoActive] = useState(false);
+  
+  const gizmoDragging = useRef(false);
+  const [bevelAmt, setBevelAmt] = useState(0.1);
+  const [insetAmt, setInsetAmt] = useState(0.15);
+  const [mirrorAxis, setMirrorAxis] = useState("x");
+
+  // ── Sessions 13-15 state ──────────────────────────────────────────────────
+  const [showMatEditor, setShowMatEditor] = useState(false);
+  const [matProps, setMatProps] = useState({
+    color: "#888888",
+    roughness: 0.5,
+    metalness: 0.1,
+    opacity: 1,
+    emissive: "#000000",
+    emissiveIntensity: 0,
+    wireframe: false,
+    transparent: false,
+    side: "front",
+  });
+  const [propEdit, setPropEdit] = useState(false);
+  const [propRadius, setPropRadius] = useState(1.0);
+  const [propFalloff, setPropFalloff] = useState("smooth"); // smooth|linear|sharp
+  const [snapEnabled, setSnapEnabled] = useState(false);
+  const [snapSize, setSnapSize] = useState(0.25);
+
+  // ── Boolean + UV state ─────────────────────────────────────────────────────
+  const [booleanMode, setBooleanMode] = useState("union");
+  const [showUVEditor, setShowUVEditor] = useState(false);
+  const [uvTriangles, setUVTriangles] = useState([]);
+  const [uvProjection, setUVProjection] = useState("box");
+
+  const meshBRef = useRef(null); // second mesh for boolean ops
+
+  // ── Playback / Timeline state ─────────────────────────────────────────────
+  
+  
+
+  // ── Sessions 1-3: Scene state ─────────────────────────────────────────────
+  
+  
+  const sceneLoadInput = useRef(null);
+
+  // helpers
+  const getActiveObj = () => sceneObjects.find((o) => o.id === activeObjId) || null;
+
+  const addSceneObject = (type) => {
+    const mesh = buildPrimitiveMesh(type);
+    mesh.position.set(
+      (Math.random() - 0.5) * 2,
+      0,
+      (Math.random() - 0.5) * 2
+    );
+    sceneRef.current?.add(mesh);
+    const obj = createSceneObject(type, null, mesh);
+    setSceneObjects((prev) => {
+      const next = [...prev, obj];
+      meshRef.current = mesh;
+      heMeshRef.current = null;
+      setActiveObjId(obj.id);
+      return next;
+    });
+    setObjectsAddedCounter((c) => c + 1);
+    setStatus(`Added ${type}`);
+  };
+
+  
+
+    
+  useEffect(() => {
+    if (selectedObject) {
+      setActiveObjId(selectedObject.uuid);
+    } else {
+      setActiveObjId(null);
+    }
+  }, [selectedObject]);
+
+    return () => window.removeEventListener('keydown', handleGlobalKeys);
+    }, [selectedObject, sceneObjects]);
+
     return () => clearInterval(interval);
   }, [isPlaying]);
 
@@ -554,6 +589,22 @@ export default function App() {
     rendererRef.current = renderer;
 
     const scene = new THREE.Scene();
+  // PRO LIGHTING SETUP
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+  scene.add(ambientLight);
+
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+  dirLight.position.set(5, 10, 7);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.width = 2048;
+  dirLight.shadow.mapSize.height = 2048;
+  scene.add(dirLight);
+
+  // Environment lighting for metalness
+  const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+  hemiLight.position.set(0, 20, 0);
+  scene.add(hemiLight);
+
     scene.background = new THREE.Color(COLORS.bg);
     scene.add(new THREE.GridHelper(10, 20, COLORS.border, COLORS.border));
     scene.add(new THREE.AxesHelper(2));
@@ -961,6 +1012,40 @@ export default function App() {
       rendererRef.current = null;
     };
   }, []);
+  const [stats, setStats] = useState({
+    vertices: 0,
+    edges: 0,
+    faces: 0,
+    halfEdges: 0,
+  });
+  const [activeWorkspace, setActiveWorkspace] = useState(DEFAULT_WORKSPACE);
+  const [sceneObjects, setSceneObjects] = useState([]);
+  const [selectedObject, setSelectedObject] = useState(null);
+  const [activeObjId, setActiveObjId] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentFrame, setCurrentFrame] = useState(0);
+  const objectsAddedCounter = useRef(0);
+  const canvasRef = useRef(null);
+  const sceneRef = useRef(null);
+  const meshRef = useRef(null);
+
+  
+  
+  
+
+
+
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
 
   // ── N panel keyboard shortcut ─────────────────────────────────────────────
   useEffect(() => {
