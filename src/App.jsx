@@ -1330,8 +1330,7 @@ export default function App() {
   const raycast = useCallback((e) => {
     const canvas = canvasRef.current;
     const camera = cameraRef.current;
-    const mesh = meshRef.current;
-    if (!canvas || !camera || !mesh) return null;
+    if (!canvas || !camera) return null;
     const rect = canvas.getBoundingClientRect();
     const mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     const my = -((e.clientY - rect.top) / rect.height) * 2 + 1;
