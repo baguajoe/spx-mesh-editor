@@ -555,7 +555,8 @@ export default function App() {
       (Math.random() - 0.5) * 2
     );
     sceneRef.current?.add(mesh);
-    const obj = createSceneObject(type, null, mesh);
+    const objCount = sceneObjects.length;
+    const obj = createSceneObject(type, type.charAt(0).toUpperCase() + type.slice(1) + "." + String(objCount+1).padStart(3,"0"), mesh);
     setSceneObjects((prev) => {
       const next = [...prev, obj];
       meshRef.current = mesh;
