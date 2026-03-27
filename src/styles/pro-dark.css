@@ -169,7 +169,7 @@ input, select { font-family: inherit; }
 /* ── Main 3-column ───────────────────────────────────────────────────────── */
 .spx-main {
   display: grid;
-  grid-template-columns: var(--left-w) 1fr var(--right-w);
+  grid-template-columns: var(--left-w) 36px 1fr var(--right-w);
   overflow: hidden; min-height: 0;
 }
 
