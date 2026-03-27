@@ -189,6 +189,5 @@ export async function detectWebGPU() {
 export function createVolumetricSettings() {
     return { enabled: false, density: 0.02, anisotropy: 0.7, absorption: "#1a1a1a", scattering: "#ffffff", stepSize: 0.1 };
 }
-export function createPathTracerSettings() {
     return { samples: 64, bounces: 3, denoise: true, resolutionScale: 1.0 };
-}
+
