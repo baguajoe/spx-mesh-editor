@@ -489,6 +489,9 @@ export default function App() {
   const heMeshRef = useRef(null);
   const orbitRef = useRef(null);
   const orbitState = useRef({ theta: 0.6, phi: 1.1, radius: 5 });
+  const orbitDragging = useRef(false);
+  const orbitLast = useRef({ x: 0, y: 0 });
+  const orbitButton = useRef(-1);
 
   const fileInputRef = useRef(null);
   const gizmoRef = useRef(null);
@@ -2125,16 +2128,55 @@ export default function App() {
         <div className="mesh-editor-canvas"
           style={{ cursor: activeWorkspace === "Sculpt" ? "crosshair" : "pointer" }}
           onMouseDown={e => {
-            if (activeWorkspace === "Sculpt" && meshRef.current) {
-              sculptingRef.current = true;
-              editModeRef.current = "sculpt";
-              applySculpt(e);
+            orbitButton.current = e.button;
+            if (e.button === 1 || e.button === 2 || (e.button === 0 && e.altKey)) {
+              // Middle click or Alt+Left = orbit/pan
+              orbitDragging.current = true;
+              orbitLast.current = { x: e.clientX, y: e.clientY };
+              e.preventDefault();
+              return;
+            }
+            if (activeWorkspace === "Sculpt") {
+              // In sculpt, use active object mesh
+              if (!meshRef.current && sceneObjects.length > 0) {
+                const obj = sceneObjects.find(o => o.id === activeObjId) || sceneObjects[0];
+                if (obj?.mesh) meshRef.current = obj.mesh;
+              }
+              if (meshRef.current) {
+                sculptingRef.current = true;
+                editModeRef.current = "sculpt";
+                applySculpt(e);
+              }
             } else {
               onKnifeClick(e);
               onCanvasClick(e);
             }
           }}
           onMouseMove={e => {
+            if (orbitDragging.current) {
+              const dx = e.clientX - orbitLast.current.x;
+              const dy = e.clientY - orbitLast.current.y;
+              orbitLast.current = { x: e.clientX, y: e.clientY };
+              const camera = cameraRef.current;
+              if (!camera) return;
+              if (e.button === 1 || (orbitButton.current === 1) || (e.altKey && orbitButton.current === 0)) {
+                // Orbit
+                orbitState.current.theta -= dx * 0.01;
+                orbitState.current.phi = Math.max(0.1, Math.min(Math.PI - 0.1, orbitState.current.phi + dy * 0.01));
+              } else if (orbitButton.current === 2) {
+                // Pan
+                const panSpeed = orbitState.current.radius * 0.001;
+                camera.position.x -= dx * panSpeed;
+                camera.position.y += dy * panSpeed;
+                return;
+              }
+              const { theta, phi, radius } = orbitState.current;
+              camera.position.x = radius * Math.sin(phi) * Math.sin(theta);
+              camera.position.y = radius * Math.cos(phi);
+              camera.position.z = radius * Math.sin(phi) * Math.cos(theta);
+              camera.lookAt(0, 0, 0);
+              return;
+            }
             if (activeWorkspace === "Sculpt" && sculptingRef.current && meshRef.current) {
               applySculpt(e);
             } else {
@@ -2142,10 +2184,26 @@ export default function App() {
             }
           }}
           onMouseUp={() => {
+            orbitDragging.current = false;
+            orbitButton.current = -1;
             sculptingRef.current = false;
             confirmEdgeSlide();
           }}
-          onMouseLeave={() => { sculptingRef.current = false; }}
+          onMouseLeave={() => {
+            orbitDragging.current = false;
+            sculptingRef.current = false;
+          }}
+          onWheel={e => {
+            const camera = cameraRef.current;
+            if (!camera) return;
+            orbitState.current.radius = Math.max(1, Math.min(50, orbitState.current.radius + e.deltaY * 0.01));
+            const { theta, phi, radius } = orbitState.current;
+            camera.position.x = radius * Math.sin(phi) * Math.sin(theta);
+            camera.position.y = radius * Math.cos(phi);
+            camera.position.z = radius * Math.sin(phi) * Math.cos(theta);
+            camera.lookAt(0, 0, 0);
+          }}
+          onContextMenu={e => e.preventDefault()}
         >
           <canvas ref={canvasRef} />
         </div>
