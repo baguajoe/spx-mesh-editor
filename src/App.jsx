@@ -1024,7 +1024,6 @@ export default function App() {
   const [activeObjId, setActiveObjId] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentFrame, setCurrentFrame] = useState(0);
-  const objectsAddedCounter = useRef(0);
   const canvasRef = useRef(null);
   const sceneRef = useRef(null);
   const meshRef = useRef(null);
