@@ -2319,7 +2319,6 @@ export default function App() {
                   objs.forEach(o => { if (!o.mesh) return; const d = o.mesh.position.distanceTo(hits[0].point); if (d < minD) { minD = d; matched = o; } });
                 }
                 if (matched) selectSceneObject(matched.id);
-                else
               } else {
                 sceneObjectsRef.current.forEach(o => { if (o.mesh) o.mesh.traverse(m => { if (m.isMesh && m.material?.emissive) { m.material.emissive.set(0x000000); m.material.emissiveIntensity = 0; } }); });
                 setActiveObjId(null);
