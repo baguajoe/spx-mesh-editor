@@ -30,6 +30,16 @@ import { createLight, createThreePointLighting, applyTemperature, createVolumeri
 import { createCamera, saveBookmark, restoreBookmark, setDOF, applyCameraShake, rackFocus, dollyZoom } from "./mesh/CameraSystem.js";
 import { applyColorGrade, createPassStack } from "./mesh/PostProcessing.js";
 import { DEFAULT_BONE_MAP, retargetFrame, bakeRetargetedAnimation, fixFootSliding, autoDetectBoneMap, getRetargetStats } from "./mesh/MocapRetarget.js";
+import { parseBVH, applyBVHFrame, buildAnimationClip, buildSkeletonFromBVH } from "./mesh/BVHImporter.js";
+import { stepClothUpgraded, buildFullConstraints, applyWindTurbulence, addSewingConstraint, createSpatialHash } from "./mesh/ClothUpgrade.js";
+import { buildGLTFMorphTargets, applyGLTFMorphWeights, extractGLTFAnimations, mergeGLTFScenes, getGLTFStats } from "./mesh/GLTFAdvanced.js";
+import { applyGroomBrush, combGroom, cutGroom, curlGroom, smoothGroom, puffGroom } from "./mesh/HairGrooming.js";
+import { createHairMaterial, createAnisotropicHairMaterial, applyHairPresetToMesh, HAIR_SHADER_PRESETS } from "./mesh/HairShader.js";
+import { addPointLight, addSpotLight, createTightLightingRig } from "./mesh/LightingRuntime.js";
+import { createCompositorGraph, createCompositorNode, COMPOSITOR_NODE_TYPES } from "./mesh/NodeCompositor.js";
+import { createScene, createSceneObject as createSceneCreatorObject, addObjectToScene, applyEnvironment, SCENE_PRESETS, ENVIRONMENT_PRESETS } from "./mesh/SceneCreator.js";
+import { applyBrush, BRUSHES } from "./mesh/SculptBrushes.js";
+import { addSculptLayer, createSculptLayer, evaluateSculptLayers, applyClayBrush, applyFlattenBrush, ADVANCED_BRUSHES } from "./mesh/SculptLayers.js";
 import { createIKChain } from "./mesh/IKSystem.js";
 import { createPathTracerSettings, createVolumetricSettings } from "./mesh/PathTracer.js";
 import { generateFibermesh } from "./mesh/FibermeshSystem.js";
@@ -98,6 +108,7 @@ import "./styles/material-editor.css";
 import TexturePaintPanel from "./components/materials/TexturePaintPanel.jsx";
 import "./styles/texture-paint.css";
 import ClothingPanel from "./components/clothing/ClothingPanel.jsx";
+import FabricPanel from "./components/clothing/FabricPanel.jsx";
 import "./styles/clothing-editor.css";
 import PatternEditorPanel from "./components/clothing/PatternEditorPanel.jsx";
 import "./styles/pattern-editor.css";
@@ -2344,6 +2355,19 @@ const closeAllWorkspacePanels = () => {
     if (fn === "heat_weights")        { if(typeof window.heatMapWeights==="function"&&meshRef.current&&armatures[0]){window.heatMapWeights(meshRef.current,armatures[0]);setStatus("Heat weights applied");} return; }
     if (fn === "paint_weights")       { setEditMode("weight_paint"); setStatus("Weight paint mode"); return; }
     if (fn === "norm_weights")        { if(typeof window.normalizeAllWeights==="function"&&meshRef.current){window.normalizeAllWeights(meshRef.current);setStatus("Weights normalized");} return; }
+    
+    if (fn === "bvh_import") {
+      const input = document.createElement("input");
+      input.type = "file"; input.accept = ".bvh";
+      input.onchange = async (e) => {
+        const file = e.target.files[0]; if (!file) return;
+        const text = await file.text();
+        const bvh = parseBVH(text);
+        window._lastBVH = bvh;
+        setStatus("BVH loaded: " + (bvh.joints?.length || 0) + " joints, " + (bvh.frames?.length || 0) + " frames");
+      };
+      input.click(); return;
+    }
     if (fn === "mocap_retarget")      { if(bvhData&&armatures[0]){retargetFrame(bvhData,boneMap,armatures[0],animFrame);setStatus("MoCap retargeted");} return; }
     if (fn === "mocap_bake")          { if(bvhData&&armatures[0]){bakeRetargetedAnimation(bvhData,boneMap,armatures[0]);setStatus("Animation baked");} return; }
     if (fn === "mocap_footfix")       { if(armatures[0]){fixFootSliding(armatures[0]);setStatus("Foot sliding fixed");} return; }
