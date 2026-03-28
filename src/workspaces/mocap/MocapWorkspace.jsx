@@ -8,6 +8,7 @@ import VideoMocapSystem  from '../../front/js/component/VideoMocapSystem.jsx';
 import useFaceMocap      from '../../front/js/hooks/useFaceMocap.js';
 import useHandMocap      from '../../front/js/hooks/useHandMocap.js';
 import { createSmoothingPipeline } from '../../front/js/utils/smoothPose.js';
+import { downloadBVH } from '../../mesh/MocapRetarget.js';
 import '../../front/styles/VideoMocap.css';
 import '../../styles/mocap-workspace.css';
 
@@ -318,8 +319,27 @@ function LiveCaptureTab({ onExportGlb }) {
               {isPlaying ? '⏹ Stop' : '▶ Play'}
             </button>
             <button className="mw-btn" onClick={exportJSON}>💾 JSON</button>
+            <button className="mw-btn" onClick={() => downloadBVH(recordedFrames, `mocap_${Date.now()}.bvh`)}>📐 BVH</button>
             <button className="mw-btn" onClick={saveToBackend}>☁ Save</button>
-            {onExportGlb && <button className="mw-btn" onClick={onExportGlb}>📦 GLB</button>}
+            {onExportGlb && <button className="mw-btn" onClick={onExportGlb}>📦 Export GLB</button>}
+        {recordedFrames?.length > 0 && (
+          <div style={{ marginTop: '4px' }}>
+            <div className="mw-section-label">Apply to Model</div>
+            <div style={{ fontSize: '11px', color: 'var(--mw-muted)', marginBottom: '4px' }}>
+              Load any GLB and bake this session into it
+            </div>
+            <label className="mw-btn mw-btn--ghost mw-file-btn" style={{ width: '100%', boxSizing: 'border-box' }}>
+              📂 Load GLB + Retarget
+              <input type="file" accept=".glb,.gltf" style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setAvatarUrl(URL.createObjectURL(file));
+                }}
+              />
+            </label>
+          </div>
+        )}
           </div>
         )}
 
