@@ -25,3 +25,6 @@ dist-ssr
 *.bak
 *.placeholder*
 backups/
+*.bak*
+*backup*
+*.tmp
