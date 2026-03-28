@@ -221,6 +221,12 @@ const closeAllWorkspacePanels = () => {
   };
 
   const openWorkspaceTool = (toolId) => {
+    // ── Grouped tab dispatchers ───────────────────────────────────────────────
+    if (tool === "materials_textures") { openWorkspaceTool("materials"); openWorkspaceTool("paint"); return; }
+    if (tool === "clothing_pattern")   { openWorkspaceTool("clothing"); openWorkspaceTool("pattern"); return; }
+    if (tool === "hair_suite")         { openWorkspaceTool("hair"); openWorkspaceTool("hair_adv"); openWorkspaceTool("hair_fx"); return; }
+    if (tool === "rigging_suite")      { openWorkspaceTool("autorig"); openWorkspaceTool("advanced_rig"); return; }
+
     closeAllWorkspacePanels();
 
     if (toolId === "uv") setUvPanelOpen?.(true);
@@ -2942,53 +2948,34 @@ const closeAllWorkspacePanels = () => {
           <span className="spx-native-workspace-tab-hint">Shift+U</span>
         </button>
 
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("materials")}>
-          <span className="spx-native-workspace-tab-label">Materials</span>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("materials_textures")}>
+          <span className="spx-native-workspace-tab-label">Materials & Textures</span>
           <span className="spx-native-workspace-tab-hint">Shift+M</span>
         </button>
 
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("paint")}>
-          <span className="spx-native-workspace-tab-label">Texture Paint</span>
-          <span className="spx-native-workspace-tab-hint">Shift+P</span>
-        </button>
-
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("clothing")}>
-          <span className="spx-native-workspace-tab-label">Clothing</span>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("clothing_pattern")}>
+          <span className="spx-native-workspace-tab-label">Clothing & Pattern</span>
           <span className="spx-native-workspace-tab-hint">Shift+G</span>
         </button>
 
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("pattern")}>
-          <span className="spx-native-workspace-tab-label">Pattern</span>
-          <span className="spx-native-workspace-tab-hint">Shift+D</span>
-        </button>
-
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("hair")}>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("hair_suite")}>
           <span className="spx-native-workspace-tab-label">Hair</span>
           <span className="spx-native-workspace-tab-hint">Shift+H</span>
         </button>
 
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("hair_adv")}>
-          <span className="spx-native-workspace-tab-label">Hair Advanced</span>
-          <span className="spx-native-workspace-tab-hint">Shift+J</span>
-        </button>
-
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("hair_fx")}>
-          <span className="spx-native-workspace-tab-label">Hair FX</span>
-          <span className="spx-native-workspace-tab-hint">Shift+K</span>
-        </button>
-
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("autorig")}>
-          <span className="spx-native-workspace-tab-label">Auto Rig</span>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("rigging_suite")}>
+          <span className="spx-native-workspace-tab-label">Rigging</span>
           <span className="spx-native-workspace-tab-hint">Shift+R</span>
         </button>
+
         <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("mocap")}>
           <span className="spx-native-workspace-tab-label">MoCap</span>
           <span className="spx-native-workspace-tab-hint">Live + Video</span>
         </button>
 
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("advanced_rig")}>
-          <span className="spx-native-workspace-tab-label">Advanced Rig</span>
-          <span className="spx-native-workspace-tab-hint">Shift+Y</span>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => setShowPerformancePanel(v => !v)}>
+          <span className="spx-native-workspace-tab-label">SPX Performance</span>
+          <span className="spx-native-workspace-tab-hint">P</span>
         </button>
       </div>
 
