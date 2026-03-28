@@ -222,10 +222,10 @@ const closeAllWorkspacePanels = () => {
 
   const openWorkspaceTool = (toolId) => {
     // ── Grouped tab dispatchers ───────────────────────────────────────────────
-    if (tool === "materials_textures") { openWorkspaceTool("materials"); openWorkspaceTool("paint"); return; }
-    if (tool === "clothing_pattern")   { openWorkspaceTool("clothing"); openWorkspaceTool("pattern"); return; }
-    if (tool === "hair_suite")         { openWorkspaceTool("hair"); openWorkspaceTool("hair_adv"); openWorkspaceTool("hair_fx"); return; }
-    if (tool === "rigging_suite")      { openWorkspaceTool("autorig"); openWorkspaceTool("advanced_rig"); return; }
+    if (toolId === "materials_textures") { closeAllWorkspacePanels(); setMaterialPanelOpen?.(true); setPaintPanelOpen?.(true); return; }
+    if (toolId === "clothing_pattern")   { closeAllWorkspacePanels(); setClothingPanelOpen?.(true); setPatternPanelOpen?.(true); return; }
+    if (toolId === "hair_suite")         { closeAllWorkspacePanels(); setHairPanelOpen?.(true); setHairAdvancedOpen?.(true); setHairFXOpen?.(true); return; }
+    if (toolId === "rigging_suite")      { closeAllWorkspacePanels(); setAutoRigOpen?.(true); setAdvancedRigOpen?.(true); return; }
 
     closeAllWorkspacePanels();
 
