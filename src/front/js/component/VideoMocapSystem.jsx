@@ -121,7 +121,8 @@ const VideoMocapSystem = ({
   const initModels = useCallback(async () => {
     // Body pose
     if (trackBody && !poseRef.current) {
-      const { Pose } = await import('@mediapipe/pose');
+      await new Promise((res,rej)=>{if(window.Pose)return res();const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+      const Pose = window.Pose;
       const pose = new Pose({
         locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
       });
@@ -138,7 +139,8 @@ const VideoMocapSystem = ({
 
     // Face mesh
     if (trackFace && !faceMeshRef.current) {
-      const { FaceMesh } = await import('@mediapipe/face_mesh');
+      await new Promise((res,rej)=>{if(window.FaceMesh)return res();const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);});
+      const FaceMesh = window.FaceMesh;
       const faceMesh = new FaceMesh({
         locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
       });
