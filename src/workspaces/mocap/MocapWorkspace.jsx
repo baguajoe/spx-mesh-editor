@@ -115,7 +115,7 @@ function LiveCaptureTab({ onExportGlb }) {
   const [trackFace,      setTrackFace]      = useState(true);
   const [trackHands,     setTrackHands]     = useState(true);
   const [showOverlay,    setShowOverlay]    = useState(true);
-  const [avatarUrl,      setAvatarUrl]      = useState(`${BACKEND}/static/models/Y_Bot.glb`);
+  const [avatarUrl,      setAvatarUrl]      = useState('');
   const [error,          setError]          = useState(null);
 
   const { faceFrame, status: faceStatus, start: startFace, stop: stopFace } = useFaceMocap(videoRef, trackFace);
@@ -357,12 +357,12 @@ function LiveCaptureTab({ onExportGlb }) {
           {isPlaying && <span className="mw-avatar-sub"> — playback {recordedFrames?.length} frames</span>}
         </div>
         <div className="mw-avatar-viewport">
-          <AvatarRigPlayer3D
+          {avatarUrl ? <AvatarRigPlayer3D
             avatarUrl={avatarUrl}
             liveFrame={isPlaying ? null : liveFrame}
             recordedFrames={isPlaying ? recordedFrames : null}
             smoothingEnabled={false}
-          />
+          /> : <div className="mw-avatar-empty">Enter a GLB URL above to load avatar</div>}
         </div>
       </div>
     </div>
@@ -379,7 +379,7 @@ function PlaybackTab({ onExportGlb }) {
   const [isPlaying,     setIsPlaying]     = useState(false);
   const [playIdx,       setPlayIdx]       = useState(0);
   const [speed,         setSpeed]         = useState(1);
-  const [avatarUrl,     setAvatarUrl]     = useState(`${BACKEND}/static/models/Y_Bot.glb`);
+  const [avatarUrl,     setAvatarUrl]     = useState('');
   const intervalRef = useRef(null);
 
   useEffect(() => {
