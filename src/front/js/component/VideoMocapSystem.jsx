@@ -400,7 +400,7 @@ const VideoMocapSystem = ({
   const uploadToBackend = useCallback(async () => {
     if (frames.length === 0) return;
 
-    const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || "" || '';
 
     try {
       const res = await fetch(`${backendUrl}/api/save-mocap-session`, {

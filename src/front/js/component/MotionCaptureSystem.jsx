@@ -7,7 +7,7 @@ import AvatarRigPlayer3D from './AvatarRigPlayer3D';
 let useHandMocap;
 try { useHandMocap = require('../../hooks/useHandMocap').default; } catch(e) { useHandMocap = null; }
 
-const BACKEND = process.env.REACT_APP_BACKEND_URL || '';
+const BACKEND = import.meta.env.VITE_BACKEND_URL || "" || '';
 
 const DEFAULT_CONFIG = {
   modelComplexity: 1, smoothLandmarks: true, enableSegmentation: false,

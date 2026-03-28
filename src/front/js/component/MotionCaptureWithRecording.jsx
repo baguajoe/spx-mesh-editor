@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 
-const BACKEND = process.env.REACT_APP_BACKEND_URL || '';
+const BACKEND = import.meta.env.VITE_BACKEND_URL || "" || '';
 
 /**
  * loadScript — dynamically loads a <script> from CDN, deduplicates.

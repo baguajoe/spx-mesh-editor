@@ -11,7 +11,7 @@ import { createSmoothingPipeline } from '../../front/js/utils/smoothPose.js';
 import '../../front/styles/VideoMocap.css';
 import '../../styles/mocap-workspace.css';
 
-const BACKEND = process.env.REACT_APP_BACKEND_URL || '';
+const BACKEND = import.meta.env.VITE_BACKEND_URL || "" || '';
 
 // ── CDN loader (deduped) ──────────────────────────────────────
 const loadScript = (src) =>

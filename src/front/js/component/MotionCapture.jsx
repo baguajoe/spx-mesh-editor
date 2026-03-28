@@ -28,7 +28,7 @@ const MotionCapture = ({ avatarRef, fullWidth = false }) => {
     pose.onResults(async (results) => {
       if (results.poseLandmarks) {
         try {
-          await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/process-pose`, {
+          await fetch(`${import.meta.env.VITE_BACKEND_URL || ""}/api/process-pose`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ pose_data: results.poseLandmarks }),

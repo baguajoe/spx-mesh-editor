@@ -157,7 +157,7 @@ const LiveMoCapAvatar = ({
   videoWidth = 320,
 }) => {
   // Use backend URL for default avatar
-  const backendUrl = process.env.REACT_APP_BACKEND_URL || '';
+  const backendUrl = import.meta.env.VITE_BACKEND_URL || "" || '';
   const defaultAvatarUrl = avatarUrl || `${backendUrl}/static/models/xbot_avatar.glb`;
   
   const videoRef = useRef(null);
