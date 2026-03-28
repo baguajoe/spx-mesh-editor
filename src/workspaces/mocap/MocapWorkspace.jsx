@@ -529,7 +529,7 @@ export default function MocapWorkspace({ open = false, onClose = null, onExportG
         </div>
         <div className="mw-body">
           {tab === 'live'     && <LiveCaptureTab onExportGlb={onExportGlb} />}
-          {tab === 'video'    && <VideoMocapSystem />}
+          {tab === 'video'    && <div style={{ height: '100%', overflow: 'auto', padding: '16px' }}><VideoMocapSystem /></div>}
           {tab === 'playback' && <PlaybackTab onExportGlb={onExportGlb} />}
         </div>
       </div>
