@@ -715,6 +715,7 @@ const closeAllWorkspacePanels = () => {
   const [knifePoints, setKnifePoints] = useState([]);
   const [slideAmount, setSlideAmount] = useState(0);
   const [history, setHistory] = useState([]);
+  const [redoStack, setRedoStack] = useState([]);
   const [exportUnlit, setExportUnlit] = useState(false);
 
   const activeToolRef = useRef("select");
@@ -1438,7 +1439,9 @@ const closeAllWorkspacePanels = () => {
         if (activeObjId) deleteSceneObject(activeObjId);
       }
       // Undo
-      if ((e.ctrlKey || e.metaKey) && key === "z") undo();
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && key === "z") undo();
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && key === "z") redo();
+      if ((e.ctrlKey || e.metaKey) && key === "y") redo();
       // Add primitives
       if (key === "Tab") {
         e.preventDefault();
@@ -1449,6 +1452,24 @@ const closeAllWorkspacePanels = () => {
     return () => window.removeEventListener("keydown", onKey);
   }, [activeObjId]);
 
+  const redo = useCallback(() => {
+    setRedoStack((r) => {
+      if (r.length === 0) return r;
+      const next = r[r.length - 1];
+      const heMesh = heMeshRef.current;
+      const mesh = meshRef.current;
+      if (!heMesh || !mesh) return r;
+      const { positions: cp, indices: ci } = heMesh.toBufferGeometry();
+      setHistory((h) => [...h.slice(-20), { positions: [...cp], indices: [...ci] }]);
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.Float32BufferAttribute(next.positions, 3));
+      geo.setIndex(new THREE.Uint32BufferAttribute(next.indices, 1));
+      geo.computeVertexNormals();
+      if (mesh.isMesh) { mesh.geometry.dispose(); mesh.geometry = geo; }
+      return r.slice(0, -1);
+    });
+  }, []);
+
   // ── Push history ───────────────────────────────────────────────────────────
   const pushHistory = useCallback(() => {
     const heMesh = heMeshRef.current;
@@ -1458,6 +1479,7 @@ const closeAllWorkspacePanels = () => {
       ...h.slice(-20),
       { positions: [...positions], indices: [...indices] },
     ]);
+    setRedoStack([]);
   }, []);
 
   const undo = useCallback(() => {
@@ -2196,6 +2218,7 @@ const closeAllWorkspacePanels = () => {
 
     // ── Edit ──────────────────────────────────────────────────────────────────
     if (fn === "undo")                { undo(); return; }
+    if (fn === "redo")                { redo(); return; }
     if (fn === "duplicateObject")     { const o=getActiveObj(); if(o?.mesh) addPrimitive(o.userData?.type||"box"); return; }
     if (fn === "deleteSelected")      { if(activeObjId) deleteSceneObject(activeObjId); return; }
     if (fn === "selectAll")           { setStatus("Select All — A"); return; }
