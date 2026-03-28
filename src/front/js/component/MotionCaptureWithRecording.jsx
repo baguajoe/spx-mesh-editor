@@ -1,4 +1,4 @@
-// src/front/js/component/MotionCaptureWithRecording.js
+// src/front/js/component/MotionCaptureWithRecording.jsx
 // Fixed: MediaPipe Pose & Camera loaded from CDN (avoids Babel ES6 class crash)
 // Fixed: All fetch URLs use REACT_APP_BACKEND_URL
 // Updated: fullWidth prop for responsive sizing, 1280x720 capture, dark theme controls

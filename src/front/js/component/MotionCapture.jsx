@@ -1,4 +1,4 @@
-// src/front/js/component/MotionCapture.js
+// src/front/js/component/MotionCapture.jsx
 // Updated: Accepts fullWidth prop to fill parent container instead of fixed 640x480
 
 import React, { useEffect, useRef } from 'react';

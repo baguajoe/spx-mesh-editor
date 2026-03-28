@@ -1,5 +1,5 @@
-// VideoMocapSystem.js — Motion Capture from Video Files
-// Location: src/front/js/component/VideoMocapSystem.js
+// VideoMocapSystem.jsx — Motion Capture from Video Files
+// Location: src/front/js/component/VideoMocapSystem.jsx
 //
 // Processes uploaded video files frame-by-frame through MediaPipe Pose
 // and optionally MediaPipe FaceMesh, extracts all landmarks with timestamps,

@@ -1,6 +1,6 @@
-// AvatarRigPlayer3D.js — ROTATION-BASED bone mapping for Mixamo rigs
+// AvatarRigPlayer3D.jsx — ROTATION-BASED bone mapping for Mixamo rigs
 // Replaces the old position-based system that caused static/broken avatars
-// Drop-in replacement: src/front/js/component/AvatarRigPlayer3D.js
+// Drop-in replacement: src/front/js/component/AvatarRigPlayer3D.jsx
 
 import React, { useRef, useEffect, useMemo } from 'react';
 import { Canvas, useFrame, useLoader } from '@react-three/fiber';

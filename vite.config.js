@@ -7,6 +7,13 @@ export default defineConfig({
     target: "esnext",
     chunkSizeWarningLimit: 2000,
     rollupOptions: {
+      external: [
+        '@mediapipe/pose',
+        '@mediapipe/hands',
+        '@mediapipe/face_mesh',
+        '@mediapipe/camera_utils',
+        '@mediapipe/drawing_utils',
+      ],
       output: {
         manualChunks(id) {
           if (id.includes("node_modules/three")) return "three-core";

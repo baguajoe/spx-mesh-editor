@@ -1,4 +1,4 @@
-// src/front/js/component/LiveMoCapAvatar.js
+// src/front/js/component/LiveMoCapAvatar.jsx
 // Real-time motion capture with avatar visualization
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
