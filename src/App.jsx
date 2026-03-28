@@ -2928,14 +2928,14 @@ const closeAllWorkspacePanels = () => {
           <span className="spx-native-workspace-tab-label">Auto Rig</span>
           <span className="spx-native-workspace-tab-hint">Shift+R</span>
         </button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("mocap")}>
+          <span className="spx-native-workspace-tab-label">MoCap</span>
+          <span className="spx-native-workspace-tab-hint">Live + Video</span>
+        </button>
 
         <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("advanced_rig")}>
           <span className="spx-native-workspace-tab-label">Advanced Rig</span>
           <span className="spx-native-workspace-tab-hint">Shift+Y</span>
-        </button>
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("mocap")}>
-          <span className="spx-native-workspace-tab-label">MoCap</span>
-          <span className="spx-native-workspace-tab-hint">Live + Video</span>
         </button>
       </div>
 

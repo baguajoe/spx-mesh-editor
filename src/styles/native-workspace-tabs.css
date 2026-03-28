@@ -69,3 +69,21 @@
     font-size:8px;
   }
 }
+
+/* Allow tab bar to scroll horizontally so all tabs are reachable */
+.spx-native-workspace-tabs {
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  scrollbar-width: thin;
+  scrollbar-color: #00ffc8 #0d1117;
+}
+.spx-native-workspace-tabs::-webkit-scrollbar {
+  height: 3px;
+}
+.spx-native-workspace-tabs::-webkit-scrollbar-track {
+  background: #0d1117;
+}
+.spx-native-workspace-tabs::-webkit-scrollbar-thumb {
+  background: #00ffc8;
+  border-radius: 2px;
+}
