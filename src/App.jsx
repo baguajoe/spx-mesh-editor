@@ -107,7 +107,6 @@ import HairAdvancedPanel from "./components/hair/HairAdvancedPanel.jsx";
 import "./styles/hair-advanced.css";
 import HairFXPanel from "./components/hair/HairFXPanel.jsx";
 import "./styles/hair-fx.css";
-import WorkspaceToolsDock from "./components/workspace/WorkspaceToolsDock.jsx";
 import "./styles/workspace-tools.css";
 import AutoRigPanel from "./components/rig/AutoRigPanel.jsx";
 import "./styles/autorig.css";
@@ -2941,7 +2940,6 @@ const closeAllWorkspacePanels = () => {
 
 
 
-      <WorkspaceToolsDock />
 
       <AutoRigPanel
         open={autoRigOpen}
