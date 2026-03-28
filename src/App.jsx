@@ -2943,7 +2943,7 @@ const closeAllWorkspacePanels = () => {
         sceneRef={sceneRef}
         setStatus={setStatus}
       />
-      <div className="spx-native-workspace-tabs">
+      <div className="spx-native-workspace-tabs" style={{left: showPerformancePanel ? 330 : 220}}>
         <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("uv")}>
           <span className="spx-native-workspace-tab-label">UV</span>
           <span className="spx-native-workspace-tab-hint">Shift+U</span>
