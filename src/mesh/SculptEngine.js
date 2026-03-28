@@ -78,6 +78,7 @@ export function applySculptStroke(mesh, hit, brush) {
     let ddx = 0, ddy = 0, ddz = 0;
 
     switch (type) {
+      case "draw":
       case "push":
         ddx = localNrm.x * falloff;
         ddy = localNrm.y * falloff;

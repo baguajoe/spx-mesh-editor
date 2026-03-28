@@ -1,0 +1,96 @@
+
+.workspace-tools-strip{
+  position:fixed;
+  top:25px;
+  left:214px;
+  right:8px;
+  z-index:11750;
+  pointer-events:none;
+}
+
+.workspace-tools-strip-inner{
+  display:flex;
+  align-items:center;
+  min-height:28px;
+  padding:2px 6px;
+  background:rgba(8,12,18,0.92);
+  border-bottom:1px solid rgba(255,255,255,0.06);
+  pointer-events:auto;
+  overflow:hidden;
+}
+
+.workspace-tools-tabs{
+  display:flex;
+  align-items:center;
+  gap:4px;
+  flex-wrap:nowrap;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width:thin;
+  min-width:0;
+  width:100%;
+}
+
+.workspace-tools-tabs::-webkit-scrollbar{
+  height:5px;
+}
+
+.workspace-tab-btn{
+  appearance:none;
+  border:1px solid rgba(255,255,255,0.08);
+  background:#122033;
+  color:#e8edf5;
+  border-radius:5px;
+  padding:3px 7px;
+  min-width:68px;
+  cursor:pointer;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:0;
+  flex:0 0 auto;
+  line-height:1.05;
+}
+
+.workspace-tab-btn:hover{
+  border-color:#4a8cff;
+  background:#18304b;
+}
+
+.workspace-tab-btn.is-active{
+  background:#21548f;
+  border-color:#69a6ff;
+  color:#ffffff;
+}
+
+.workspace-tab-label{
+  font-size:10px;
+  line-height:1.05;
+  font-weight:600;
+}
+
+.workspace-tab-hint{
+  font-size:8px;
+  line-height:1.05;
+  color:#8eaed3;
+}
+
+@media (max-width: 1400px){
+  .workspace-tools-strip{
+    left:206px;
+    right:6px;
+  }
+
+  .workspace-tab-btn{
+    min-width:60px;
+    padding:3px 6px;
+  }
+
+  .workspace-tab-label{
+    font-size:9px;
+  }
+
+  .workspace-tab-hint{
+    font-size:7px;
+  }
+}

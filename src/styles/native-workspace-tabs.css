@@ -1,0 +1,71 @@
+
+.spx-native-workspace-tabs{
+  position:fixed;
+  top:26px;
+  left:220px;
+  right:10px;
+  z-index:11750;
+  display:flex;
+  gap:6px;
+  align-items:center;
+  flex-wrap:nowrap;
+  overflow-x:auto;
+  overflow-y:hidden;
+  padding:4px 8px;
+  background:rgba(8,12,18,0.96);
+  border-bottom:1px solid rgba(255,255,255,0.08);
+  scrollbar-width:thin;
+}
+
+.spx-native-workspace-tab{
+  appearance:none;
+  border:1px solid rgba(255,255,255,0.10);
+  background:#132031;
+  color:#e8edf5;
+  border-radius:6px;
+  padding:4px 8px;
+  min-width:84px;
+  cursor:pointer;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:1px;
+  flex:0 0 auto;
+}
+
+.spx-native-workspace-tab:hover{
+  border-color:#4a8cff;
+  background:#18304b;
+}
+
+.spx-native-workspace-tab-label{
+  font-size:11px;
+  line-height:1.1;
+  font-weight:600;
+}
+
+.spx-native-workspace-tab-hint{
+  font-size:9px;
+  line-height:1.1;
+  color:#8eaed3;
+}
+
+@media (max-width: 1400px){
+  .spx-native-workspace-tabs{
+    left:208px;
+    right:8px;
+  }
+
+  .spx-native-workspace-tab{
+    min-width:74px;
+    padding:4px 6px;
+  }
+
+  .spx-native-workspace-tab-label{
+    font-size:10px;
+  }
+
+  .spx-native-workspace-tab-hint{
+    font-size:8px;
+  }
+}

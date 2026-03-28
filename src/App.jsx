@@ -91,6 +91,45 @@ import { AnimationTimeline } from "./components/AnimationTimeline.jsx";
 
 import "./App.css";
 import "./styles/pro-dark.css";
+import UVEditorPanel from "./components/uv/UVEditorPanel.jsx";
+import "./styles/uv-editor.css";
+import MaterialPanel from "./components/materials/MaterialPanel.jsx";
+import "./styles/material-editor.css";
+import TexturePaintPanel from "./components/materials/TexturePaintPanel.jsx";
+import "./styles/texture-paint.css";
+import ClothingPanel from "./components/clothing/ClothingPanel.jsx";
+import "./styles/clothing-editor.css";
+import PatternEditorPanel from "./components/clothing/PatternEditorPanel.jsx";
+import "./styles/pattern-editor.css";
+import HairPanel from "./components/hair/HairPanel.jsx";
+import "./styles/hair-editor.css";
+import HairAdvancedPanel from "./components/hair/HairAdvancedPanel.jsx";
+import "./styles/hair-advanced.css";
+import HairFXPanel from "./components/hair/HairFXPanel.jsx";
+import "./styles/hair-fx.css";
+import WorkspaceToolsDock from "./components/workspace/WorkspaceToolsDock.jsx";
+import "./styles/workspace-tools.css";
+import AutoRigPanel from "./components/rig/AutoRigPanel.jsx";
+import "./styles/autorig.css";
+import AdvancedRigPanel from "./components/rig/AdvancedRigPanel.jsx";
+import "./styles/advanced-rig.css";
+import "./styles/native-workspace-tabs.css";
+import RenderWorkspacePanel from "./components/workspace/RenderWorkspacePanel.jsx";
+import "./styles/render-workspace.css";
+import { createDefaultRigGuides, mirrorGuidePoint, guidesToRigSettings } from "./mesh/rig/AutoRigGuides.js";
+import {
+  applyCheckerToMesh,
+  unwrapBoxProjection,
+  exportUVLayoutGLB
+} from "./mesh/uv/UVUnwrap.js";
+import {
+  createQuadCameraSet,
+  resizeQuadCameraSet,
+  renderViewportSet,
+  detectViewportFromPointer,
+  getActiveViewportCamera,
+  snapCameraToAxis
+} from "./mesh/MultiViewportSystem.js";
 
 const TOOLS = [
   { id: "select", icon: "↖", label: "Select (S)" },
@@ -131,6 +170,213 @@ const COLORS = {
 };
 
 export default function App() {
+
+  const [renderWorkspaceOpen, setRenderWorkspaceOpen] = useState(false);
+
+
+
+  const [activeWorkspaceMode, setActiveWorkspaceMode] = useState("modeling");
+
+
+
+  const [advancedRigOpen, setAdvancedRigOpen] = useState(false);
+
+  
+  useEffect(() => {
+    const onWorkspaceMode = (e) => {
+      const mode = e?.detail?.mode;
+      if (mode) setActiveWorkspaceMode(mode);
+    };
+    window.addEventListener("spx:setWorkspaceMode", onWorkspaceMode);
+    return () => window.removeEventListener("spx:setWorkspaceMode", onWorkspaceMode);
+  }, []);
+
+const closeAllWorkspacePanels = () => {
+    setUvPanelOpen?.(false);
+    setMaterialPanelOpen?.(false);
+    setPaintPanelOpen?.(false);
+    setClothingPanelOpen?.(false);
+    setPatternPanelOpen?.(false);
+    setHairPanelOpen?.(false);
+    setHairAdvancedOpen?.(false);
+    setHairFXOpen?.(false);
+    setAutoRigOpen?.(false);
+    setAdvancedRigOpen?.(false);
+    setRenderWorkspaceOpen?.(false);
+  };
+
+  const openWorkspaceTool = (toolId) => {
+    closeAllWorkspacePanels();
+
+    if (toolId === "uv") setUvPanelOpen?.(true);
+    else if (toolId === "materials") setMaterialPanelOpen?.(true);
+    else if (toolId === "paint") setPaintPanelOpen?.(true);
+    else if (toolId === "clothing") setClothingPanelOpen?.(true);
+    else if (toolId === "pattern") setPatternPanelOpen?.(true);
+    else if (toolId === "hair") setHairPanelOpen?.(true);
+    else if (toolId === "hair_adv") setHairAdvancedOpen?.(true);
+    else if (toolId === "hair_fx") setHairFXOpen?.(true);
+    else if (toolId === "autorig") setAutoRigOpen?.(true);
+    else if (toolId === "advanced_rig") setAdvancedRigOpen?.(true);
+  };
+
+
+
+  useEffect(() => {
+    const onAdvancedRigKey = (e) => {
+      if (e.shiftKey && e.key.toLowerCase() == "y") {
+        e.preventDefault();
+        setAdvancedRigOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onAdvancedRigKey);
+    return () => window.removeEventListener("keydown", onAdvancedRigKey);
+  }, []);
+
+
+
+  const [autoRigOpen, setAutoRigOpen] = useState(false);
+
+  useEffect(() => {
+    const onAutoRigKey = (e) => {
+      if (e.shiftKey && e.key.toLowerCase() === "r") {
+        e.preventDefault();
+        setAutoRigOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onAutoRigKey);
+    return () => window.removeEventListener("keydown", onAutoRigKey);
+  }, []);
+
+
+
+  const [hairFXOpen, setHairFXOpen] = useState(false);
+
+  useEffect(() => {
+    const onHairFXKey = (e) => {
+      if (e.shiftKey && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setHairFXOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onHairFXKey);
+    return () => window.removeEventListener("keydown", onHairFXKey);
+  }, []);
+
+
+
+  const [hairAdvancedOpen, setHairAdvancedOpen] = useState(false);
+
+  useEffect(() => {
+    const onHairAdvancedKey = (e) => {
+      if (e.shiftKey && e.key.toLowerCase() === "j") {
+        e.preventDefault();
+        setHairAdvancedOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onHairAdvancedKey);
+    return () => window.removeEventListener("keydown", onHairAdvancedKey);
+  }, []);
+
+
+
+  const [hairPanelOpen, setHairPanelOpen] = useState(false);
+
+  useEffect(() => {
+    const onHairKey = (e) => {
+      if (e.shiftKey && e.key.toLowerCase() === "h") {
+        e.preventDefault();
+        setHairPanelOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onHairKey);
+    return () => window.removeEventListener("keydown", onHairKey);
+  }, []);
+
+
+
+  const [patternPanelOpen, setPatternPanelOpen] = useState(false);
+
+  useEffect(() => {
+    const onPatternKey = (e) => {
+      if (e.shiftKey && e.key.toLowerCase() === "d") {
+        e.preventDefault();
+        setPatternPanelOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onPatternKey);
+    return () => window.removeEventListener("keydown", onPatternKey);
+  }, []);
+
+
+
+  const [clothingPanelOpen, setClothingPanelOpen] = useState(false);
+
+  useEffect(() => {
+    const onClothingKey = (e) => {
+      if (e.shiftKey && e.key.toLowerCase() === "g") {
+        e.preventDefault();
+        setClothingPanelOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onClothingKey);
+    return () => window.removeEventListener("keydown", onClothingKey);
+  }, []);
+
+
+
+  const [paintPanelOpen, setPaintPanelOpen] = useState(false);
+
+  useEffect(() => {
+    const onPaintKey = (e) => {
+      if (e.shiftKey && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        setPaintPanelOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onPaintKey);
+    return () => window.removeEventListener("keydown", onPaintKey);
+  }, []);
+
+
+
+  const [materialPanelOpen, setMaterialPanelOpen] = useState(false);
+
+  useEffect(() => {
+    const onMaterialKey = (e) => {
+      if (e.shiftKey && e.key.toLowerCase() === "m") {
+        e.preventDefault();
+        setMaterialPanelOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onMaterialKey);
+    return () => window.removeEventListener("keydown", onMaterialKey);
+  }, []);
+
+
+
+  const [uvPanelOpen, setUvPanelOpen] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.shiftKey && e.key.toLowerCase() === "u") {
+        e.preventDefault();
+        setUvPanelOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+
+
+  const quadCamerasRef = useRef(null);
+  const activeViewportRef = useRef("persp");
+  const [quadView, setQuadView] = useState(false);
+  const quadViewRef = useRef(false);
+  useEffect(() => { quadViewRef.current = quadView; }, [quadView]);
+
+
   const [objectsAddedCounter, setObjectsAddedCounter] = useState(0);
   const [stats, setStats] = useState({ vertices: 0, edges: 0, faces: 0, halfEdges: 0 });
   const [activeWorkspace, setActiveWorkspace] = useState(DEFAULT_WORKSPACE);
@@ -323,7 +569,7 @@ export default function App() {
   const [sculptFalloff, setSculptFalloff] = useState("smooth");
   const [sculptSymX, setSculptSymX] = useState(false);
   const sculptingRef = useRef(false);
-  const sculptBrushRef = useRef("draw");
+  const sculptBrushRef = useRef("push");
   const sculptRadiusRef = useRef(0.8);
   const sculptStrengthRef = useRef(0.02);
   const sculptFalloffRef = useRef("smooth");
@@ -497,6 +743,16 @@ export default function App() {
         setCurrentFrame((prev) => (prev >= 250 ? 0 : prev + 1));
       }, 1000 / 24);
     }
+
+  const snapViewToAxis = (axis) => {
+    const cam = getActiveViewportCamera(
+      quadCamerasRef.current || { persp: cameraRef.current },
+      activeViewportRef.current
+    ) || cameraRef.current;
+    snapCameraToAxis(cam, axis);
+  };
+
+
     return () => clearInterval(interval);
   }, [isPlaying]);
 
@@ -669,7 +925,48 @@ export default function App() {
 
     scene.background = new THREE.Color(COLORS.bg);
     scene.add(new THREE.GridHelper(10, 20, COLORS.border, COLORS.border));
-    scene.add(new THREE.AxesHelper(2));
+
+    // subtle center marker like Blender origin / cursor
+    const centerRingGeo = new THREE.RingGeometry(0.05, 0.08, 24);
+    const centerRingMat = new THREE.MeshBasicMaterial({
+      color: 0xff6a00,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.9,
+      depthTest: false
+    });
+    const centerMarker = new THREE.Mesh(centerRingGeo, centerRingMat);
+    centerMarker.rotation.x = -Math.PI / 2;
+    centerMarker.position.set(0, 0.001, 0);
+    centerMarker.renderOrder = 999;
+    scene.add(centerMarker);
+
+    // center axis guide lines (Blender style reference)
+    const centerGuidePts = [
+      -5, 0.001,  0.0,  -0.12, 0.001,  0.0,
+       0.12, 0.001,  0.0,   5, 0.001,  0.0,
+       0.0,  0.001, -5,    0.0, 0.001, -0.12,
+       0.0,  0.001,  0.12, 0.0, 0.001,  5,
+    ];
+
+    const centerGuideGeo = new THREE.BufferGeometry();
+    centerGuideGeo.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(centerGuidePts, 3)
+    );
+
+    const centerGuideMat = new THREE.LineBasicMaterial({
+        color: 0x888888,
+        transparent: true,
+        opacity: 0.8,
+        depthTest: false
+    });
+
+    const centerGuides = new THREE.LineSegments(centerGuideGeo, centerGuideMat);
+    centerGuides.renderOrder = 998;
+
+    scene.add(centerGuides);
+
     sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(
@@ -681,6 +978,8 @@ export default function App() {
     camera.position.set(3, 3, 5);
     camera.lookAt(0, 0, 0);
     cameraRef.current = camera;
+    quadCamerasRef.current = createQuadCameraSet(camera);
+    resizeQuadCameraSet(quadCamerasRef.current, canvas.clientWidth, canvas.clientHeight);
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.5));
     const dir = new THREE.DirectionalLight(0xffffff, 1.2);
@@ -701,7 +1000,14 @@ export default function App() {
 
     const animate = () => {
       rafRef.current = requestAnimationFrame(animate);
-      renderer.render(scene, camera);
+      renderViewportSet(
+        renderer,
+        scene,
+        quadCamerasRef.current || { persp: camera },
+        canvas.clientWidth,
+        canvas.clientHeight,
+        typeof quadViewRef !== "undefined" ? quadViewRef.current : false
+      );
     };
     animate();
 
@@ -709,6 +1015,11 @@ export default function App() {
       renderer.setSize(canvas.clientWidth, canvas.clientHeight);
       camera.aspect = canvas.clientWidth / canvas.clientHeight;
       camera.updateProjectionMatrix();
+      resizeQuadCameraSet(
+        quadCamerasRef.current,
+        canvas.clientWidth,
+        canvas.clientHeight
+      );
     };
     window.addEventListener("resize", onResize);
 
@@ -942,6 +1253,10 @@ export default function App() {
     window.applyHairPreset = applyHairPreset;
     window.HAIR_PRESETS = HAIR_PRESETS;
     window.exportHairCardsGLB = exportHairCardsGLB;
+    window.applyCheckerToMesh = applyCheckerToMesh;
+    window.unwrapBoxProjection = unwrapBoxProjection;
+    window.exportUVLayoutGLB = exportUVLayoutGLB;
+
     window.FORCE_FIELD_TYPES = FORCE_FIELD_TYPES;
     window.createGPUParticleSystem = createGPUParticleSystem;
     window.emitGPUParticles = emitGPUParticles;
@@ -1165,6 +1480,19 @@ export default function App() {
       setTimeout(() => {
         const mesh = meshRef.current;
         if (!mesh || !mesh.geometry) return;
+
+        // Force primitive to be centered at world origin like Blender
+        mesh.geometry.computeBoundingBox();
+        if (mesh.geometry.boundingBox) {
+          const center = new THREE.Vector3();
+          mesh.geometry.boundingBox.getCenter(center);
+          mesh.geometry.translate(-center.x, -center.y, -center.z);
+        }
+        mesh.position.set(0, 0, 0);
+        mesh.rotation.set(0, 0, 0);
+        mesh.scale.set(1, 1, 1);
+        mesh.geometry.computeVertexNormals();
+
         try {
           const heMesh = HalfEdgeMesh.fromBufferGeometry(mesh.geometry);
           heMeshRef.current = heMesh;
@@ -1903,6 +2231,37 @@ export default function App() {
 
     // ── Remesh ────────────────────────────────────────────────────────────────
     if (fn === "voxel_remesh")        { if(typeof window.voxelRemesh==="function"&&meshRef.current){const m=window.voxelRemesh(meshRef.current,remeshVoxel);if(m)sceneRef.current?.add(m);setStatus("Voxel remesh done");} return; }
+    
+    if (fn === "apply_checker")       {
+      if (meshRef.current) {
+        window.applyCheckerToMesh?.(meshRef.current);
+        setStatus?.("Checker texture applied");
+      }
+      return;
+    }
+    if (fn === "box_unwrap")         {
+      const geom = meshRef.current?.geometry;
+      if (geom) {
+        window.unwrapBoxProjection?.(geom);
+        geom.attributes.uv && (geom.attributes.uv.needsUpdate = true);
+        setStatus?.("Box unwrap applied");
+      }
+      return;
+    }
+    if (fn === "export_uv_glb")      {
+      if (meshRef.current) {
+        window.exportUVLayoutGLB?.(meshRef.current).then((data) => {
+          const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = "uv-layout-export.gltf";
+          a.click();
+          URL.revokeObjectURL(a.href);
+          setStatus?.("UV GLTF exported");
+        });
+      }
+      return;
+    }
     if (fn === "quad_remesh")         { if(typeof window.quadRemesh==="function"&&meshRef.current){window.quadRemesh(meshRef.current);setStatus("Quad remesh done");} return; }
     if (fn === "auto_retopo")         { if(typeof window.quadDominantRetopo==="function"&&meshRef.current){const r=window.quadDominantRetopo(meshRef.current,createRetopoSettings());setRetopoResult(r);setStatus("Retopo done");} return; }
     if (fn === "marching_cubes")      { if(typeof window.marchingCubesRemesh==="function"&&meshRef.current){window.marchingCubesRemesh(meshRef.current,mcResolution,mcIsolevel);setStatus("Marching cubes done");} return; }
@@ -2394,7 +2753,19 @@ export default function App() {
           }}
           onContextMenu={e => e.preventDefault()}
         >
-          <canvas ref={canvasRef} />
+          
+            <div className="viewport-toolbar">
+              <button
+                type="button"
+                className={`quad-toggle-btn ${quadView ? "is-active" : ""}`}
+                onClick={() => setQuadView((v) => !v)}
+                title="Toggle quad view"
+              >
+                {quadView ? "Single" : "Quad"}
+              </button>
+            </div>
+
+<canvas ref={canvasRef} />
           {/* XYZ orientation gizmo — top right corner */}
           <div style={{
             position:"absolute", top:8, right:8,
@@ -2456,6 +2827,135 @@ export default function App() {
               />
             )}
           </div>
+      <UVEditorPanel
+        open={uvPanelOpen}
+        onClose={() => setUvPanelOpen(false)}
+      />
+
+      <MaterialPanel
+        open={materialPanelOpen}
+        onClose={() => setMaterialPanelOpen(false)}
+        meshRef={meshRef}
+      />
+
+      <TexturePaintPanel
+        open={paintPanelOpen}
+        onClose={() => setPaintPanelOpen(false)}
+        meshRef={meshRef}
+      />
+
+      <ClothingPanel
+        open={clothingPanelOpen}
+        onClose={() => setClothingPanelOpen(false)}
+        sceneRef={sceneRef}
+        setStatus={setStatus}
+      />
+
+      <PatternEditorPanel
+        open={patternPanelOpen}
+        onClose={() => setPatternPanelOpen(false)}
+        sceneRef={sceneRef}
+        setStatus={setStatus}
+      />
+
+      <HairPanel
+        open={hairPanelOpen}
+        onClose={() => setHairPanelOpen(false)}
+        sceneRef={sceneRef}
+        setStatus={setStatus}
+      />
+
+      <HairAdvancedPanel
+        open={hairAdvancedOpen}
+        onClose={() => setHairAdvancedOpen(false)}
+        sceneRef={sceneRef}
+        setStatus={setStatus}
+      />
+
+      <HairFXPanel
+        open={hairFXOpen}
+        onClose={() => setHairFXOpen(false)}
+        sceneRef={sceneRef}
+        setStatus={setStatus}
+      />
+      <div className="spx-native-workspace-tabs">
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("uv")}>
+          <span className="spx-native-workspace-tab-label">UV</span>
+          <span className="spx-native-workspace-tab-hint">Shift+U</span>
+        </button>
+
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("materials")}>
+          <span className="spx-native-workspace-tab-label">Materials</span>
+          <span className="spx-native-workspace-tab-hint">Shift+M</span>
+        </button>
+
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("paint")}>
+          <span className="spx-native-workspace-tab-label">Texture Paint</span>
+          <span className="spx-native-workspace-tab-hint">Shift+P</span>
+        </button>
+
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("clothing")}>
+          <span className="spx-native-workspace-tab-label">Clothing</span>
+          <span className="spx-native-workspace-tab-hint">Shift+G</span>
+        </button>
+
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("pattern")}>
+          <span className="spx-native-workspace-tab-label">Pattern</span>
+          <span className="spx-native-workspace-tab-hint">Shift+D</span>
+        </button>
+
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("hair")}>
+          <span className="spx-native-workspace-tab-label">Hair</span>
+          <span className="spx-native-workspace-tab-hint">Shift+H</span>
+        </button>
+
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("hair_adv")}>
+          <span className="spx-native-workspace-tab-label">Hair Advanced</span>
+          <span className="spx-native-workspace-tab-hint">Shift+J</span>
+        </button>
+
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("hair_fx")}>
+          <span className="spx-native-workspace-tab-label">Hair FX</span>
+          <span className="spx-native-workspace-tab-hint">Shift+K</span>
+        </button>
+
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("autorig")}>
+          <span className="spx-native-workspace-tab-label">Auto Rig</span>
+          <span className="spx-native-workspace-tab-hint">Shift+R</span>
+        </button>
+
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("advanced_rig")}>
+          <span className="spx-native-workspace-tab-label">Advanced Rig</span>
+          <span className="spx-native-workspace-tab-hint">Shift+Y</span>
+        </button>
+      </div>
+
+
+
+      <WorkspaceToolsDock />
+
+      <AutoRigPanel
+        open={autoRigOpen}
+        onClose={() => setAutoRigOpen(false)}
+        sceneRef={sceneRef}
+        setStatus={setStatus}
+      />
+
+      <AdvancedRigPanel
+        open={advancedRigOpen}
+        onClose={() => setAdvancedRigOpen(false)}
+        sceneRef={sceneRef}
+        setStatus={setStatus}
+      />
+
+      <RenderWorkspacePanel
+        open={renderWorkspaceOpen}
+        onClose={() => setRenderWorkspaceOpen(false)}
+        sceneRef={sceneRef}
+        canvasRef={canvasRef}
+        setStatus={setStatus}
+      />
+
         </div>
       }
       bottomPanel={
@@ -2478,5 +2978,7 @@ export default function App() {
         />
       }
     />
+
+
   );
 }

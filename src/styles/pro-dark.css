@@ -753,3 +753,377 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px s
   flex-shrink: 0;
   overflow-y: auto;
 }
+
+
+/* ---- viewport toolbar ---- */
+.viewport-toolbar {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 30;
+  display: flex;
+  gap: 8px;
+}
+
+.viewport-btn {
+  background: #11161d;
+  color: #d7e3f4;
+  border: 1px solid #2a3646;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.viewport-btn:hover {
+  background: #18212b;
+}
+
+.viewport-btn.is-active {
+  border-color: #5aa9ff;
+  box-shadow: 0 0 0 1px rgba(90,169,255,.35) inset;
+}
+
+/* ---- xyz widget ---- */
+.xyz-widget {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 31;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+
+.xyz-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid #263241;
+  background: rgba(13,17,23,.88);
+  color: #d7e3f4;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.xyz-x { color: #ff6666; }
+.xyz-y { color: #80ff80; }
+.xyz-z { color: #6aa8ff; }
+
+.xyz-btn:hover {
+  background: #1a2430;
+}
+
+/* ---- quad view shell ---- */
+.quad-view-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  border: 1px solid rgba(255,255,255,.06);
+}
+
+.quad-cell {
+  position: relative;
+  border: 1px solid rgba(255,255,255,.10);
+}
+
+.quad-cell::before {
+  content: attr(class);
+  display: none;
+}
+
+.quad-cell:nth-child(1)::after,
+.quad-cell:nth-child(2)::after,
+.quad-cell:nth-child(3)::after,
+.quad-cell:nth-child(4)::after {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  font-size: 11px;
+  color: #c6d3e3;
+  background: rgba(10,12,16,.66);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.quad-cell:nth-child(1)::after { content: "Top"; }
+.quad-cell:nth-child(2)::after { content: "Front"; }
+.quad-cell:nth-child(3)::after { content: "Right"; }
+.quad-cell:nth-child(4)::after { content: "Perspective"; }
+
+
+.quad-toggle-btn {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 45;
+  background: rgba(13,17,23,.92);
+  color: #d7e3f4;
+  border: 1px solid #2a3646;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.quad-toggle-btn:hover {
+  background: #18212b;
+}
+
+.mesh-editor-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+
+.quad-overlay-ui {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 44;
+}
+
+.viewport-label {
+  position: absolute;
+  pointer-events: auto;
+  background: rgba(10,12,16,.8);
+  color: #d7e3f4;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.viewport-label.is-active {
+  border-color: #6aa8ff;
+  box-shadow: 0 0 0 1px rgba(106,168,255,.35) inset;
+}
+
+.viewport-label:nth-child(1) { top: 10px; left: 10px; }
+.viewport-label:nth-child(2) { top: 10px; left: calc(50% + 10px); }
+.viewport-label:nth-child(3) { top: calc(50% + 10px); left: 10px; }
+.viewport-label:nth-child(4) { top: calc(50% + 10px); left: calc(50% + 10px); }
+
+.viewport-active-outline {
+  position: absolute;
+  border: 2px solid transparent;
+  pointer-events: none;
+  z-index: 43;
+}
+
+.viewport-active-outline.is-active {
+  border-color: rgba(106,168,255,.65);
+}
+
+.viewport-top   { left: 0; top: 0; width: 50%; height: 50%; }
+.viewport-persp { left: 50%; top: 0; width: 50%; height: 50%; }
+.viewport-front { left: 0; top: 50%; width: 50%; height: 50%; }
+.viewport-right { left: 50%; top: 50%; width: 50%; height: 50%; }
+
+.quad-divider {
+  position: absolute;
+  z-index: 46;
+  background: rgba(255,255,255,.16);
+}
+
+.quad-divider-v {
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  margin-left: -1px;
+  cursor: col-resize;
+}
+
+.quad-divider-h {
+  left: 0;
+  right: 0;
+  height: 3px;
+  margin-top: -1px;
+  cursor: row-resize;
+}
+
+.maximized-viewport-label {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 45;
+  background: rgba(10,12,16,.8);
+  color: #d7e3f4;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
+
+.vp-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 44;
+}
+
+.vp-rect {
+  position: absolute;
+  border: 1px solid rgba(255,255,255,.10);
+  box-sizing: border-box;
+}
+
+.vp-rect.is-active {
+  border: 2px solid rgba(106,168,255,.75);
+}
+
+.vp-label {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  pointer-events: auto;
+  background: rgba(10,12,16,.84);
+  color: #d7e3f4;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.vp-label.is-active {
+  border-color: #6aa8ff;
+  box-shadow: 0 0 0 1px rgba(106,168,255,.35) inset;
+}
+
+.vp-max {
+  top: 10px;
+  left: 10px;
+}
+
+
+/* force quad toggle visible */
+.viewport-toolbar{
+  position:absolute;
+  top:8px;
+  left:8px;
+  z-index:9999;
+  pointer-events:auto;
+}
+
+.quad-toggle-btn{
+  background:#111;
+  color:#eee;
+  border:1px solid #333;
+  padding:4px 8px;
+  font-size:11px;
+  border-radius:4px;
+  cursor:pointer;
+}
+
+.quad-toggle-btn.is-active{
+  background:#4a8cff;
+  border-color:#4a8cff;
+  color:white;
+}
+
+
+/* ensure canvas is below UI */
+.mesh-editor-canvas{
+  position:relative;
+}
+
+/* force quad button visible */
+.viewport-toolbar{
+  position:absolute !important;
+  top:10px !important;
+  left:10px !important;
+  z-index:99999 !important;
+  pointer-events:auto !important;
+}
+
+/* ensure canvas doesn't cover UI */
+.mesh-editor-canvas canvas{
+  position:absolute;
+  top:0;
+  left:0;
+  z-index:1;
+}
+
+/* quad button styling */
+.quad-toggle-btn{
+  background:#0e0f14;
+  color:#e6e6e6;
+  border:1px solid #2a2f3a;
+  padding:4px 10px;
+  font-size:11px;
+  border-radius:4px;
+  cursor:pointer;
+  backdrop-filter:blur(4px);
+}
+
+.quad-toggle-btn.is-active{
+  background:#4a8cff;
+  border-color:#4a8cff;
+  color:white;
+}
+
+
+/* viewport container must create stacking context */
+.mesh-editor-canvas{
+  position:relative;
+  overflow:hidden;
+}
+
+/* keep webgl canvas below UI */
+.mesh-editor-canvas canvas{
+  position:absolute;
+  inset:0;
+  z-index:0;
+}
+
+/* ensure toolbar floats above canvas */
+.viewport-toolbar{
+  position:absolute;
+  top:8px;
+  left:8px;
+  z-index:50;
+  pointer-events:auto;
+}
+
+/* visible quad button */
+.quad-toggle-btn{
+  background:#0f1116;
+  color:#e8ecf1;
+  border:1px solid #2b3240;
+  padding:5px 10px;
+  font-size:11px;
+  border-radius:6px;
+  cursor:pointer;
+}
+
+.quad-toggle-btn:hover{
+  border-color:#4a8cff;
+}
+
+.quad-toggle-btn.is-active{
+  background:#4a8cff;
+  color:white;
+  border-color:#4a8cff;
+}
+
+
+/* === QUAD VIEW CLEAN FIX START === */
+.mesh-editor-canvas{position:relative !important; overflow:hidden;}
+.mesh-editor-canvas canvas{position:absolute !important; inset:0 !important; z-index:0 !important; display:block;}
+.viewport-toolbar{position:absolute !important; top:8px !important; left:8px !important; z-index:9999 !important; pointer-events:auto !important; display:flex !important; gap:8px !important;}
+.quad-toggle-btn{appearance:none; background:#0f1116 !important; color:#e8ecf1 !important; border:1px solid #2b3240 !important; padding:5px 10px !important; font-size:11px !important; line-height:1 !important; border-radius:6px !important; cursor:pointer !important; position:relative !important; z-index:10000 !important;}
+.quad-toggle-btn:hover{border-color:#4a8cff !important;}
+.quad-toggle-btn.is-active{background:#4a8cff !important; color:#fff !important; border-color:#4a8cff !important;}
+/* === QUAD VIEW CLEAN FIX END === */
