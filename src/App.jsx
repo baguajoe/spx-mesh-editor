@@ -3,7 +3,8 @@ import { ViewportHeader } from "./components/ViewportHeader";
 import { PropertyInspector } from "./components/PropertyInspector";
 import { Outliner } from "./components/Outliner";
 import React, { useRef, useEffect, useState, useCallback } from "react";
-import * as THREE from "three";
+
+import SPXPerformancePanel from "./components/SPXPerformancePanel.jsx";import * as THREE from "three";
 import ProfessionalShell from "./pro-ui/ProfessionalShell";
 import FeatureIndexPanel from "./pro-ui/FeatureIndexPanel";
 import WORKSPACE_FEATURES from "./pro-ui/workspaceMap";
@@ -716,6 +717,7 @@ const closeAllWorkspacePanels = () => {
   const [slideAmount, setSlideAmount] = useState(0);
   const [history, setHistory] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
+  const [showPerformancePanel, setShowPerformancePanel] = useState(false);
   const [exportUnlit, setExportUnlit] = useState(false);
 
   const activeToolRef = useRef("select");
@@ -1446,6 +1448,10 @@ const closeAllWorkspacePanels = () => {
       if (key === "Tab") {
         e.preventDefault();
         setShowNPanel(v => !v);
+      }
+      if (key === "p" || key === "P") {
+        e.preventDefault();
+        setShowPerformancePanel(v => !v);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -2219,6 +2225,7 @@ const closeAllWorkspacePanels = () => {
     // ── Edit ──────────────────────────────────────────────────────────────────
     if (fn === "undo")                { undo(); return; }
     if (fn === "redo")                { redo(); return; }
+    if (fn === "togglePerformance")   { setShowPerformancePanel(v => !v); return; }
     if (fn === "duplicateObject")     { const o=getActiveObj(); if(o?.mesh) addPrimitive(o.userData?.type||"box"); return; }
     if (fn === "deleteSelected")      { if(activeObjId) deleteSceneObject(activeObjId); return; }
     if (fn === "selectAll")           { setStatus("Select All — A"); return; }
