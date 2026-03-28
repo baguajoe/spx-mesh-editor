@@ -27,8 +27,9 @@ const S = {
   sizeBtn: (active) => ({ background: active ? "#00ffc820" : "#21262d", border: `1px solid ${active ? "#00ffc8" : "#30363d"}`, color: active ? "#00ffc8" : "#c8c8c8", borderRadius: 3, padding: "2px 6px", cursor: "pointer", fontSize: 10, fontFamily: "JetBrains Mono, monospace" }),
 };
 
-export default function FabricPanel({ clothStateRef, setStatus, panels = [], onPanelsChange }) {
+export default function FabricPanel({ open = false, clothStateRef, setStatus, panels = [], onPanelsChange }) {
   const [selectedFabric, setSelectedFabric] = useState("cotton");
+  if (!open) return null;
   const [fabricProps, setFabricProps] = useState({ ...FABRIC_LIBRARY.cotton });
   const [colorwaySession, setColorwaySession] = useState(() => createColorwaySession("My Garment"));
   const [newCWName, setNewCWName] = useState("");

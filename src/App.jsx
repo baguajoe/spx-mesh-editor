@@ -210,7 +210,7 @@ export default function App() {
   const openWorkspaceTool = (toolId) => {
     // ── Grouped tab dispatchers ───────────────────────────────────────────────
     if (toolId === "materials_textures") { closeAllWorkspacePanels(); setMaterialPanelOpen?.(true); setPaintPanelOpen?.(true); return; }
-    if (toolId === "clothing_pattern")   { closeAllWorkspacePanels(); setClothingPanelOpen?.(true); setPatternPanelOpen?.(true); return; }
+    if (toolId === "clothing_pattern")   { closeAllWorkspacePanels(); setClothingPanelOpen?.(true); setPatternPanelOpen?.(true); setFabricPanelOpen?.(true); return; }
     if (toolId === "hair_suite")         { closeAllWorkspacePanels(); setHairPanelOpen?.(true); setHairAdvancedOpen?.(true); setHairFXOpen?.(true); return; }
     if (toolId === "rigging_suite")      { closeAllWorkspacePanels(); setAutoRigOpen?.(true); setAdvancedRigOpen?.(true); return; }
 
@@ -320,6 +320,7 @@ export default function App() {
 
 
   const [clothingPanelOpen, setClothingPanelOpen] = useState(false);
+  const [fabricPanelOpen, setFabricPanelOpen] = useState(false);
 
   useEffect(() => {
     const onClothingKey = (e) => {
@@ -385,6 +386,7 @@ export default function App() {
     setMaterialPanelOpen(false);
     setPaintPanelOpen(false);
     setClothingPanelOpen(false);
+    setFabricPanelOpen(false);
     setPatternPanelOpen(false);
     setHairPanelOpen(false);
     setHairAdvancedOpen(false);
@@ -2916,6 +2918,12 @@ export default function App() {
         onClose={() => setClothingPanelOpen(false)}
         sceneRef={sceneRef}
         setStatus={setStatus}
+      />
+      <FabricPanel
+        open={fabricPanelOpen}
+        clothStateRef={sceneRef}
+        setStatus={setStatus}
+        panels={[]}
       />
 
       <PatternEditorPanel
