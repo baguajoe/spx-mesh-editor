@@ -205,20 +205,7 @@ export default function App() {
     return () => window.removeEventListener("spx:setWorkspaceMode", onWorkspaceMode);
   }, []);
 
-const closeAllWorkspacePanels = () => {
-    setUvPanelOpen?.(false);
-    setMaterialPanelOpen?.(false);
-    setPaintPanelOpen?.(false);
-    setClothingPanelOpen?.(false);
-    setPatternPanelOpen?.(false);
-    setHairPanelOpen?.(false);
-    setHairAdvancedOpen?.(false);
-    setHairFXOpen?.(false);
-    setAutoRigOpen?.(false);
-    setAdvancedRigOpen?.(false);
-    setRenderWorkspaceOpen?.(false);
-    setMocapWorkspaceOpen?.(false);
-  };
+// closeAllWorkspacePanels defined below after state declarations;
 
   const openWorkspaceTool = (toolId) => {
     // ── Grouped tab dispatchers ───────────────────────────────────────────────
@@ -391,6 +378,21 @@ const closeAllWorkspacePanels = () => {
   }, []);
 
 
+
+
+  const closeAllWorkspacePanels = () => {
+    setUvPanelOpen(false);
+    setMaterialPanelOpen(false);
+    setPaintPanelOpen(false);
+    setClothingPanelOpen(false);
+    setPatternPanelOpen(false);
+    setHairPanelOpen(false);
+    setHairAdvancedOpen(false);
+    setHairFXOpen(false);
+    setAutoRigOpen(false);
+    setAdvancedRigOpen(false);
+    setMocapWorkspaceOpen?.(false);
+  };
 
   const quadCamerasRef = useRef(null);
   const activeViewportRef = useRef("persp");
