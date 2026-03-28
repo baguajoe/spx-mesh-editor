@@ -2891,6 +2891,7 @@ const closeAllWorkspacePanels = () => {
               />
             )}
           </div>
+      {showPerformancePanel && (<div style={{position:"absolute",top:0,left:0,width:320,height:"100%",zIndex:30,background:"#0d1117",borderRight:"1px solid #21262d",display:"flex",flexDirection:"column",overflow:"hidden"}}><SPXPerformancePanel sceneObjects={sceneObjects} activeObjId={activeObjId} /></div>)}
       <UVEditorPanel
         open={uvPanelOpen}
         onClose={() => setUvPanelOpen(false)}
