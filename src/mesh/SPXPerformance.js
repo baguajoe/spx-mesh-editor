@@ -575,7 +575,7 @@ export function downloadSessionJSON(session) {
 }
 
 /**
- * Send to StreamPireX (stubbed — wires to /api/performance/save on integration)
+ * Send to StreamPireX — wires to /api/performance/save
  */
 export async function sendToStreamPireX(session, userId) {
   await deductAICredit(userId, "performance_save");

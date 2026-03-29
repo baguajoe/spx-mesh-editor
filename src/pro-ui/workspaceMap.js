@@ -4,14 +4,15 @@
 // ═══════════════════════════════════════════════════════════════════
 
 export const WORKSPACES_MAP = {
-  MODELING:   "Modeling",
-  SCULPT:     "Sculpt",
-  RIGGING:    "Rigging",
-  ANIMATION:  "Animation",
-  SHADING:    "Shading",
-  RENDERING:  "Rendering",
-  VFX:        "VFX",
-  PIPELINE:   "Pipeline",
+  MODELING:     "Modeling",
+  SCULPT:       "Sculpt",
+  RIGGING:      "Rigging",
+  ANIMATION:    "Animation",
+  SHADING:      "Shading",
+  RENDERING:    "Rendering",
+  VFX:          "VFX",
+  PIPELINE:     "Pipeline",
+  PERFORMANCE:  "Performance",
 };
 
 export const WORKSPACES = Object.values(WORKSPACES_MAP);
@@ -20,6 +21,45 @@ export const DEFAULT_WORKSPACE = WORKSPACES_MAP.MODELING;
 // ── Each workspace has folders; each folder has items ───────────────
 // item: { id, label, system }  — system = source file name
 export const WORKSPACE_TREE = {
+  Performance: [
+    {
+      folder: "MoCap Capture",
+      items: [
+        { id: "mocap_live",      label: "Live Capture",      system: "SPXPerformance" },
+        { id: "mocap_video",     label: "Video MoCap",       system: "SPXPerformance" },
+        { id: "mocap_face",      label: "Face Capture",      system: "SPXPerformance" },
+        { id: "mocap_hands",     label: "Hand Capture",      system: "SPXPerformance" },
+        { id: "mocap_multicam",  label: "Multi-Camera",      system: "SPXPerformance" },
+      ],
+    },
+    {
+      folder: "MoCap Pipeline",
+      items: [
+        { id: "mocap_retarget",  label: "Retarget Frame",    system: "MocapRetarget"  },
+        { id: "mocap_bake",      label: "Bake Animation",    system: "MocapRetarget"  },
+        { id: "mocap_footfix",   label: "Fix Foot Sliding",  system: "MocapRetarget"  },
+        { id: "mocap_automap",   label: "Auto Bone Map",     system: "MocapRetarget"  },
+        { id: "mocap_bvh_import",label: "Import BVH",        system: "BVHImporter"    },
+        { id: "mocap_bvh_export",label: "Export BVH",        system: "MocapRetarget"  },
+      ],
+    },
+    {
+      folder: "Avatar",
+      items: [
+        { id: "avatar_ybot",     label: "Y Bot (Default)",   system: "SPXPerformance" },
+        { id: "avatar_load",     label: "Load GLB Avatar",   system: "SPXPerformance" },
+        { id: "avatar_export",   label: "Export Baked GLB",  system: "SPXPerformance" },
+      ],
+    },
+    {
+      folder: "AI Animation",
+      items: [
+        { id: "ai_anim_assist",  label: "AI Assistant",      system: "AIAnimationAssistant" },
+        { id: "ai_walk_gen",     label: "Walk Cycle Gen",    system: "WalkCycleGenerator"   },
+        { id: "ai_pose_match",   label: "Pose Matching",     system: "SPXPerformance"       },
+      ],
+    },
+  ],
 
   Modeling: [
     {

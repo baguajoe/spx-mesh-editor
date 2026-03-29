@@ -116,7 +116,30 @@ export function exportTexture(paintCanvas, format = "image/png") {
   return paintCanvas.canvas.toDataURL(format);
 }
 
-// ── Export all maps (albedo, normal placeholder) ──────────────────────────────
+// ── Export all maps (albedo + generated normal map via Sobel filter) ──────────
+// Generate normal map from height/albedo using Sobel filter
+export function generateNormalMap(albedoCanvas, strength = 2.0) {
+  const w = albedoCanvas.width, h = albedoCanvas.height;
+  const src = albedoCanvas.getContext('2d').getImageData(0, 0, w, h);
+  const out = new ImageData(w, h);
+  for (let y = 1; y < h-1; y++) {
+    for (let x = 1; x < w-1; x++) {
+      const idx = (y*w+x)*4;
+      const tl = src.data[((y-1)*w+(x-1))*4]/255, t = src.data[((y-1)*w+x)*4]/255, tr = src.data[((y-1)*w+(x+1))*4]/255;
+      const l  = src.data[(y*w+(x-1))*4]/255,                                        r  = src.data[(y*w+(x+1))*4]/255;
+      const bl = src.data[((y+1)*w+(x-1))*4]/255, b = src.data[((y+1)*w+x)*4]/255, br = src.data[((y+1)*w+(x+1))*4]/255;
+      const dX = (tr + 2*r + br - tl - 2*l - bl) * strength;
+      const dY = (bl + 2*b + br - tl - 2*t - tr) * strength;
+      const len = Math.sqrt(dX*dX + dY*dY + 1);
+      out.data[idx]   = Math.round((-dX/len*0.5+0.5)*255);
+      out.data[idx+1] = Math.round((-dY/len*0.5+0.5)*255);
+      out.data[idx+2] = Math.round((1/len*0.5+0.5)*255);
+      out.data[idx+3] = 255;
+    }
+  }
+  const canvas = document.createElement('canvas'); canvas.width=w; canvas.height=h;
+  canvas.getContext('2d').putImageData(out,0,0); return canvas;
+}
 export function exportMaps(stack) {
   const flat = flattenLayers(stack);
   return {

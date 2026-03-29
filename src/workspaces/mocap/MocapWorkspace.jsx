@@ -116,7 +116,7 @@ function LiveCaptureTab({ onExportGlb }) {
   const [trackFace,      setTrackFace]      = useState(true);
   const [trackHands,     setTrackHands]     = useState(true);
   const [showOverlay,    setShowOverlay]    = useState(true);
-  const [avatarUrl,      setAvatarUrl]      = useState('');
+  const [avatarUrl,      setAvatarUrl]      = useState('/ybot.glb'); // Y Bot default
   const [error,          setError]          = useState(null);
 
   const { faceFrame, status: faceStatus, start: startFace, stop: stopFace } = useFaceMocap(videoRef, trackFace);
@@ -300,7 +300,21 @@ function LiveCaptureTab({ onExportGlb }) {
         </select>
 
         {/* Avatar URL */}
-        <div className="mw-section-label">Avatar GLB</div>
+        <div className="mw-section-label">Avatar</div>
+        <div style={{display:'flex',gap:4,marginBottom:6,flexWrap:'wrap'}}>
+          {[
+            {label:'Y Bot',  url:'/ybot.glb'},
+            {label:'Upload', url:null},
+          ].map(p => (
+            <button key={p.label}
+              className={`mw-btn${avatarUrl===p.url?' mw-btn-active':''}`}
+              style={{fontSize:10,padding:'3px 8px',background:avatarUrl===p.url?'#00ffc822':'#0a1628',border:`1px solid ${avatarUrl===p.url?'#00ffc8':'#1a2a3a'}`,color:avatarUrl===p.url?'#00ffc8':'#888',borderRadius:3,cursor:'pointer'}}
+              onClick={()=>{ if(p.url) setAvatarUrl(p.url); }}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <div className="mw-section-label">GLB URL / Path</div>
         <input className="mw-input" value={avatarUrl} onChange={e => setAvatarUrl(e.target.value)} />
 
         {/* Buttons */}
@@ -382,7 +396,7 @@ function LiveCaptureTab({ onExportGlb }) {
             liveFrame={isPlaying ? null : liveFrame}
             recordedFrames={isPlaying ? recordedFrames : null}
             smoothingEnabled={false}
-          /> : <div className="mw-avatar-empty">Enter a GLB URL above to load avatar</div>}
+          /> : <div className="mw-avatar-empty">⟳ Loading Y Bot avatar...</div>}
         </div>
       </div>
     </div>
@@ -399,7 +413,7 @@ function PlaybackTab({ onExportGlb }) {
   const [isPlaying,     setIsPlaying]     = useState(false);
   const [playIdx,       setPlayIdx]       = useState(0);
   const [speed,         setSpeed]         = useState(1);
-  const [avatarUrl,     setAvatarUrl]     = useState('');
+  const [avatarUrl,     setAvatarUrl]     = useState('/ybot.glb'); // Y Bot default
   const intervalRef = useRef(null);
 
   useEffect(() => {

@@ -4,7 +4,17 @@
  * Connects to Anthropic API — credits deducted via StreamPireX credit system on integration
  */
 
-// ── Credit hook (stubbed — wires to StreamPireX /api/ai/credits on integration) ──
+// ── Credit hook — wires to StreamPireX /api/ai/credits ──────────────────────────
+const BACKEND = typeof import.meta !== 'undefined' ? (import.meta.env?.VITE_BACKEND_URL || '') : '';
+async function deductCredit(userId, amount = 1) {
+  try {
+    const r = await fetch(`${BACKEND}/api/ai/credits/deduct`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, amount, service: 'ai_animation' })
+    });
+    return r.ok;
+  } catch { return false; }
+}
 export async function deductAICredit(userId, action) {
   if (window.SPX_CREDITS) {
     return await window.SPX_CREDITS.deduct(userId, action);
