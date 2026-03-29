@@ -213,19 +213,18 @@ export default function App() {
 
   const openWorkspaceTool = (toolId) => {
     // ── Grouped tab dispatchers ───────────────────────────────────────────────
-    if (toolId === "sculpt_workspace")   { closeAllWorkspacePanels(); ensureWorkspaceMesh("sculpt"); return; }
     if (toolId === "materials_textures") { closeAllWorkspacePanels(); setMaterialPanelOpen?.(true); setPaintPanelOpen?.(true); return; }
-    if (toolId === "clothing_pattern")   { closeAllWorkspacePanels(); setClothingPanelOpen?.(true); setPatternPanelOpen?.(true); setFabricPanelOpen?.(true); ensureWorkspaceMesh("clothing"); return; }
-    if (toolId === "hair_suite")         { closeAllWorkspacePanels(); setHairPanelOpen?.(true); setHairAdvancedOpen?.(true); setHairFXOpen?.(true); ensureWorkspaceMesh("hair"); return; }
-    if (toolId === "rigging_suite")      { closeAllWorkspacePanels(); setAutoRigOpen?.(true); setAdvancedRigOpen?.(true); ensureWorkspaceMesh("rigging"); return; }
+    if (toolId === "clothing_pattern")   { closeAllWorkspacePanels(); setClothingPanelOpen?.(true); setPatternPanelOpen?.(true); setFabricPanelOpen?.(true); return; }
+    if (toolId === "hair_suite")         { closeAllWorkspacePanels(); setHairPanelOpen?.(true); setHairAdvancedOpen?.(true); setHairFXOpen?.(true); return; }
+    if (toolId === "rigging_suite")      { closeAllWorkspacePanels(); setAutoRigOpen?.(true); setAdvancedRigOpen?.(true); return; }
 
     closeAllWorkspacePanels();
 
     if (toolId === "uv") setUvPanelOpen?.(true);
     else if (toolId === "materials") setMaterialPanelOpen?.(true);
     else if (toolId === "paint") setPaintPanelOpen?.(true);
-    else if (toolId === "clothing") { setClothingPanelOpen?.(true); ensureWorkspaceMesh("clothing"); }
-    else if (toolId === "pattern") { setPatternPanelOpen?.(true); ensureWorkspaceMesh("pattern"); }
+    else if (toolId === "clothing") setClothingPanelOpen?.(true);
+    else if (toolId === "pattern") setPatternPanelOpen?.(true);
     else if (toolId === "hair") setHairPanelOpen?.(true);
     else if (toolId === "collaborate") setCollaboratePanelOpen?.(true);
     else if (toolId === "lighting") setLightingCameraPanelOpen?.(true);
@@ -1540,80 +1539,6 @@ export default function App() {
   }, []);
 
   // ── Add primitive ──────────────────────────────────────────────────────────
-  // ── Workspace default model loader ─────────────────────────────────────────
-  // Uses active mesh if scene has one, otherwise loads the right starter model
-  const ensureWorkspaceMesh = useCallback((workspaceType) => {
-    // If there's already an active object in the scene, use it
-    if (activeObjId && meshRef.current) {
-      setStatus(`Using active mesh for ${workspaceType}`);
-      return;
-    }
-    // If scene has any objects at all, activate the first one
-    if (sceneObjects.length > 0 && sceneObjects[0].mesh) {
-      const first = sceneObjects[0];
-      setActiveObjId(first.id);
-      meshRef.current = first.mesh;
-      setStatus(`Using ${first.name || "scene mesh"} for ${workspaceType}`);
-      return;
-    }
-    // Scene is empty — load the right default model
-    const DEFAULTS = {
-      sculpt:   { type: "sphere",      label: "Base Sculpt Sphere",  params: { radius: 1, segments: 64 } },
-      hair:     { type: "glb",         label: "Head Mesh",           url: "/models/michelle.glb" },
-      clothing: { type: "glb",         label: "Body Mesh",           url: "/models/michelle.glb" },
-      pattern:  { type: "glb",         label: "Body for Draping",    url: "/models/michelle.glb" },
-      fabric:   { type: "glb",         label: "Body Mesh",           url: "/models/michelle.glb" },
-      shading:  { type: "sphere",      label: "Shading Preview Sphere", params: { radius: 1, segments: 32 } },
-      modeling: { type: "box",         label: "Default Box",         params: {} },
-      rigging:  { type: "glb",         label: "Y Bot Rig",           url: "/models/ybot.glb" },
-      vfx:      { type: "sphere",      label: "VFX Target",          params: { radius: 0.5, segments: 32 } },
-    };
-    const def = DEFAULTS[workspaceType];
-    if (!def) return;
-    if (def.type === "glb") {
-      // Load GLB via THREE GLTFLoader
-      const loader = new window.THREE?.GLTFLoader?.() || null;
-      if (!loader && typeof window !== "undefined") {
-        // Fallback: use importGLB if available
-        fetch(def.url)
-          .then(r => r.blob())
-          .then(blob => {
-            const file = new File([blob], def.url.split("/").pop(), { type: "model/gltf-binary" });
-            importGLB(file);
-            setStatus(`Loaded ${def.label}`);
-          })
-          .catch(() => setStatus(`Could not load ${def.label} — drag in a GLB or add a mesh`));
-        return;
-      }
-      setStatus(`Loading ${def.label}...`);
-      import("three/examples/jsm/loaders/GLTFLoader.js").then(({ GLTFLoader }) => {
-        const gltfLoader = new GLTFLoader();
-        gltfLoader.load(def.url, (gltf) => {
-          const model = gltf.scene;
-          model.name = def.label;
-          sceneRef.current?.add(model);
-          const id = Date.now();
-          const newObj = { id, name: def.label, mesh: model, userData: { type: "glb", url: def.url } };
-          setSceneObjects(prev => [...prev, newObj]);
-          setActiveObjId(id);
-          meshRef.current = model;
-          setStatus(`✓ ${def.label} loaded — ready for ${workspaceType}`);
-        }, undefined, () => {
-          // GLB failed — add a primitive as fallback
-          addPrimitive("Sphere");
-          setStatus(`${def.label} unavailable — using sphere`);
-        });
-      }).catch(() => {
-        addPrimitive("Sphere");
-        setStatus(`Fallback: sphere loaded for ${workspaceType}`);
-      });
-    } else {
-      // Add a Three.js primitive
-      addPrimitive(def.type === "sphere" ? "Sphere" : "Box");
-      setStatus(`✓ ${def.label} loaded — ready for ${workspaceType}`);
-    }
-  }, [activeObjId, sceneObjects, meshRef, sceneRef, addPrimitive, setActiveObjId, importGLB]);
-
   const addPrimitive = useCallback(
     (type) => {
       // addSceneObject handles everything — creates mesh, adds to scene, stores in sceneObjects
