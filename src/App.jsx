@@ -57,6 +57,7 @@ import { voxelRemesh, quadRemesh, symmetrizeMesh, getRemeshStats } from "./mesh/
 import { createRenderFarm, addRenderFarmJob, cancelRenderJob, runNextRenderJob, getRenderFarmStats, detectWebGPU, getWebGLInfo, applyIBLToScene, setupCascadedShadows, enableShadowsOnScene, createNPROutlinePass } from "./mesh/RenderFarm.js";
 import { createAdvancedShapeKey, addAdvancedShapeKey, removeShapeKey, evaluateShapeKeysAdvanced, mirrorShapeKey, blendShapeKeys, driverShapeKey, buildMorphTargetsFromKeys, getShapeKeyStats } from "./mesh/ShapeKeysAdvanced.js";
 import { exportOBJ, parseOBJ, importFBXFromBackend, exportFBXToBackend, exportAlembic, exportUSD } from "./mesh/FBXPipeline.js";
+import { sendMeshToStreamPireX } from "./mesh/StreamPireXBridge.js";
 import { heatMapWeights, bindSkeletonAdvanced, normalizeAllWeights, paintBoneWeight, getBindingStats } from "./mesh/SkeletalBinding.js";
 import { initVertexColors, paintVertexColor, fillVertexColor, gradientFillVertexColor } from "./mesh/VertexColorPainter.js";
 import { createUDIMLayout, createUDIMTileCanvas, paintUDIM, fillUDIMTile, exportUDIMTile, exportAllUDIMTiles, buildUDIMAtlas, getUDIMStats } from "./mesh/UDIMSystem.js";
@@ -2173,6 +2174,9 @@ export default function App() {
         a.href = url;
         a.download = "spx_mesh.glb";
         a.click();
+        if (localStorage.getItem("jwt-token") || localStorage.getItem("token")) {
+          sendMeshToStreamPireX(blob, "spx_mesh", { polycount: meshRef.current?.geometry?.attributes?.position?.count || 0 }, (s) => console.log("[SPX Bridge]", s)).catch(e => console.warn("[SPX Bridge]", e));
+        }
         localStorage.setItem(
           "spx_mesh_export",
           JSON.stringify({
@@ -2220,6 +2224,7 @@ export default function App() {
     if (fn === "exportSpxScene")      { exportSpxScene(); return; }
     if (fn === "importSpxScene")      { if (arg) importSpxScene(arg); return; }
     if (fn === "exportGLB")           { exportGLB(); return; }
+    if (fn === "sendToStreamPireX")   { exportGLB(); return; }
     if (fn === "importGLB")           { if (arg) importGLB(arg); return; }
     if (fn === "importOBJ")           { setStatus("OBJ import — select a .obj file"); return; }
     if (fn === "importFBX")           { setStatus("FBX import via backend"); return; }
