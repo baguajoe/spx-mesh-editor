@@ -119,8 +119,6 @@ import "./styles/hair-editor.css";
 import HairAdvancedPanel from "./components/hair/HairAdvancedPanel.jsx";
 import "./styles/hair-advanced.css";
 import HairFXPanel from "./components/hair/HairFXPanel.jsx";
-import CollaboratePanel from "./components/collaboration/CollaboratePanel.jsx";
-import GreasePencilPanel from "./components/greasepencil/GreasePencilPanel.jsx";
 import "./styles/hair-fx.css";
 import "./styles/workspace-tools.css";
 import AutoRigPanel from "./components/rig/AutoRigPanel.jsx";
@@ -225,8 +223,6 @@ export default function App() {
     else if (toolId === "clothing") setClothingPanelOpen?.(true);
     else if (toolId === "pattern") setPatternPanelOpen?.(true);
     else if (toolId === "hair") setHairPanelOpen?.(true);
-    else if (toolId === "collaborate") setCollaboratePanelOpen?.(true);
-    else if (toolId === "grease_pencil") setGreasePencilPanelOpen?.(true);
     else if (toolId === "hair_adv") setHairAdvancedOpen?.(true);
     else if (toolId === "hair_fx") setHairFXOpen?.(true);
     else if (toolId === "autorig") setAutoRigOpen?.(true);
@@ -295,8 +291,6 @@ export default function App() {
 
 
   const [hairPanelOpen, setHairPanelOpen] = useState(false);
-  const [collaboratePanelOpen, setCollaboratePanelOpen] = useState(false);
-  const [greasePencilPanelOpen, setGreasePencilPanelOpen] = useState(false);
 
   useEffect(() => {
     const onHairKey = (e) => {
@@ -396,8 +390,6 @@ export default function App() {
     setFabricPanelOpen(false);
     setPatternPanelOpen(false);
     setHairPanelOpen(false);
-    setCollaboratePanelOpen(false);
-    setGreasePencilPanelOpen(false);
     setHairAdvancedOpen(false);
     setHairFXOpen(false);
     setAutoRigOpen(false);
@@ -2425,24 +2417,11 @@ export default function App() {
     if (fn === "mocap_bake")          { if(bvhData&&armatures[0]){bakeRetargetedAnimation(bvhData,boneMap,armatures[0]);setStatus("Animation baked");} return; }
     if (fn === "mocap_footfix")       { if(armatures[0]){fixFootSliding(armatures[0]);setStatus("Foot sliding fixed");} return; }
     if (fn === "mocap_automap")       { if(bvhData&&armatures[0]){const m=autoDetectBoneMap(Object.keys(bvhData.joints||{}),armatures[0].bones?.map(b=>b.name)||[]);setBoneMap(m);setStatus("Bone map detected");} return; }
-    if (fn === "mocap_live")          { setMocapWorkspaceOpen(true); setStatus("Live MoCap — webcam"); return; }
-    if (fn === "mocap_video")         { setMocapWorkspaceOpen(true); setStatus("Video MoCap"); return; }
-    if (fn === "avatar_ybot")         { setMocapWorkspaceOpen(true); setStatus("Y Bot avatar loaded"); return; }
-    if (fn === "avatar_load")         { setMocapWorkspaceOpen(true); setStatus("Load GLB avatar"); return; }
-    if (fn === "ai_anim_assist")      { setShowPerformancePanel(true); setStatus("AI Animation Assistant"); return; }
-    if (fn === "mocap_bvh_export")    { if(bvhData){downloadBVH?.(bvhData,"spx_mocap.bvh");setStatus("BVH exported");} return; }
-    if (fn === "ai_pose_match")       { setStatus("AI Pose Matching — select source clip"); return; }
 
     // ── Animation ─────────────────────────────────────────────────────────────
     if (fn === "add_keyframe")        { if(meshRef.current){recordKeyframe(meshRef.current,"position",meshRef.current.position.clone());setStatus("Keyframe at frame "+currentFrame);} return; }
     if (fn === "auto_key")            { setAutoKey(v=>!v); setStatus(isAutoKey?"Auto key OFF":"Auto key ON"); return; }
     if (fn === "push_action")         { const a=createAction("Action_"+Date.now()); setNlaActions(p=>[...p,a]); setStatus("Action pushed"); return; }
-    if (fn === "collaborate")       { setCollaboratePanelOpen(true); return; }
-    if (fn === "collab_snapshot")   { const snap = createVersionSnapshot(sceneObjects, prompt("Version note:","v"+Date.now())||""); setStatus("Version snapshot saved — "+snap.message); return; }
-    if (fn === "collab_comment")    { const pin = createCommentPin(meshRef.current?.position||{x:0,y:0,z:0}, prompt("Comment:",""),"user"); setStatus("Comment pin added"); return; }
-    if (fn === "grease_pencil")     { setGreasePencilPanelOpen(true); return; }
-    if (fn === "gp_layer")          { const l = createLayer("Layer_"+Date.now()); setStatus("Grease Pencil layer created"); return; }
-    if (fn === "gp_stroke")         { const s = createStroke([]); setStatus("Grease Pencil stroke created"); return; }
     if (fn === "bake_nla")            { if(typeof window.bakeNLA==="function"){window.bakeNLA(nlaTracks,nlaActions,0,120);setStatus("NLA baked");} return; }
     if (fn === "shapekey_new")        { if(meshRef.current){const sk=createShapeKey("Key_"+shapeKeys.length,meshRef.current);setShapeKeys(p=>[...p,sk]);setStatus("Shape key created");} return; }
     if (fn === "shapekey_apply")      { if(meshRef.current){applyShapeKeys(meshRef.current,shapeKeys);setStatus("Shape keys applied");} return; }
@@ -3033,26 +3012,6 @@ export default function App() {
         setStatus={setStatus}
       />
 
-
-      {/* Collaborate Panel */}
-      {collaboratePanelOpen && (
-        <div style={{position:"fixed",top:60,right:0,width:360,height:"calc(100vh - 60px)",zIndex:50,background:"#0d1117",borderLeft:"1px solid #21262d",display:"flex",flexDirection:"column",overflow:"hidden"}}>
-          <CollaboratePanel
-            sceneObjects={sceneObjects}
-            onClose={() => setCollaboratePanelOpen(false)}
-          />
-        </div>
-      )}
-
-      {/* Grease Pencil Panel */}
-      {greasePencilPanelOpen && (
-        <div style={{position:"fixed",top:60,right:0,width:320,height:"calc(100vh - 60px)",zIndex:50,background:"#0d1117",borderLeft:"1px solid #21262d",display:"flex",flexDirection:"column",overflow:"hidden"}}>
-          <GreasePencilPanel
-            onApplyFunction={applyFunction}
-            onClose={() => setGreasePencilPanelOpen(false)}
-          />
-        </div>
-      )}
 
       <MocapWorkspace
         open={mocapWorkspaceOpen}
