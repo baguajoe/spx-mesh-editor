@@ -120,7 +120,6 @@ import HairAdvancedPanel from "./components/hair/HairAdvancedPanel.jsx";
 import "./styles/hair-advanced.css";
 import HairFXPanel from "./components/hair/HairFXPanel.jsx";
 import CollaboratePanel from "./components/collaboration/CollaboratePanel.jsx";
-import LightingCameraPanel from "./components/scene/LightingCameraPanel.jsx";
 import GreasePencilPanel from "./components/greasepencil/GreasePencilPanel.jsx";
 import "./styles/hair-fx.css";
 import "./styles/workspace-tools.css";
@@ -227,9 +226,6 @@ export default function App() {
     else if (toolId === "pattern") setPatternPanelOpen?.(true);
     else if (toolId === "hair") setHairPanelOpen?.(true);
     else if (toolId === "collaborate") setCollaboratePanelOpen?.(true);
-    else if (toolId === "lighting") setLightingCameraPanelOpen?.(true);
-    else if (toolId === "camera") setLightingCameraPanelOpen?.(true);
-    else if (toolId === "lighting_camera") setLightingCameraPanelOpen?.(true);
     else if (toolId === "grease_pencil") setGreasePencilPanelOpen?.(true);
     else if (toolId === "hair_adv") setHairAdvancedOpen?.(true);
     else if (toolId === "hair_fx") setHairFXOpen?.(true);
@@ -300,7 +296,6 @@ export default function App() {
 
   const [hairPanelOpen, setHairPanelOpen] = useState(false);
   const [collaboratePanelOpen, setCollaboratePanelOpen] = useState(false);
-  const [lightingCameraPanelOpen, setLightingCameraPanelOpen] = useState(false);
   const [greasePencilPanelOpen, setGreasePencilPanelOpen] = useState(false);
 
   useEffect(() => {
@@ -402,7 +397,6 @@ export default function App() {
     setPatternPanelOpen(false);
     setHairPanelOpen(false);
     setCollaboratePanelOpen(false);
-    setLightingCameraPanelOpen(false);
     setGreasePencilPanelOpen(false);
     setHairAdvancedOpen(false);
     setHairFXOpen(false);
@@ -3039,19 +3033,6 @@ export default function App() {
         setStatus={setStatus}
       />
 
-
-      {/* Lighting & Camera Panel */}
-      {lightingCameraPanelOpen && (
-        <div style={{position:"fixed",top:0,right:0,width:380,height:"100vh",zIndex:60,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-          <LightingCameraPanel
-            sceneRef={sceneRef}
-            cameraRef={cameraRef}
-            cameras={cameras}
-            onApplyFunction={applyFunction}
-            onClose={() => setLightingCameraPanelOpen(false)}
-          />
-        </div>
-      )}
 
       {/* Collaborate Panel */}
       {collaboratePanelOpen && (

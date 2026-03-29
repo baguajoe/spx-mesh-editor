@@ -463,7 +463,8 @@ export const WORKSPACE_TREE = {
       ],
     },
     {
-      folder: "Lighting",
+      folder: "Lighting & Camera",
+      toolId: "lighting_camera",
       items: [
         { id: "light_point",     label: "Point Light",     system: "LightSystem" },
         { id: "light_spot",      label: "Spot Light",      system: "LightSystem" },
