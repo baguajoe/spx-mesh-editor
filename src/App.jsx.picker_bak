@@ -302,9 +302,6 @@ export default function App() {
   const [hairPanelOpen, setHairPanelOpen] = useState(false);
   const [collaboratePanelOpen, setCollaboratePanelOpen] = useState(false);
   const [lightingCameraPanelOpen, setLightingCameraPanelOpen] = useState(false);
-  const [showModelPicker, setShowModelPicker] = useState(false);
-  const [activeModelUrl, setActiveModelUrl] = useState(null);
-  const [modelPickerContext, setModelPickerContext] = useState("general");
   const [greasePencilPanelOpen, setGreasePencilPanelOpen] = useState(false);
 
   useEffect(() => {
@@ -1543,35 +1540,6 @@ export default function App() {
   }, []);
 
   // ── Add primitive ──────────────────────────────────────────────────────────
-  // ── Load a specific model into the scene ────────────────────────────────────
-  const loadModelToScene = useCallback((url, label) => {
-    // Remove existing default models (keep user-added meshes)
-    const DEFAULT_URLS = ["/models/michelle.glb", "/models/xbot.glb", "/models/ybot.glb", "/ybot.glb"];
-    setSceneObjects(prev => {
-      const toRemove = prev.filter(o => DEFAULT_URLS.includes(o.userData?.url));
-      toRemove.forEach(o => { if(o.mesh) sceneRef.current?.remove(o.mesh); });
-      return prev.filter(o => !DEFAULT_URLS.includes(o.userData?.url));
-    });
-    setActiveModelUrl(url);
-    setShowModelPicker(false);
-    // Load via dynamic GLTFLoader
-    import("three/examples/jsm/loaders/GLTFLoader.js").then(({ GLTFLoader }) => {
-      const loader = new GLTFLoader();
-      setStatus(`Loading ${label}...`);
-      loader.load(url, (gltf) => {
-        const model = gltf.scene;
-        model.name = label;
-        sceneRef.current?.add(model);
-        const id = Date.now();
-        const newObj = { id, name: label, mesh: model, userData: { type:"glb", url } };
-        setSceneObjects(prev => [...prev, newObj]);
-        setActiveObjId(id);
-        meshRef.current = model;
-        setStatus(`✓ ${label} loaded`);
-      }, undefined, () => setStatus(`Could not load ${label}`));
-    }).catch(() => setStatus(`GLTFLoader unavailable`));
-  }, [sceneRef, meshRef, setSceneObjects, setActiveObjId]);
-
   // ── Workspace default model loader ─────────────────────────────────────────
   // Uses active mesh if scene has one, otherwise loads the right starter model
   const ensureWorkspaceMesh = useCallback((workspaceType) => {
@@ -1603,11 +1571,42 @@ export default function App() {
     const def = DEFAULTS[workspaceType];
     if (!def) return;
     if (def.type === "glb") {
-      // Show model picker so user can choose or confirm default
-      setModelPickerContext(workspaceType);
-      setShowModelPicker(true);
-      // Also auto-load the default
-      loadModelToScene(def.url, def.label);
+      // Load GLB via THREE GLTFLoader
+      const loader = new window.THREE?.GLTFLoader?.() || null;
+      if (!loader && typeof window !== "undefined") {
+        // Fallback: use importGLB if available
+        fetch(def.url)
+          .then(r => r.blob())
+          .then(blob => {
+            const file = new File([blob], def.url.split("/").pop(), { type: "model/gltf-binary" });
+            importGLB(file);
+            setStatus(`Loaded ${def.label}`);
+          })
+          .catch(() => setStatus(`Could not load ${def.label} — drag in a GLB or add a mesh`));
+        return;
+      }
+      setStatus(`Loading ${def.label}...`);
+      import("three/examples/jsm/loaders/GLTFLoader.js").then(({ GLTFLoader }) => {
+        const gltfLoader = new GLTFLoader();
+        gltfLoader.load(def.url, (gltf) => {
+          const model = gltf.scene;
+          model.name = def.label;
+          sceneRef.current?.add(model);
+          const id = Date.now();
+          const newObj = { id, name: def.label, mesh: model, userData: { type: "glb", url: def.url } };
+          setSceneObjects(prev => [...prev, newObj]);
+          setActiveObjId(id);
+          meshRef.current = model;
+          setStatus(`✓ ${def.label} loaded — ready for ${workspaceType}`);
+        }, undefined, () => {
+          // GLB failed — add a primitive as fallback
+          addPrimitive("Sphere");
+          setStatus(`${def.label} unavailable — using sphere`);
+        });
+      }).catch(() => {
+        addPrimitive("Sphere");
+        setStatus(`Fallback: sphere loaded for ${workspaceType}`);
+      });
     } else {
       // Add a Three.js primitive
       addPrimitive(def.type === "sphere" ? "Sphere" : "Box");
@@ -3061,21 +3060,6 @@ export default function App() {
         sceneRef={sceneRef}
         setStatus={setStatus}
       />
-      {/* Model picker trigger button */}
-      <button
-        onClick={() => { setModelPickerContext("general"); setShowModelPicker(v => !v); }}
-        title="Switch character model"
-        style={{
-          position:"fixed", bottom:44, left:8, zIndex:100,
-          background: showModelPicker ? "#00ffc822" : "#0a0a14",
-          border:`1px solid ${showModelPicker ? "#00ffc8" : "#1a2a3a"}`,
-          borderRadius:6, color: showModelPicker ? "#00ffc8" : "#5a7088",
-          padding:"5px 10px", fontSize:10, cursor:"pointer",
-          fontFamily:"JetBrains Mono,monospace", display:"flex", gap:5, alignItems:"center",
-        }}>
-        🧍 {activeModelUrl ? activeModelUrl.split("/").pop().replace(".glb","") : "Model"}
-      </button>
-
       <div className="spx-native-workspace-tabs" style={{left: showPerformancePanel ? 330 : 220}}>
         <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("uv")}>
           <span className="spx-native-workspace-tab-label">UV</span>
@@ -3130,73 +3114,6 @@ export default function App() {
         setStatus={setStatus}
       />
 
-
-      {/* ── Model Picker ── */}
-      {showModelPicker && (
-        <div style={{
-          position:"fixed", bottom:80, left:"50%", transform:"translateX(-50%)",
-          zIndex:200, background:"#0a0a14", border:"1px solid #1a2a3a",
-          borderRadius:8, padding:"12px 16px", display:"flex", gap:10,
-          alignItems:"center", boxShadow:"0 8px 32px rgba(0,0,0,0.8)",
-          fontFamily:"JetBrains Mono,monospace",
-        }}>
-          <span style={{fontSize:10,color:"#5a7088",marginRight:4}}>MODEL</span>
-          {[
-            { url:"/models/michelle.glb", label:"Michelle", thumb:"👩", desc:"Female character" },
-            { url:"/models/xbot.glb",     label:"X Bot",    thumb:"🤖", desc:"Male Mixamo rig" },
-            { url:"/models/ybot.glb",     label:"Y Bot",    thumb:"🦾", desc:"Female Mixamo rig" },
-          ].map(m => (
-            <button key={m.url} onClick={() => loadModelToScene(m.url, m.label)}
-              style={{
-                display:"flex", flexDirection:"column", alignItems:"center", gap:3,
-                padding:"8px 12px", borderRadius:6, cursor:"pointer",
-                border:`1px solid ${activeModelUrl===m.url?"#00ffc8":"#1a2a3a"}`,
-                background:activeModelUrl===m.url?"#00ffc822":"#070f1a",
-                color:activeModelUrl===m.url?"#00ffc8":"#ccc",
-                fontFamily:"inherit",
-              }}>
-              <span style={{fontSize:22}}>{m.thumb}</span>
-              <span style={{fontSize:10,fontWeight:700}}>{m.label}</span>
-              <span style={{fontSize:8,color:"#5a7088"}}>{m.desc}</span>
-            </button>
-          ))}
-          {/* Upload custom GLB */}
-          <label style={{
-            display:"flex", flexDirection:"column", alignItems:"center", gap:3,
-            padding:"8px 12px", borderRadius:6, cursor:"pointer",
-            border:"1px solid #1a2a3a", background:"#070f1a", color:"#ccc",
-            fontFamily:"inherit",
-          }}>
-            <span style={{fontSize:22}}>📂</span>
-            <span style={{fontSize:10,fontWeight:700}}>Upload</span>
-            <span style={{fontSize:8,color:"#5a7088"}}>Custom GLB</span>
-            <input type="file" accept=".glb,.gltf" style={{display:"none"}}
-              onChange={e => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                const url = URL.createObjectURL(file);
-                loadModelToScene(url, file.name.replace(/\.[^.]+$/,""));
-              }} />
-          </label>
-          {/* Use scene mesh if available */}
-          {sceneObjects.length > 0 && (
-            <button onClick={() => {
-              const first = sceneObjects.find(o => o.mesh);
-              if (first) { setActiveObjId(first.id); meshRef.current=first.mesh; setActiveModelUrl(null); setShowModelPicker(false); setStatus("Using scene mesh: "+first.name); }
-            }} style={{
-              display:"flex", flexDirection:"column", alignItems:"center", gap:3,
-              padding:"8px 12px", borderRadius:6, cursor:"pointer",
-              border:"1px solid #FF6600", background:"#FF660011", color:"#FF6600", fontFamily:"inherit",
-            }}>
-              <span style={{fontSize:22}}>🎯</span>
-              <span style={{fontSize:10,fontWeight:700}}>Use Mine</span>
-              <span style={{fontSize:8,color:"#5a7088"}}>Scene mesh</span>
-            </button>
-          )}
-          <button onClick={() => setShowModelPicker(false)}
-            style={{alignSelf:"flex-start",background:"none",border:"none",color:"#5a7088",cursor:"pointer",fontSize:16,padding:"2px 6px"}}>✕</button>
-        </div>
-      )}
 
       {/* Lighting & Camera Panel */}
       {lightingCameraPanelOpen && (
