@@ -121,6 +121,22 @@ import "./styles/hair-advanced.css";
 import HairFXPanel from "./components/hair/HairFXPanel.jsx";
 import CollaboratePanel from "./components/collaboration/CollaboratePanel.jsx";
 import LightingCameraPanel from "./components/scene/LightingCameraPanel.jsx";
+
+// ── VFX Panels ──
+import FluidPanel            from "./components/vfx/FluidPanel.jsx";
+import WeatherPanel          from "./components/vfx/WeatherPanel.jsx";
+import DestructionPanel      from "./components/vfx/DestructionPanel.jsx";
+
+// ── World / Generator Panels ──
+import EnvironmentGenerator    from "./components/generators/EnvironmentGenerator.jsx";
+import CityGenerator          from "./components/generators/CityGenerator.jsx";
+import BuildingSimulator      from "./components/generators/BuildingSimulator.jsx";
+import PhysicsSimulation      from "./components/generators/PhysicsSimulation.jsx";
+import AssetLibraryPanel      from "./components/generators/AssetLibrary.jsx";
+import NodeModifierSystem     from "./components/generators/NodeModifierSystem.jsx";
+import VRPreviewMode          from "./components/generators/VRPreviewMode.jsx";
+import ProceduralCrowdGenerator from "./components/generators/ProceduralCrowdGenerator.jsx";
+import TerrainSculpting       from "./components/generators/TerrainSculpting.jsx";
 import GreasePencilPanel from "./components/greasepencil/GreasePencilPanel.jsx";
 import "./styles/hair-fx.css";
 import "./styles/workspace-tools.css";
@@ -232,6 +248,18 @@ export default function App() {
     else if (toolId === "camera") setLightingCameraPanelOpen?.(true);
     else if (toolId === "lighting_camera") setLightingCameraPanelOpen?.(true);
     else if (toolId === "grease_pencil") setGreasePencilPanelOpen?.(true);
+    else if (toolId === "fluid")        setFluidPanelOpen?.(true);
+    else if (toolId === "weather")      setWeatherPanelOpen?.(true);
+    else if (toolId === "destruction")  setDestructionPanelOpen?.(true);
+    else if (toolId === "env_gen")      setEnvGenOpen?.(true);
+    else if (toolId === "city_gen")     setCityGenOpen?.(true);
+    else if (toolId === "building")     setBuildingOpen?.(true);
+    else if (toolId === "physics_sim")  setPhysicsOpen?.(true);
+    else if (toolId === "asset_lib")    setAssetLibOpen?.(true);
+    else if (toolId === "node_mod")     setNodeModOpen?.(true);
+    else if (toolId === "vr_preview")   setVrPreviewOpen?.(true);
+    else if (toolId === "crowd_gen")    setCrowdGenOpen?.(true);
+    else if (toolId === "terrain")      setTerrainOpen?.(true);
     else if (toolId === "hair_adv") setHairAdvancedOpen?.(true);
     else if (toolId === "hair_fx") setHairFXOpen?.(true);
     else if (toolId === "autorig") setAutoRigOpen?.(true);
@@ -302,6 +330,20 @@ export default function App() {
   const [hairPanelOpen, setHairPanelOpen] = useState(false);
   const [collaboratePanelOpen, setCollaboratePanelOpen] = useState(false);
   const [lightingCameraPanelOpen, setLightingCameraPanelOpen] = useState(false);
+  // ── VFX panels ──
+  const [fluidPanelOpen,       setFluidPanelOpen]       = useState(false);
+  const [weatherPanelOpen,     setWeatherPanelOpen]     = useState(false);
+  const [destructionPanelOpen, setDestructionPanelOpen] = useState(false);
+  // ── Generator / World panels ──
+  const [envGenOpen,     setEnvGenOpen]     = useState(false);
+  const [cityGenOpen,    setCityGenOpen]    = useState(false);
+  const [buildingOpen,   setBuildingOpen]   = useState(false);
+  const [physicsOpen,    setPhysicsOpen]    = useState(false);
+  const [assetLibOpen,   setAssetLibOpen]   = useState(false);
+  const [nodeModOpen,    setNodeModOpen]    = useState(false);
+  const [vrPreviewOpen,  setVrPreviewOpen]  = useState(false);
+  const [crowdGenOpen,   setCrowdGenOpen]   = useState(false);
+  const [terrainOpen,    setTerrainOpen]    = useState(false);
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [activeModelUrl, setActiveModelUrl] = useState(null);
   const [modelPickerContext, setModelPickerContext] = useState("general");
@@ -2538,6 +2580,19 @@ export default function App() {
     if (fn === "vfx_sparks")          { if(typeof window.createEmitter==="function"&&window.VFX_PRESETS){const e=window.createEmitter(window.VFX_PRESETS.sparks);setStatus("Sparks emitter created");} return; }
     if (fn === "vfx_burst")           { if(typeof window.burstEmit==="function"){window.burstEmit(null,meshRef.current?.position,100);setStatus("Burst emitted");} return; }
     if (fn === "fluid_water")         { if(typeof window.createFluidSettings==="function"&&window.FLUID_PRESETS){window.createFluidSettings(window.FLUID_PRESETS.water);setStatus("Water fluid created");} return; }
+    
+    if (fn === "open_fluid")        { setFluidPanelOpen(true); return; }
+    if (fn === "open_weather")      { setWeatherPanelOpen(true); return; }
+    if (fn === "open_destruction")  { setDestructionPanelOpen(true); return; }
+    if (fn === "open_env_gen")      { setEnvGenOpen(true); return; }
+    if (fn === "open_city_gen")     { setCityGenOpen(true); return; }
+    if (fn === "open_building")     { setBuildingOpen(true); return; }
+    if (fn === "open_physics_sim")  { setPhysicsOpen(true); return; }
+    if (fn === "open_asset_lib")    { setAssetLibOpen(true); return; }
+    if (fn === "open_node_mod")     { setNodeModOpen(true); return; }
+    if (fn === "open_vr_preview")   { setVrPreviewOpen(true); return; }
+    if (fn === "open_crowd_gen")    { setCrowdGenOpen(true); return; }
+    if (fn === "open_terrain")      { setTerrainOpen(true); return; }
     if (fn === "fluid_pyro")          { if(typeof window.createPyroEmitter==="function"){window.createPyroEmitter(meshRef.current?.position||{x:0,y:0,z:0});setStatus("Pyro emitter created");} return; }
     if (fn === "rb_create")           { if(typeof window.createRigidBody==="function"&&meshRef.current){const rb=window.createRigidBody(meshRef.current);setRigidBodies(p=>[...p,rb]);setStatus("Rigid body created");} return; }
     if (fn === "rb_bake")             { if(typeof window.bakeRigidBodies==="function"){const b=window.bakeRigidBodies(rigidBodies,120);setBakedPhysics(b);setStatus("Physics baked");} return; }
@@ -3111,6 +3166,56 @@ export default function App() {
           <span className="spx-native-workspace-tab-label">SPX Performance</span>
           <span className="spx-native-workspace-tab-hint">P</span>
         </button>
+        {/* ── VFX Tabs ── */}
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("fluid")}>
+          <span className="spx-native-workspace-tab-label">💧 Fluid</span>
+          <span className="spx-native-workspace-tab-hint">Shift+F</span>
+        </button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("weather")}>
+          <span className="spx-native-workspace-tab-label">🌧 Weather</span>
+          <span className="spx-native-workspace-tab-hint">Shift+W</span>
+        </button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("destruction")}>
+          <span className="spx-native-workspace-tab-label">💥 Destruction</span>
+          <span className="spx-native-workspace-tab-hint">Shift+D</span>
+        </button>
+        {/* ── World / Generator Tabs ── */}
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("env_gen")}>
+          <span className="spx-native-workspace-tab-label">🌲 Environment</span>
+          <span className="spx-native-workspace-tab-hint">World</span>
+        </button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("city_gen")}>
+          <span className="spx-native-workspace-tab-label">🏙️ City Gen</span>
+          <span className="spx-native-workspace-tab-hint">World</span>
+        </button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("building")}>
+          <span className="spx-native-workspace-tab-label">🏗️ Building</span>
+          <span className="spx-native-workspace-tab-hint">World</span>
+        </button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("physics_sim")}>
+          <span className="spx-native-workspace-tab-label">⚙️ Physics</span>
+          <span className="spx-native-workspace-tab-hint">World</span>
+        </button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("asset_lib")}>
+          <span className="spx-native-workspace-tab-label">📦 Assets</span>
+          <span className="spx-native-workspace-tab-hint">World</span>
+        </button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("node_mod")}>
+          <span className="spx-native-workspace-tab-label">🔗 Nodes</span>
+          <span className="spx-native-workspace-tab-hint">World</span>
+        </button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("vr_preview")}>
+          <span className="spx-native-workspace-tab-label">🥽 VR Preview</span>
+          <span className="spx-native-workspace-tab-hint">World</span>
+        </button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("crowd_gen")}>
+          <span className="spx-native-workspace-tab-label">👥 Crowd</span>
+          <span className="spx-native-workspace-tab-hint">World</span>
+        </button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("terrain")}>
+          <span className="spx-native-workspace-tab-label">🏔️ Terrain</span>
+          <span className="spx-native-workspace-tab-hint">World</span>
+        </button>
       </div>
 
 
@@ -3228,6 +3333,107 @@ export default function App() {
             onApplyFunction={applyFunction}
             onClose={() => setGreasePencilPanelOpen(false)}
           />
+        </div>
+      )}
+
+      
+      {/* ══ VFX PANELS ══ */}
+      {fluidPanelOpen && (
+        <div style={{position:"fixed",top:0,right:0,width:340,height:"100vh",zIndex:60,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+          <FluidPanel open={fluidPanelOpen} onClose={() => setFluidPanelOpen(false)} sceneRef={sceneRef} setStatus={setStatus} />
+        </div>
+      )}
+      {weatherPanelOpen && (
+        <div style={{position:"fixed",top:0,right:0,width:340,height:"100vh",zIndex:60,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+          <WeatherPanel open={weatherPanelOpen} onClose={() => setWeatherPanelOpen(false)} sceneRef={sceneRef} setStatus={setStatus} />
+        </div>
+      )}
+      {destructionPanelOpen && (
+        <div style={{position:"fixed",top:0,right:0,width:360,height:"100vh",zIndex:60,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+          <DestructionPanel open={destructionPanelOpen} onClose={() => setDestructionPanelOpen(false)} sceneRef={sceneRef} meshRef={meshRef} setStatus={setStatus} onApplyFunction={handleApplyFunction} />
+        </div>
+      )}
+
+      {/* ══ WORLD / GENERATOR PANELS (full-screen overlays with own viewport) ══ */}
+      {envGenOpen && (
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:80,background:"#06060f",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",alignItems:"center",padding:"6px 12px",background:"#0a0a14",borderBottom:"1px solid #1a2a3a",gap:8}}>
+            <span style={{color:"#00ffc8",fontFamily:"JetBrains Mono,monospace",fontSize:11,fontWeight:700}}>🌲 ENVIRONMENT GENERATOR</span>
+            <button onClick={() => setEnvGenOpen(false)} style={{marginLeft:"auto",background:"none",border:"1px solid #1a2a3a",borderRadius:3,color:"#5a7088",cursor:"pointer",padding:"3px 10px",fontFamily:"JetBrains Mono,monospace",fontSize:10}}>✕ CLOSE</button>
+          </div>
+          <div style={{flex:1,overflow:"hidden"}}><EnvironmentGenerator /></div>
+        </div>
+      )}
+      {cityGenOpen && (
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:80,background:"#06060f",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",alignItems:"center",padding:"6px 12px",background:"#0a0a14",borderBottom:"1px solid #1a2a3a",gap:8}}>
+            <span style={{color:"#00ffc8",fontFamily:"JetBrains Mono,monospace",fontSize:11,fontWeight:700}}>🏙️ CITY GENERATOR</span>
+            <button onClick={() => setCityGenOpen(false)} style={{marginLeft:"auto",background:"none",border:"1px solid #1a2a3a",borderRadius:3,color:"#5a7088",cursor:"pointer",padding:"3px 10px",fontFamily:"JetBrains Mono,monospace",fontSize:10}}>✕ CLOSE</button>
+          </div>
+          <div style={{flex:1,overflow:"hidden"}}><CityGenerator /></div>
+        </div>
+      )}
+      {buildingOpen && (
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:80,background:"#06060f",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",alignItems:"center",padding:"6px 12px",background:"#0a0a14",borderBottom:"1px solid #1a2a3a",gap:8}}>
+            <span style={{color:"#00ffc8",fontFamily:"JetBrains Mono,monospace",fontSize:11,fontWeight:700}}>🏗️ BUILDING SIMULATOR</span>
+            <button onClick={() => setBuildingOpen(false)} style={{marginLeft:"auto",background:"none",border:"1px solid #1a2a3a",borderRadius:3,color:"#5a7088",cursor:"pointer",padding:"3px 10px",fontFamily:"JetBrains Mono,monospace",fontSize:10}}>✕ CLOSE</button>
+          </div>
+          <div style={{flex:1,overflow:"hidden"}}><BuildingSimulator /></div>
+        </div>
+      )}
+      {physicsOpen && (
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:80,background:"#06060f",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",alignItems:"center",padding:"6px 12px",background:"#0a0a14",borderBottom:"1px solid #1a2a3a",gap:8}}>
+            <span style={{color:"#FF6600",fontFamily:"JetBrains Mono,monospace",fontSize:11,fontWeight:700}}>⚙️ PHYSICS SIMULATION</span>
+            <button onClick={() => setPhysicsOpen(false)} style={{marginLeft:"auto",background:"none",border:"1px solid #1a2a3a",borderRadius:3,color:"#5a7088",cursor:"pointer",padding:"3px 10px",fontFamily:"JetBrains Mono,monospace",fontSize:10}}>✕ CLOSE</button>
+          </div>
+          <div style={{flex:1,overflow:"hidden"}}><PhysicsSimulation /></div>
+        </div>
+      )}
+      {assetLibOpen && (
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:80,background:"#06060f",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",alignItems:"center",padding:"6px 12px",background:"#0a0a14",borderBottom:"1px solid #1a2a3a",gap:8}}>
+            <span style={{color:"#00ffc8",fontFamily:"JetBrains Mono,monospace",fontSize:11,fontWeight:700}}>📦 ASSET LIBRARY</span>
+            <button onClick={() => setAssetLibOpen(false)} style={{marginLeft:"auto",background:"none",border:"1px solid #1a2a3a",borderRadius:3,color:"#5a7088",cursor:"pointer",padding:"3px 10px",fontFamily:"JetBrains Mono,monospace",fontSize:10}}>✕ CLOSE</button>
+          </div>
+          <div style={{flex:1,overflow:"hidden"}}><AssetLibraryPanel /></div>
+        </div>
+      )}
+      {nodeModOpen && (
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:80,background:"#06060f",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",alignItems:"center",padding:"6px 12px",background:"#0a0a14",borderBottom:"1px solid #1a2a3a",gap:8}}>
+            <span style={{color:"#00ffc8",fontFamily:"JetBrains Mono,monospace",fontSize:11,fontWeight:700}}>🔗 NODE MODIFIER SYSTEM</span>
+            <button onClick={() => setNodeModOpen(false)} style={{marginLeft:"auto",background:"none",border:"1px solid #1a2a3a",borderRadius:3,color:"#5a7088",cursor:"pointer",padding:"3px 10px",fontFamily:"JetBrains Mono,monospace",fontSize:10}}>✕ CLOSE</button>
+          </div>
+          <div style={{flex:1,overflow:"hidden"}}><NodeModifierSystem /></div>
+        </div>
+      )}
+      {vrPreviewOpen && (
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:80,background:"#06060f",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",alignItems:"center",padding:"6px 12px",background:"#0a0a14",borderBottom:"1px solid #1a2a3a",gap:8}}>
+            <span style={{color:"#aa44ff",fontFamily:"JetBrains Mono,monospace",fontSize:11,fontWeight:700}}>🥽 VR PREVIEW</span>
+            <button onClick={() => setVrPreviewOpen(false)} style={{marginLeft:"auto",background:"none",border:"1px solid #1a2a3a",borderRadius:3,color:"#5a7088",cursor:"pointer",padding:"3px 10px",fontFamily:"JetBrains Mono,monospace",fontSize:10}}>✕ CLOSE</button>
+          </div>
+          <div style={{flex:1,overflow:"hidden"}}><VRPreviewMode /></div>
+        </div>
+      )}
+      {crowdGenOpen && (
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:80,background:"#06060f",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",alignItems:"center",padding:"6px 12px",background:"#0a0a14",borderBottom:"1px solid #1a2a3a",gap:8}}>
+            <span style={{color:"#00ffc8",fontFamily:"JetBrains Mono,monospace",fontSize:11,fontWeight:700}}>👥 CROWD GENERATOR</span>
+            <button onClick={() => setCrowdGenOpen(false)} style={{marginLeft:"auto",background:"none",border:"1px solid #1a2a3a",borderRadius:3,color:"#5a7088",cursor:"pointer",padding:"3px 10px",fontFamily:"JetBrains Mono,monospace",fontSize:10}}>✕ CLOSE</button>
+          </div>
+          <div style={{flex:1,overflow:"hidden"}}><ProceduralCrowdGenerator /></div>
+        </div>
+      )}
+      {terrainOpen && (
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:80,background:"#06060f",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",alignItems:"center",padding:"6px 12px",background:"#0a0a14",borderBottom:"1px solid #1a2a3a",gap:8}}>
+            <span style={{color:"#44bb77",fontFamily:"JetBrains Mono,monospace",fontSize:11,fontWeight:700}}>🏔️ TERRAIN SCULPTING</span>
+            <button onClick={() => setTerrainOpen(false)} style={{marginLeft:"auto",background:"none",border:"1px solid #1a2a3a",borderRadius:3,color:"#5a7088",cursor:"pointer",padding:"3px 10px",fontFamily:"JetBrains Mono,monospace",fontSize:10}}>✕ CLOSE</button>
+          </div>
+          <div style={{flex:1,overflow:"hidden"}}><TerrainSculpting /></div>
         </div>
       )}
 
