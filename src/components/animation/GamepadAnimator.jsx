@@ -1,5 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import * as THREE from "three";
+import {
+  exportBVH, downloadBVH, captureSkeletonFrame,
+  buildJointsFromSkeleton, getBVHStats,
+} from "../../mesh/BVHExporter.js";
 
 const C = {
   bg:"#06060f", panel:"#0a0a14", border:"#1a2a3a",
@@ -219,12 +223,10 @@ export default function GamepadAnimator({ open, onClose, sceneRef, meshRef, setS
         const elapsed = startTime.current ? (now - startTime.current) / 1000 : 0;
         const mesh = meshRef?.current;
         if (mesh && frameCount % 2 === 0) { // record at ~30fps
-          keysRef.current.push({
-            time: elapsed,
-            frame: frameRef.current,
-            pos: mesh.position.clone(),
-            rot: mesh.rotation.clone(),
-          });
+          // Capture full bone data for proper BVH export
+          const skeleton = mesh.skeleton || null;
+          const frame = captureSkeletonFrame(skeleton, mesh, frameRef.current, elapsed);
+          keysRef.current.push(frame);
           frameRef.current++;
           setStats(s => ({ ...s, keys: keysRef.current.length, duration: +elapsed.toFixed(1) }));
         }
@@ -325,9 +327,13 @@ export default function GamepadAnimator({ open, onClose, sceneRef, meshRef, setS
   };
 
   const exportAnimation = () => {
-    const data = { keyframes: keysRef.current.map(k => ({ time: k.time, frame: k.frame, pos: k.pos.toArray(), rot: [k.rot.x, k.rot.y, k.rot.z] })), mapping, fps: 30 };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type:"application/json" });
-    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "gamepad_anim.json"; a.click();
+    if (!keysRef.current.length) { setStatus?.("No frames recorded"); return; }
+    // Export as standard BVH — compatible with Blender, iClone, Maya, MotionBuilder, Unreal, Unity
+    const skeleton = meshRef?.current?.skeleton || null;
+    const bvhString = exportBVH(skeleton, keysRef.current, 1/30);
+    const stats = getBVHStats(bvhString);
+    downloadBVH(bvhString, `spx_anim_${Date.now()}.bvh`);
+    setStatus?.(`BVH exported — ${stats.joints} joints, ${stats.frames} frames, ${stats.duration}, ${stats.size}`);
   };
 
   const setAxisMap = (axisIdx, target) => {
