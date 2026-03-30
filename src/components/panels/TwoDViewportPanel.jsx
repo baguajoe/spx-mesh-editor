@@ -40,7 +40,12 @@ function getStyleColor(styleName) {
     "Marvel What If":"#FF6600","Spider-Verse":"#ff00ff","Manga B&W":"#ffffff",
     "Manga Color":"#ff4444","90s Saturday Morning":"#ffaa00","90s Anime":"#00aaff",
     "Synthwave Retro":"#00ffc8","Noir Cinematic":"#888888","Shadow Puppet":"#111111",
-    "Arcane Painterly":"#aa6644","Studio Ghibli":"#88cc88",
+    "Arcane Painterly":"#aa6644"
+    "Fleischer Rubber Hose":"#f5e6c0", "UPA Flat 50s":"#ff9966",
+    "Soviet Soyuzmultfilm":"#8899aa", "Moebius / Heavy Metal":"#cc9944",
+    "CalArts / Adventure Time":"#ff66aa", "Ralph Bakshi Adult":"#885522",
+    "Rankin Bass Stop Motion":"#ffcc66", "Adult Swim Surreal":"#00ff88",
+    "Wayang Kulit Shadow":"#ff8800", "South Park Cutout":"#ff4400",,"Studio Ghibli":"#88cc88",
   };
   return colors[styleName] || "#00ffc8";
 }
@@ -50,6 +55,37 @@ function drawStickFigure(ctx, kf, style, w, h, time) {
   ctx.clearRect(0,0,w,h);
 
   // Background effects
+  if (sp.feltTexture || sp.snapMovement) {
+    ctx.fillStyle = "#ffe8cc"; ctx.fillRect(0,0,w,h);
+    // Felt texture dots
+    ctx.globalAlpha=0.08;
+    for(let i=0;i<200;i++){ctx.beginPath();ctx.arc(Math.random()*w,Math.random()*h,Math.random()*3,0,Math.PI*2);ctx.fillStyle="#aa6633";ctx.fill();}
+    ctx.globalAlpha=1;
+  } else if (sp.vhsDistort) {
+    ctx.fillStyle="#050510";ctx.fillRect(0,0,w,h);
+    // VHS scanlines
+    ctx.globalAlpha=0.15;
+    for(let y=0;y<h;y+=3){ctx.fillStyle=y%6===0?"#ffffff":"#000000";ctx.fillRect(0,y,w,1);}
+    // Color fringe
+    ctx.globalAlpha=0.05;ctx.fillStyle="#ff0000";ctx.fillRect(-2,0,w,h);
+    ctx.fillStyle="#0000ff";ctx.fillRect(2,0,w,h);
+    ctx.globalAlpha=1;
+  } else if (sp.rubberLimbs) {
+    ctx.fillStyle="#f5e6b0";ctx.fillRect(0,0,w,h);
+    // Film grain
+    ctx.globalAlpha=0.06;
+    for(let i=0;i<300;i++){ctx.fillStyle="#000";ctx.fillRect(Math.random()*w,Math.random()*h,1,1);}
+    ctx.globalAlpha=1;
+  } else if (sp.crosshatch) {
+    ctx.fillStyle="#f8f4e8";ctx.fillRect(0,0,w,h);
+  } else if (sp.wobbleLines) {
+    ctx.fillStyle="#ffffff";ctx.fillRect(0,0,w,h);
+  } else if (sp.silhouette && sp.profileOnly) {
+    // Amber backlit for Wayang
+    const bg=ctx.createLinearGradient(0,0,0,h);
+    bg.addColorStop(0,"#2a1500");bg.addColorStop(0.5,"#ff8800");bg.addColorStop(1,"#2a1500");
+    ctx.fillStyle=bg;ctx.fillRect(0,0,w,h);
+  }
   if (sp.neonGlow) {
     ctx.fillStyle = "#050510"; ctx.fillRect(0,0,w,h);
     // grid lines
@@ -82,6 +118,52 @@ function drawStickFigure(ctx, kf, style, w, h, time) {
   // Transform keyframes by style
   const transformed = applyStyleTransform(kf, style, time);
 
+  
+  // Rubber hose — draw wavy curves instead of straight lines for Fleischer
+  if (sp.rubberLimbs) {
+    SKELETON_CONNECTIONS.forEach(([a,b]) => {
+      const pa = transformed[a], pb = transformed[b];
+      if (!pa || !pb) return;
+      const mx=(pa.x+pb.x)/2+(Math.sin(t.current*3+pa.x))*8;
+      const my=(pa.y+pb.y)/2+(Math.cos(t.current*3+pa.y))*8;
+      ctx.beginPath();ctx.moveTo(pa.x,pa.y);
+      ctx.quadraticCurveTo(mx,my,pb.x,pb.y);
+      ctx.strokeStyle=jColor;ctx.lineWidth=4;ctx.stroke();
+    });
+    // Draw joints as circles only
+    Object.entries(transformed).forEach(([bone,pos])=>{
+      const r=bone==="head"?(sp.headScale||1)*16:5;
+      ctx.beginPath();ctx.arc(pos.x,pos.y,r,0,Math.PI*2);
+      ctx.fillStyle=jColor;ctx.fill();
+    });
+    return; // Skip normal drawing
+  }
+  // South Park — static body, only mouth area moves
+  if (sp.staticLimbs) {
+    const torso=["chest","spine","hips","l_shoulder","r_shoulder"];
+    SKELETON_CONNECTIONS.forEach(([a,b])=>{
+      if(!torso.includes(a)&&!torso.includes(b)) return;
+      const pa=transformed[a],pb=transformed[b];
+      if(!pa||!pb)return;
+      ctx.beginPath();ctx.moveTo(pa.x,pa.y);ctx.lineTo(pb.x,pb.y);
+      ctx.strokeStyle=jColor;ctx.lineWidth=3;ctx.stroke();
+    });
+    if(transformed.head){
+      ctx.beginPath();ctx.arc(transformed.head.x,transformed.head.y,(sp.headScale||1)*14,0,Math.PI*2);
+      ctx.fillStyle=jColor;ctx.fill();
+    }
+    return;
+  }
+  // Wayang — pure silhouette profile
+  if (sp.profileOnly) {
+    const sortedBones=Object.entries(transformed).sort((a,b)=>a[1].y-b[1].y);
+    ctx.fillStyle="#000000";
+    sortedBones.forEach(([bone,pos])=>{
+      const r=bone==="head"?18:bone.includes("thigh")||bone.includes("chest")?10:6;
+      ctx.beginPath();ctx.arc(pos.x*0.3+w*0.5,pos.y,r,0,Math.PI*2);ctx.fill();
+    });
+    return;
+  }
   const lineW  = sp.inkOutline ? 3 : 2;
   const jColor = getStyleColor(style);
 

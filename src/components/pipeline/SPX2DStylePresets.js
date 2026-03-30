@@ -30,6 +30,89 @@ export const STYLE_PRESETS = {
   "Storyboard Draft":    { desc:"Rough sketch thumbnail format.", headScale:1.0, limbScale:1.0, snapDeg:0, sketch:true, combinable:true },
   "Ukiyo-e Woodblock":   { desc:"Japanese woodblock print. Bold flat areas, texture lines.", headScale:1.0, limbScale:1.0, snapDeg:0, inkOutline:true, limitedPalette:true, combinable:true },
   "Art Deco":            { desc:"Geometric elegance. 1920s glamour.", headScale:1.0, limbScale:1.0, snapDeg:15, combinable:true },
+
+// ── NEW STYLES v2 ──────────────────────────────────────
+
+  "Fleischer Rubber Hose": {
+    desc: "1930s pre-Disney. Rubbery limbs, no joints, bouncy everything. Steamboat Willie energy.",
+    headScale: 1.4, limbScale: 1.0, snapDeg: 0, combinable: true,
+    rubberLimbs: true, bouncyHead: true, inkOutline: true, limitedPalette: true,
+    bgStyle: "cream", outlineWeight: 3,
+    notes: "Limbs have no elbows/knees — pure curves. Head bobs on every beat.",
+  },
+
+  "UPA Flat 50s": {
+    desc: "1950s limited animation. Mr. Magoo, Gerald McBoing Boing. Geometric shapes, pastel fills, minimal motion.",
+    headScale: 0.9, limbScale: 0.85, snapDeg: 0, combinable: true,
+    flatColor: true, limitedPalette: true, inkOutline: true, geometricShapes: true,
+    bgStyle: "pastel", outlineWeight: 2,
+    notes: "Hold poses longer. Only animate what must move. Color blocks over detail.",
+  },
+
+  "Soviet Soyuzmultfilm": {
+    desc: "USSR animation 1950-80s. Cheburashka, Hedgehog in the Fog. Painterly, melancholic, textured backgrounds.",
+    headScale: 1.05, limbScale: 0.95, snapDeg: 0, combinable: true,
+    painterly: true, filmGrain: true, softEdges: true,
+    bgStyle: "painterly_dark", outlineWeight: 1.5,
+    notes: "Slow deliberate movement. Watercolor texture overlay. Muted palette with occasional vivid accent.",
+  },
+
+  "Moebius / Heavy Metal": {
+    desc: "Jean Giraud / Heavy Metal magazine. Ultra-fine linework, epic sci-fi scale, chrome and desert palettes.",
+    headScale: 0.88, limbScale: 1.1, snapDeg: 0, combinable: true,
+    inkOutline: true, crosshatch: true, detailLines: true,
+    bgStyle: "stark", outlineWeight: 1,
+    notes: "Thin precise lines. Vast empty space. Characters small against enormous environments.",
+  },
+
+  "CalArts / Adventure Time": {
+    desc: "Adventure Time, Gravity Falls, Steven Universe. Wobbly lines, thick outlines, expressive squash/stretch.",
+    headScale: 1.15, limbScale: 1.0, snapDeg: 0, combinable: true,
+    inkOutline: true, wobbleLines: true, squashStretch: true,
+    bgStyle: "bright_flat", outlineWeight: 2.5,
+    notes: "Lines slightly wobbly — not perfect circles. Bold outlines. Oversized eyes.",
+  },
+
+  "Ralph Bakshi Adult": {
+    desc: "Fritz the Cat, Wizards. Rotoscoped grit, exaggerated ugly-beautiful, raw energy.",
+    headScale: 1.0, limbScale: 1.05, snapDeg: 0, combinable: false,
+    filmGrain: true, highContrast: true, inkOutline: true, roughLines: true,
+    bgStyle: "gritty", outlineWeight: 2,
+    notes: "Rotoscope over live action. Deliberately imperfect. High contrast shadows.",
+  },
+
+  "Rankin Bass Stop Motion": {
+    desc: "Rudolph the Red-Nosed Reindeer, The Hobbit. Puppet-like stiff movement, felt texture, holiday warmth.",
+    headScale: 1.1, limbScale: 0.9, snapDeg: 22.5, combinable: false,
+    limitedPalette: true, feltTexture: true, snapMovement: true,
+    bgStyle: "warm_flat", outlineWeight: 1.5,
+    notes: "Movement snaps between poses — no tweening. 12fps maximum. Puppet proportions.",
+  },
+
+  "Adult Swim Surreal": {
+    desc: "Tim and Eric, Rick and Morty early, Too Many Cooks. Lo-fi absurdist, VHS aesthetic, off-model.",
+    headScale: 1.05, limbScale: 1.0, snapDeg: 0, combinable: true,
+    filmGrain: true, vhsDistort: true, offModel: true, limitedPalette: false,
+    bgStyle: "vhs_static", outlineWeight: 2,
+    notes: "Deliberately wrong proportions. VHS color bleed. Random frame holds.",
+  },
+
+  "Wayang Kulit Shadow": {
+    desc: "Indonesian shadow puppet. Intricate silhouette cutouts, highly stylized profile view, batik patterns.",
+    headScale: 1.0, limbScale: 1.0, snapDeg: 15, combinable: false,
+    silhouette: true, cutout: true, profileOnly: true, ornateDetail: true,
+    bgStyle: "amber_backlit", outlineWeight: 0,
+    notes: "Pure profile. Silhouette only. Intricate internal cutout patterns visible when backlit.",
+  },
+
+  "South Park Cutout": {
+    desc: "Deliberately crude construction paper look. Minimal frames, static limbs, mouth-only animation.",
+    headScale: 1.2, limbScale: 0.8, snapDeg: 45, combinable: false,
+    cutout: true, limitedPalette: true, staticLimbs: true, snapMovement: true,
+    pixelGrid: 0, frameSkip: 6,
+    bgStyle: "flat_bright", outlineWeight: 1,
+    notes: "Maximum 8fps. Limbs barely move. Only mouth and eyes animate. Intentionally cheap.",
+  },
 };
 
 export const STYLE_NAMES = Object.keys(STYLE_PRESETS);
@@ -50,7 +133,19 @@ export const COMBINABLE_PAIRS = [
 ];
 
 export function applyStyleTransform(kf, styleName, time=0) {
-  const style = STYLE_PRESETS[styleName];
+  const style = STYLE_PRESETS[styleName
+  ["Fleischer Rubber Hose", "Classic Cartoon"],
+  ["Fleischer Rubber Hose", "90s Saturday Morning"],
+  ["UPA Flat 50s", "CalArts / Adventure Time"],
+  ["UPA Flat 50s", "Webtoon"],
+  ["Moebius / Heavy Metal", "Western Comic"],
+  ["Moebius / Heavy Metal", "Noir Cinematic"],
+  ["CalArts / Adventure Time", "Studio Ghibli"],
+  ["CalArts / Adventure Time", "Spider-Verse"],
+  ["Soviet Soyuzmultfilm", "Studio Ghibli"],
+  ["Adult Swim Surreal", "Underground Indie"],
+  ["Ralph Bakshi Adult", "Rotoscope Realism"],
+];
   if (!style) return kf;
   const out = {};
   const snap = (v, g) => g > 0 ? Math.round(v/g)*g : v;
