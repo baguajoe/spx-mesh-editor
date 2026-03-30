@@ -455,6 +455,18 @@ export default function App() {
     setAutoRigOpen(false);
     setAdvancedRigOpen(false);
     setMocapWorkspaceOpen?.(false);
+    setFluidPanelOpen(false);
+    setWeatherPanelOpen(false);
+    setDestructionPanelOpen(false);
+    setEnvGenOpen(false);
+    setCityGenOpen(false);
+    setBuildingOpen(false);
+    setPhysicsOpen(false);
+    setAssetLibOpen(false);
+    setNodeModOpen(false);
+    setVrPreviewOpen(false);
+    setCrowdGenOpen(false);
+    setTerrainOpen(false);
   };
 
   const quadCamerasRef = useRef(null);
