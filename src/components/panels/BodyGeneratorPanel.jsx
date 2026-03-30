@@ -1,5 +1,6 @@
 
 import React, { useState } from "react";
+import { PolyQualityBar, Q, estimateTris, formatTris } from './PolyQualityUtil';
 import * as THREE from "three";
 
 const T={bg:"#06060f",panel:"#0d0d1a",border:"#1a1a2e",teal:"#00ffc8",orange:"#FF6600",text:"#e0e0e0",muted:"#aaa",font:"JetBrains Mono,monospace"};
@@ -31,6 +32,7 @@ const CTRL=[
 
 export default function BodyGeneratorPanel({scene}){
   const [preset,setPreset]=useState("Athletic");
+  const [quality, setQuality] = useState('Mid');
   const [body,setBody]=useState({...BODY_PRESETS["Athletic"]});
   const [age,setAge]=useState(25);
   const [genderBal,setGenderBal]=useState(0.5);
@@ -48,13 +50,13 @@ export default function BodyGeneratorPanel({scene}){
     const headH=h/7.5;
     const add=(geo,px,py,pz)=>{const m=new THREE.Mesh(geo,mat.clone());m.position.set(px,py,pz);m.castShadow=true;scene.add(m);ms.push(m);return m;};
     // Head
-    add(new THREE.SphereGeometry(headH*.5,12,10),0,h-headH*.5,0);
+    add(new THREE.SphereGeometry(headH*.5,Q(quality).sphere,Q(quality).sphereH),0,h-headH*.5,0);
     // Torso
     const tw=body.shoulderW*2, tth=headH*2.2;
     add(new THREE.BoxGeometry(tw,tth,body.chestSz),0,h-headH-tth*.5,0);
     // Belly/waist
     const wh=headH*.8;
-    add(new THREE.CylinderGeometry(body.waistSz*.9,body.waistSz,wh,10),0,h-headH-tth-wh*.5,0);
+    add(new THREE.CylinderGeometry(body.waistSz*.9,body.waistSz,wh,Q(quality).cylinder),0,h-headH-tth-wh*.5,0);
     // Hips
     const hipH=headH*.6;
     add(new THREE.BoxGeometry(body.hipW*2,hipH,body.chestSz*.85+(genderBal*.15)),0,h-headH-tth-wh-hipH*.5,0);
@@ -62,14 +64,14 @@ export default function BodyGeneratorPanel({scene}){
     // Arms
     const armH=headH*2.5;
     [-1,1].forEach(s=>{
-      add(new THREE.CylinderGeometry(body.armTk*.5,body.armTk*.45,armH*.55,8),s*(tw*.5+body.armTk*.5),h-headH-armH*.15,0);
-      add(new THREE.CylinderGeometry(body.armTk*.42,body.armTk*.35,armH*.45,8),s*(tw*.5+body.armTk*.5),h-headH-armH*.15-armH*.45*.5-armH*.55*.5,0);
+      add(new THREE.CylinderGeometry(body.armTk*.5,body.armTk*.45,armH*.55,Q(quality).cylinder),s*(tw*.5+body.armTk*.5),h-headH-armH*.15,0);
+      add(new THREE.CylinderGeometry(body.armTk*.42,body.armTk*.35,armH*.45,Q(quality).cylinder),s*(tw*.5+body.armTk*.5),h-headH-armH*.15-armH*.45*.5-armH*.55*.5,0);
     });
     // Legs
     const legH=hipY*.5;
     [-1,1].forEach(s=>{
-      add(new THREE.CylinderGeometry(body.thighTk*.55,body.thighTk*.45,legH,8),s*body.hipW*.6,hipY-legH*.5,0);
-      add(new THREE.CylinderGeometry(body.thighTk*.4,body.thighTk*.3,legH*.9,8),s*body.hipW*.6,hipY-legH-legH*.9*.5,0);
+      add(new THREE.CylinderGeometry(body.thighTk*.55,body.thighTk*.45,legH,Q(quality).cylinder),s*body.hipW*.6,hipY-legH*.5,0);
+      add(new THREE.CylinderGeometry(body.thighTk*.4,body.thighTk*.3,legH*.9,Q(quality).cylinder),s*body.hipW*.6,hipY-legH-legH*.9*.5,0);
       add(new THREE.BoxGeometry(body.thighTk*.7,.12,body.thighTk*1.2),s*body.hipW*.6,hipY-legH-legH*.9-.06,body.thighTk*.25);
     });
     // Lights
@@ -81,7 +83,9 @@ export default function BodyGeneratorPanel({scene}){
   return(
     <div style={S.root}>
       <div style={S.h2}>💪 BODY GENERATOR</div>
-      <div style={S.sec}>
+      
+      <PolyQualityBar quality={quality} onChange={setQuality}/>
+<div style={S.sec}>
         <label style={S.lbl}>Body Preset</label>
         <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
           {Object.keys(BODY_PRESETS).map(p=><button key={p} style={{...S.btnSm,background:preset===p?T.teal:T.panel,color:preset===p?T.bg:T.teal}} onClick={()=>loadPreset(p)}>{p}</button>)}

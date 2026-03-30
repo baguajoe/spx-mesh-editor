@@ -1,5 +1,6 @@
 
 import React, { useState, useRef } from "react";
+import { PolyQualityBar, Q, estimateTris, formatTris } from './PolyQualityUtil';
 import * as THREE from "three";
 
 const T={bg:"#06060f",panel:"#0d0d1a",border:"#1a1a2e",teal:"#00ffc8",orange:"#FF6600",text:"#e0e0e0",muted:"#aaa",font:"JetBrains Mono,monospace"};
@@ -37,14 +38,14 @@ function buildBird(scene, cfg) {
   const bL=cfg.bodyL,bW=cfg.bodyW,bH=cfg.bodyH;
 
   // Body — slightly egg-shaped using scaled sphere
-  const bodyGeo = new THREE.SphereGeometry(.5,12,8);
+  const bodyGeo = new THREE.SphereGeometry(.5,Q(quality).sphere,Q(quality).sphereH);
   const body = new THREE.Mesh(bodyGeo, bodyMat.clone());
   body.scale.set(bW,bH,bL);
   body.position.set(0,baseY+bH/2,0);
   body.castShadow=true; scene.add(body); ms.push(body);
 
   // Belly patch
-  const belGeo = new THREE.SphereGeometry(.45,10,7);
+  const belGeo = new THREE.SphereGeometry(.45,Q(quality).sphere,Q(quality).sphereH);
   const bel = new THREE.Mesh(belGeo, bellyMat.clone());
   bel.scale.set(bW*.7,bH*.65,bL*.6);
   bel.position.set(0,baseY+bH*.3,bL*.15);
@@ -52,11 +53,11 @@ function buildBird(scene, cfg) {
 
   // Neck
   if(cfg.neckL>.05){
-    add(new THREE.CylinderGeometry(cfg.headSc*.25,cfg.headSc*.3,cfg.neckL,8),0,baseY+bH+cfg.neckL/2,bL/2*.6,-.25,0,0);
+    add(new THREE.CylinderGeometry(cfg.headSc*.25,cfg.headSc*.3,cfg.neckL,Q(quality).cylinder),0,baseY+bH+cfg.neckL/2,bL/2*.6,-.25,0,0);
   }
 
   // Head
-  const headGeo = new THREE.SphereGeometry(cfg.headSc,10,8);
+  const headGeo = new THREE.SphereGeometry(cfg.headSc,Q(quality).sphere,Q(quality).sphereH);
   const head = new THREE.Mesh(headGeo,bodyMat.clone());
   head.position.set(0,baseY+bH+cfg.neckL+cfg.headSc*.85,bL/2*.5);
   scene.add(head); ms.push(head);
@@ -65,12 +66,12 @@ function buildBird(scene, cfg) {
   if(cfg.crestH>.02){
     for(let i=0;i<4;i++){
       const cx=(i-1.5)*.06;
-      add(new THREE.ConeGeometry(cfg.headSc*.08,cfg.crestH+i*.03,4),cx,baseY+bH+cfg.neckL+cfg.headSc*1.7+i*.02,bL/2*.5,-.2,0,.1*(i-1.5));
+      add(new THREE.ConeGeometry(cfg.headSc*.08,cfg.crestH+i*.03,Q(quality).cone),cx,baseY+bH+cfg.neckL+cfg.headSc*1.7+i*.02,bL/2*.5,-.2,0,.1*(i-1.5));
     }
   }
 
   // Beak
-  const beakGeo = new THREE.CylinderGeometry(cfg.headSc*.06,cfg.headSc*.12,cfg.beakL,6);
+  const beakGeo = new THREE.CylinderGeometry(cfg.headSc*.06,cfg.headSc*.12,cfg.beakL,Q(quality).cylinder);
   const beak = new THREE.Mesh(beakGeo,new THREE.MeshStandardMaterial({color:0xddaa44,roughness:.6}));
   beak.rotation.x = .5*Math.PI + cfg.beakCurve*.4;
   beak.position.set(0,baseY+bH+cfg.neckL+cfg.headSc*.8,bL/2*.5+cfg.headSc+cfg.beakL*.4);
@@ -78,7 +79,7 @@ function buildBird(scene, cfg) {
 
   // Lower beak (pouch for pelican etc)
   if(cfg.beakL>.2){
-    const lbGeo = new THREE.CylinderGeometry(cfg.headSc*.05,cfg.headSc*.14,cfg.beakL*.8,6);
+    const lbGeo = new THREE.CylinderGeometry(cfg.headSc*.05,cfg.headSc*.14,cfg.beakL*.8,Q(quality).cylinder);
     const lb=new THREE.Mesh(lbGeo,new THREE.MeshStandardMaterial({color:0xcc8833,roughness:.7,transparent:true,opacity:.8}));
     lb.rotation.x=.5*Math.PI+cfg.beakCurve*.2+.1;
     lb.position.set(0,baseY+bH+cfg.neckL+cfg.headSc*.65,bL/2*.5+cfg.headSc+cfg.beakL*.35);
@@ -87,8 +88,8 @@ function buildBird(scene, cfg) {
 
   // Eyes
   [-1,1].forEach(s=>{
-    add(new THREE.SphereGeometry(cfg.headSc*.18,7,5),s*cfg.headSc*.6,baseY+bH+cfg.neckL+cfg.headSc*.95,bL/2*.5+cfg.headSc*.6,0,0,0,eyeMat);
-    add(new THREE.SphereGeometry(cfg.headSc*.09,5,4),s*cfg.headSc*.65,baseY+bH+cfg.neckL+cfg.headSc*.95,bL/2*.5+cfg.headSc*.75,0,0,0,new THREE.MeshStandardMaterial({color:0x000000}));
+    add(new THREE.SphereGeometry(cfg.headSc*.18,Q(quality).sphere,Q(quality).sphereH),s*cfg.headSc*.6,baseY+bH+cfg.neckL+cfg.headSc*.95,bL/2*.5+cfg.headSc*.6,0,0,0,eyeMat);
+    add(new THREE.SphereGeometry(cfg.headSc*.09,Q(quality).sphere,Q(quality).sphereH),s*cfg.headSc*.65,baseY+bH+cfg.neckL+cfg.headSc*.95,bL/2*.5+cfg.headSc*.75,0,0,0,new THREE.MeshStandardMaterial({color:0x000000}));
   });
 
   // Wings
@@ -117,7 +118,7 @@ function buildBird(scene, cfg) {
     scene.add(wm); ms.push(wm);
 
     // Wing arm bone
-    add(new THREE.CylinderGeometry(.025,.04,cfg.wingSpan*.35,5),
+    add(new THREE.CylinderGeometry(.025,.04,cfg.wingSpan*.35,Q(quality).cylinder),
       s*bW*.3+s*cfg.wingSpan*.18,baseY+bH*.65,0,0,0,Math.PI/2);
   });
 
@@ -142,12 +143,12 @@ function buildBird(scene, cfg) {
   // Legs + feet
   [-1,1].forEach(s=>{
     const lx=s*bW*.25;
-    add(new THREE.CylinderGeometry(cfg.legW*.9,cfg.legW*.7,cfg.legL*.55,6),lx,baseY-cfg.legL*.28,0);
-    add(new THREE.CylinderGeometry(cfg.legW*.7,cfg.legW*.5,cfg.legL*.45,6),lx,baseY-cfg.legL*.72,bL*.05,.35,0,0);
+    add(new THREE.CylinderGeometry(cfg.legW*.9,cfg.legW*.7,cfg.legL*.55,Q(quality).cylinder),lx,baseY-cfg.legL*.28,0);
+    add(new THREE.CylinderGeometry(cfg.legW*.7,cfg.legW*.5,cfg.legL*.45,Q(quality).cylinder),lx,baseY-cfg.legL*.72,bL*.05,.35,0,0);
     // Talons / toes
     for(let t=0;t<3;t++){
       const ta=(t-1)*.5;
-      add(new THREE.ConeGeometry(cfg.talonSz*.18,cfg.talonSz*.7,4),
+      add(new THREE.ConeGeometry(cfg.talonSz*.18,cfg.talonSz*.7,Q(quality).cone),
         lx+Math.sin(ta)*cfg.talonSz*.35,.04,Math.cos(ta)*cfg.talonSz*.5+cfg.talonSz*.2,.8,ta,0,
         new THREE.MeshStandardMaterial({color:0x332211,roughness:.7}));
     }
@@ -184,6 +185,7 @@ const CTRL=[
 
 export default function BirdGeneratorPanel({ scene }) {
   const [preset,setPreset] = useState("Eagle/Hawk");
+  const [quality, setQuality] = useState('Mid');
   const [cfg,setCfg]       = useState({...BIRD_PRESETS["Eagle/Hawk"]});
   const [colors,setColors] = useState({color:"#553311",wingColor:"#3a2208",bellyColor:"#ccaa88",eyeColor:"#ffaa00"});
   const [status,setStatus] = useState("");
@@ -202,7 +204,9 @@ export default function BirdGeneratorPanel({ scene }) {
   return(
     <div style={S.root}>
       <div style={S.h2}>🦅 BIRD GENERATOR</div>
-      <div style={S.sec}>
+      
+      <PolyQualityBar quality={quality} onChange={setQuality}/>
+<div style={S.sec}>
         <label style={S.lbl}>Bird Preset</label>
         <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
           {Object.keys(BIRD_PRESETS).map(p=><button key={p} style={{...S.btnSm,background:preset===p?T.teal:T.panel,color:preset===p?T.bg:T.teal}} onClick={()=>loadPreset(p)}>{p}</button>)}

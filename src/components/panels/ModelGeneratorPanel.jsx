@@ -1,5 +1,6 @@
 
 import React, { useState, useRef } from "react";
+import { PolyQualityBar, Q, estimateTris, formatTris } from './PolyQualityUtil';
 import * as THREE from "three";
 
 const T={bg:"#06060f",panel:"#0d0d1a",border:"#1a1a2e",teal:"#00ffc8",orange:"#FF6600",text:"#e0e0e0",muted:"#aaa",font:"JetBrains Mono,monospace"};
@@ -39,9 +40,9 @@ function buildCharacterMesh(scene, cfg) {
   };
 
   // Head
-  add(new THREE.SphereGeometry(headH * 0.5, 16, 12), 0, h - headH * 0.5, 0);
+  add(new THREE.SphereGeometry(headH * 0.5,Q(quality).sphere,Q(quality).sphereH), 0, h - headH * 0.5, 0);
   // Neck
-  add(new THREE.CylinderGeometry(headH*0.18, headH*0.22, headH*0.35, 8), 0, h - headH - headH*0.175, 0);
+  add(new THREE.CylinderGeometry(headH*0.18, headH*0.22, headH*0.35,Q(quality).cylinder), 0, h - headH - headH*0.175, 0);
   // Torso
   const tw = headH * p.shoulderW, th = headH * 2.2 * p.torsoLen;
   const torsoGeo = new THREE.BoxGeometry(tw, th, headH * 0.7);
@@ -52,9 +53,9 @@ function buildCharacterMesh(scene, cfg) {
   // Upper arms
   const armW = headH * 0.22, armH = headH * 1.3 * p.armLen;
   [-1, 1].forEach(side => {
-    add(new THREE.CylinderGeometry(armW, armW*0.9, armH, 8), side*(tw/2+armW), h-headH-headH*.4-armH*.5, 0);
+    add(new THREE.CylinderGeometry(armW, armW*0.9, armH,Q(quality).cylinder), side*(tw/2+armW), h-headH-headH*.4-armH*.5, 0);
     // Forearm
-    add(new THREE.CylinderGeometry(armW*0.85, armW*0.7, armH*0.9, 8), side*(tw/2+armW), h-headH-headH*.4-armH-armH*.9*.5, 0);
+    add(new THREE.CylinderGeometry(armW*0.85, armW*0.7, armH*0.9,Q(quality).cylinder), side*(tw/2+armW), h-headH-headH*.4-armH-armH*.9*.5, 0);
     // Hand
     add(new THREE.BoxGeometry(headH*0.25, headH*0.3, headH*0.15), side*(tw/2+armW), h-headH-headH*.4-armH-armH*.9-headH*.15, 0);
   });
@@ -63,25 +64,25 @@ function buildCharacterMesh(scene, cfg) {
   const hipY = h - headH - headH*0.35 - th - hh;
   [-1, 1].forEach(side => {
     // Thigh
-    add(new THREE.CylinderGeometry(legW*1.1, legW*0.9, legH, 8), side*headH*0.3, hipY - legH*0.5, 0);
+    add(new THREE.CylinderGeometry(legW*1.1, legW*0.9, legH,Q(quality).cylinder), side*headH*0.3, hipY - legH*0.5, 0);
     // Shin
-    add(new THREE.CylinderGeometry(legW*0.9, legW*0.7, legH*0.95, 8), side*headH*0.3, hipY - legH - legH*.95*.5, 0);
+    add(new THREE.CylinderGeometry(legW*0.9, legW*0.7, legH*0.95,Q(quality).cylinder), side*headH*0.3, hipY - legH - legH*.95*.5, 0);
     // Foot
     add(new THREE.BoxGeometry(headH*0.35, headH*0.18, headH*0.55), side*headH*0.3, hipY - legH - legH*.95 - headH*.09, headH*0.15);
   });
 
   // Eyes
-  const eyeY = h - headH*0.55, eyeGeo = new THREE.SphereGeometry(headH*0.1, 8, 6);
+  const eyeY = h - headH*0.55, eyeGeo = new THREE.SphereGeometry(headH*0.1,Q(quality).sphere,Q(quality).sphereH);
   [-1,1].forEach(s=>{const em=add(eyeGeo,s*headH*0.2,eyeY,headH*0.42);em.material=new THREE.MeshStandardMaterial({color:cfg.eyeColor||0x224488,roughness:0.05,metalness:0.3});});
 
   // Creature / demon extras
   if(cfg.archetype.includes("Dragon")||cfg.archetype.includes("Kaiju")){
-    const tailGeo=new THREE.CylinderGeometry(headH*0.15,headH*0.05,headH*2,6);
+    const tailGeo=new THREE.CylinderGeometry(headH*0.15,headH*0.05,headH*2,Q(quality).cylinder);
     add(tailGeo,0,hipY-headH*0.5,-(headH*0.5),0.8,0,0);
   }
   if(cfg.archetype.includes("Demon")){
     [[-.25,.35,.22],[.25,.35,.22]].forEach(([x,y,z])=>{
-      const hg=new THREE.ConeGeometry(headH*.1,headH*.4,4);
+      const hg=new THREE.ConeGeometry(headH*.1,headH*.4,Q(quality).cone);
       const hm=add(hg,x*headH,(h-headH*.15+y*headH),z*headH);
       hm.material=new THREE.MeshStandardMaterial({color:0x442200,roughness:0.7});
     });
@@ -98,6 +99,7 @@ function buildCharacterMesh(scene, cfg) {
 
 export default function ModelGeneratorPanel({scene}){
   const [archetype,setArchetype]=useState("Realistic Human");
+  const [quality, setQuality] = useState('Mid');
   const [ancestry,setAncestry]=useState("Mixed/Global Neutral");
   const [proportions,setProportions]=useState("Realistic");
   const [topology,setTopology]=useState("Animation Ready");
@@ -125,7 +127,9 @@ export default function ModelGeneratorPanel({scene}){
   return(
     <div style={S.root}>
       <div style={S.h2}>🧍 MODEL GENERATOR</div>
-      <div style={S.sec}>
+      
+      <PolyQualityBar quality={quality} onChange={setQuality}/>
+<div style={S.sec}>
         <label style={S.lbl}>Archetype</label>
         <select style={S.sel} value={archetype} onChange={e=>setArchetype(e.target.value)}>{ARCHETYPES.map(a=><option key={a}>{a}</option>)}</select>
         <label style={S.lbl}>Ancestry / Heritage</label>

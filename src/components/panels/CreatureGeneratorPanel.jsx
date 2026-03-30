@@ -1,5 +1,6 @@
 
 import React, { useState, useRef } from "react";
+import { PolyQualityBar, Q, estimateTris, formatTris } from './PolyQualityUtil';
 import * as THREE from "three";
 
 const T={bg:"#06060f",panel:"#0d0d1a",border:"#1a1a2e",teal:"#00ffc8",orange:"#FF6600",text:"#e0e0e0",muted:"#aaa",font:"JetBrains Mono,monospace"};
@@ -29,7 +30,7 @@ function buildCreature(scene, cfg) {
   // Body
   add(new THREE.BoxGeometry(cfg.bodyW, cfg.bodyH, cfg.bodyL), 0, baseY+cfg.bodyH/2, 0);
   // Neck + head
-  add(new THREE.CylinderGeometry(cfg.headSc*.25, cfg.headSc*.32, cfg.neckL, 8), 0, baseY+cfg.bodyH+cfg.neckL/2, cfg.bodyL/2-.1, -.35,0,0);
+  add(new THREE.CylinderGeometry(cfg.headSc*.25, cfg.headSc*.32, cfg.neckL,Q(quality).cylinder), 0, baseY+cfg.bodyH+cfg.neckL/2, cfg.bodyL/2-.1, -.35,0,0);
   add(new THREE.BoxGeometry(cfg.headSc*.8, cfg.headSc*.65, cfg.headSc*(1+cfg.jawLen)), 0, baseY+cfg.bodyH+cfg.neckL+cfg.headSc*.28, cfg.bodyL/2+cfg.headSc*.1);
   // Lower jaw
   add(new THREE.BoxGeometry(cfg.headSc*.7, cfg.headSc*.2, cfg.headSc*cfg.jawLen*.8), 0, baseY+cfg.bodyH+cfg.neckL+cfg.headSc*.02, cfg.bodyL/2+cfg.headSc*.5+cfg.headSc*cfg.jawLen*.1);
@@ -38,18 +39,18 @@ function buildCreature(scene, cfg) {
   for(let h=0;h<cfg.hornCount;h++){
     const angle = cfg.hornCount>1 ? (h/(cfg.hornCount-1)-.5)*Math.PI*.6 : 0;
     const hx=Math.sin(angle)*cfg.headSc*.3, hz=Math.cos(angle)*cfg.headSc*.1;
-    add(new THREE.ConeGeometry(cfg.headSc*.07, cfg.hornLen, 5), hx, baseY+cfg.bodyH+cfg.neckL+cfg.headSc*.7, cfg.bodyL/2+hz, 0,angle,.2*Math.sign(hx||1));
+    add(new THREE.ConeGeometry(cfg.headSc*.07, cfg.hornLen,Q(quality).cone), hx, baseY+cfg.bodyH+cfg.neckL+cfg.headSc*.7, cfg.bodyL/2+hz, 0,angle,.2*Math.sign(hx||1));
   }
 
   // 4 Legs with claws
   [[-1,1],[-1,-1],[1,1],[1,-1]].forEach(([sx,sz])=>{
     const lx=sx*cfg.bodyW/2*.75, lz=sz*cfg.bodyL/2*.6;
-    add(new THREE.CylinderGeometry(cfg.legW*.9,cfg.legW*.7,cfg.legL*.55,8),lx,baseY-cfg.legL*.55/2,lz);
-    add(new THREE.CylinderGeometry(cfg.legW*.7,cfg.legW*.5,cfg.legL*.45,8),lx,baseY-cfg.legL*.55-cfg.legL*.45/2,lz);
+    add(new THREE.CylinderGeometry(cfg.legW*.9,cfg.legW*.7,cfg.legL*.55,Q(quality).cylinder),lx,baseY-cfg.legL*.55/2,lz);
+    add(new THREE.CylinderGeometry(cfg.legW*.7,cfg.legW*.5,cfg.legL*.45,Q(quality).cylinder),lx,baseY-cfg.legL*.55-cfg.legL*.45/2,lz);
     // Claws
     for(let c=0;c<3;c++){
       const ca=(c-1)*.35;
-      add(new THREE.ConeGeometry(cfg.clawSz*.2,cfg.clawSz,4),lx+Math.sin(ca)*cfg.clawSz*.5,.08,lz+Math.cos(ca)*cfg.clawSz*.5+cfg.clawSz*.3,.8,ca,0);
+      add(new THREE.ConeGeometry(cfg.clawSz*.2,cfg.clawSz,Q(quality).cone),lx+Math.sin(ca)*cfg.clawSz*.5,.08,lz+Math.cos(ca)*cfg.clawSz*.5+cfg.clawSz*.3,.8,ca,0);
     }
   });
 
@@ -63,7 +64,7 @@ function buildCreature(scene, cfg) {
   if(cfg.spineSpikes){
     for(let i=0;i<6;i++){
       const sz=-cfg.bodyL/2+i*(cfg.bodyL/5);
-      add(new THREE.ConeGeometry(cfg.bodyW*.06,cfg.bodyH*.35+i*.02,4),0,baseY+cfg.bodyH+cfg.bodyH*.15,sz,.2,0,0);
+      add(new THREE.ConeGeometry(cfg.bodyW*.06,cfg.bodyH*.35+i*.02,Q(quality).cone),0,baseY+cfg.bodyH+cfg.bodyH*.15,sz,.2,0,0);
     }
   }
 
@@ -83,7 +84,7 @@ function buildCreature(scene, cfg) {
       wm.position.set(s*cfg.bodyW*.45,baseY+cfg.bodyH*.6,cfg.bodyL*.1);
       scene.add(wm); ms.push(wm);
       // Wing arm bone
-      add(new THREE.CylinderGeometry(.04,.06,cfg.wingSpan*.5,6),s*cfg.bodyW*.3+s*cfg.wingSpan*.25,baseY+cfg.bodyH*.7,0,0,0,Math.PI/2);
+      add(new THREE.CylinderGeometry(.04,.06,cfg.wingSpan*.5,Q(quality).cylinder),s*cfg.bodyW*.3+s*cfg.wingSpan*.25,baseY+cfg.bodyH*.7,0,0,0,Math.PI/2);
     });
   }
 
@@ -112,6 +113,7 @@ const CTRL=[
 
 export default function CreatureGeneratorPanel({ scene }) {
   const [preset, setPreset] = useState("Dragon");
+  const [quality, setQuality] = useState('Mid');
   const [cfg, setCfg]       = useState({ ...CREATURE_PRESETS["Dragon"] });
   const [color, setColor]   = useState("#8b1a1a");
   const [glowColor, setGlowColor] = useState("#ff4400");
@@ -133,7 +135,9 @@ export default function CreatureGeneratorPanel({ scene }) {
   return(
     <div style={S.root}>
       <div style={S.h2}>🐉 CREATURE GENERATOR</div>
-      <div style={S.sec}>
+      
+      <PolyQualityBar quality={quality} onChange={setQuality}/>
+<div style={S.sec}>
         <label style={S.lbl}>Creature Preset</label>
         <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
           {Object.keys(CREATURE_PRESETS).map(p=><button key={p} style={{...S.btnSm,background:preset===p?T.teal:T.panel,color:preset===p?T.bg:T.teal}} onClick={()=>loadPreset(p)}>{p}</button>)}

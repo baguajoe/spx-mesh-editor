@@ -1,5 +1,6 @@
 
 import React, { useState, useRef } from "react";
+import { PolyQualityBar, Q, estimateTris, formatTris } from './PolyQualityUtil';
 import * as THREE from "three";
 
 const T={bg:"#06060f",panel:"#0d0d1a",border:"#1a1a2e",teal:"#00ffc8",orange:"#FF6600",text:"#e0e0e0",muted:"#aaa",font:"JetBrains Mono,monospace"};
@@ -37,10 +38,10 @@ function buildHybrid(scene, cfg) {
   add(new THREE.BoxGeometry(headH*.8*hsx,headH*.85*hsy,headH*.9*hsz),0,baseY+torsoH+hipH+headH*.4,0);
   // Horns
   if(cfg.hornLen>.05){
-    [-1,1].forEach(s=>add(new THREE.ConeGeometry(headH*.08,cfg.hornLen,4),s*headH*.25,baseY+torsoH+hipH+headH*.85,0,0,0,s*.3));
+    [-1,1].forEach(s=>add(new THREE.ConeGeometry(headH*.08,cfg.hornLen,Q(quality).cone),s*headH*.25,baseY+torsoH+hipH+headH*.85,0,0,0,s*.3));
   }
   // Neck
-  add(new THREE.CylinderGeometry(headH*.2,headH*.25,headH*.4,8),0,baseY+torsoH+hipH+headH*.15,0);
+  add(new THREE.CylinderGeometry(headH*.2,headH*.25,headH*.4,Q(quality).cylinder),0,baseY+torsoH+hipH+headH*.15,0);
   // Torso
   add(new THREE.BoxGeometry(sw*2,torsoH,headH*.75),0,baseY+torsoH/2,0);
   // Hips
@@ -50,11 +51,11 @@ function buildHybrid(scene, cfg) {
   [-1,1].forEach(s=>{
     const ax=s*(sw+headH*.15), ay=baseY+torsoH*.78;
     const armW=headH*(cfg.handMix>.5?.28:.2);
-    add(new THREE.CylinderGeometry(armW,armW*.85,headH*1.3,8),ax,ay,0);
-    add(new THREE.CylinderGeometry(armW*.8,armW*.6,headH*1.1,8),ax,ay-headH*1.3,0);
+    add(new THREE.CylinderGeometry(armW,armW*.85,headH*1.3,Q(quality).cylinder),ax,ay,0);
+    add(new THREE.CylinderGeometry(armW*.8,armW*.6,headH*1.1,Q(quality).cylinder),ax,ay-headH*1.3,0);
     // Claws or hands
     if(cfg.clawSz>.1){
-      for(let c=0;c<3;c++){const ca=(c-1)*.3; add(new THREE.ConeGeometry(cfg.clawSz*.15,cfg.clawSz*.7,4),ax+Math.sin(ca)*cfg.clawSz*.3,ay-headH*2.5,Math.cos(ca)*cfg.clawSz*.2,.8,ca,0);}
+      for(let c=0;c<3;c++){const ca=(c-1)*.3; add(new THREE.ConeGeometry(cfg.clawSz*.15,cfg.clawSz*.7,Q(quality).cone),ax+Math.sin(ca)*cfg.clawSz*.3,ay-headH*2.5,Math.cos(ca)*cfg.clawSz*.2,.8,ca,0);}
     } else {
       add(new THREE.BoxGeometry(headH*.3,headH*.38,headH*.18),ax,ay-headH*2.55,0);
     }
@@ -66,14 +67,14 @@ function buildHybrid(scene, cfg) {
     const lx=s*sw*.55;
     if(cfg.legMix<.3){
       // Normal human legs
-      add(new THREE.CylinderGeometry(headH*.28,headH*.24,legH*.5,8),lx,hipY-legH*.25,0);
-      add(new THREE.CylinderGeometry(headH*.22,headH*.18,legH*.5,8),lx,hipY-legH*.75,0);
+      add(new THREE.CylinderGeometry(headH*.28,headH*.24,legH*.5,Q(quality).cylinder),lx,hipY-legH*.25,0);
+      add(new THREE.CylinderGeometry(headH*.22,headH*.18,legH*.5,Q(quality).cylinder),lx,hipY-legH*.75,0);
       add(new THREE.BoxGeometry(headH*.38,.12,headH*.55),lx,.06,headH*.12);
     } else {
       // Creature digitigrade legs
-      add(new THREE.CylinderGeometry(headH*.3,headH*.25,legH*.4,8),lx,hipY-legH*.2,0);
-      add(new THREE.CylinderGeometry(headH*.22,headH*.18,legH*.35,8),lx,hipY-legH*.55,.15,-.4,0,0);
-      add(new THREE.CylinderGeometry(headH*.18,headH*.14,legH*.25,8),lx,hipY-legH*.85,.3,.5,0,0);
+      add(new THREE.CylinderGeometry(headH*.3,headH*.25,legH*.4,Q(quality).cylinder),lx,hipY-legH*.2,0);
+      add(new THREE.CylinderGeometry(headH*.22,headH*.18,legH*.35,Q(quality).cylinder),lx,hipY-legH*.55,.15,-.4,0,0);
+      add(new THREE.CylinderGeometry(headH*.18,headH*.14,legH*.25,Q(quality).cylinder),lx,hipY-legH*.85,.3,.5,0,0);
       add(new THREE.BoxGeometry(headH*.35,.1,headH*.5*(1+cfg.legMix)),lx,.05,headH*.15);
     }
   });
@@ -131,6 +132,7 @@ const CTRL=[
 
 export default function HybridGeneratorPanel({ scene }) {
   const [preset,setPreset]=useState("Werewolf");
+  const [quality, setQuality] = useState('Mid');
   const [cfg,setCfg]=useState({...HYBRID_PRESETS["Werewolf"]});
   const [color,setColor]=useState("#5a3a22");
   const [glowColor,setGlowColor]=useState("#ff4400");
@@ -151,7 +153,9 @@ export default function HybridGeneratorPanel({ scene }) {
   return(
     <div style={S.root}>
       <div style={S.h2}>🧬 HYBRID GENERATOR</div>
-      <div style={S.sec}>
+      
+      <PolyQualityBar quality={quality} onChange={setQuality}/>
+<div style={S.sec}>
         <label style={S.lbl}>Hybrid Preset</label>
         <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
           {Object.keys(HYBRID_PRESETS).map(p=><button key={p} style={{...S.btnSm,background:preset===p?T.teal:T.panel,color:preset===p?T.bg:T.teal}} onClick={()=>loadPreset(p)}>{p}</button>)}

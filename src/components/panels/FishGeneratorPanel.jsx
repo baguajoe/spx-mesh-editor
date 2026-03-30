@@ -1,5 +1,6 @@
 
 import React, { useState, useRef } from "react";
+import { PolyQualityBar, Q, estimateTris, formatTris } from './PolyQualityUtil';
 import * as THREE from "three";
 
 const T={bg:"#06060f",panel:"#0d0d1a",border:"#1a1a2e",teal:"#00ffc8",orange:"#FF6600",text:"#e0e0e0",muted:"#aaa",font:"JetBrains Mono,monospace"};
@@ -43,7 +44,7 @@ function buildFish(scene, cfg) {
     for(let t=0;t<12;t++){
       const a=t/12*Math.PI*2, r=cfg.bodyW*.38;
       for(let s=0;s<8;s++){
-        const tGeo=new THREE.SphereGeometry(.015,4,3);
+        const tGeo=new THREE.SphereGeometry(.015,Q(quality).sphere,Q(quality).sphereH);
         const tm=add(tGeo,Math.cos(a)*r*.8,-.2-s*.14,Math.sin(a)*r*.8,0,0,0,new THREE.MeshStandardMaterial({color:finCol,transparent:true,opacity:.6+Math.random()*.3,emissive:new THREE.Color(cfg.eyeColor),emissiveIntensity:.2}));
       }
     }
@@ -63,14 +64,14 @@ function buildFish(scene, cfg) {
     for(let i=0;i<8;i++){
       const y=i*.045+.1, r=.025*(1-i/8*.5)+.01;
       const bumpX=Math.sin(i*.5)*.02;
-      add(new THREE.SphereGeometry(r,7,5),bumpX,y,0,0,0,0,mat);
+      add(new THREE.SphereGeometry(r,Q(quality).sphere,Q(quality).sphereH),bumpX,y,0,0,0,0,mat);
     }
     // Curved neck
-    add(new THREE.CylinderGeometry(.018,.025,.12,7),.04,.52,0,0,0,.3);
+    add(new THREE.CylinderGeometry(.018,.025,.12,Q(quality).cylinder),.04,.52,0,0,0,.3);
     // Head
     add(new THREE.BoxGeometry(.06,.05,.08),.06,.6,0);
     // Snout
-    add(new THREE.CylinderGeometry(.006,.012,cfg.jawL,5),.06,.61,cfg.jawL*.5+.04,Math.PI/2,0,0);
+    add(new THREE.CylinderGeometry(.006,.012,cfg.jawL,Q(quality).cylinder),.06,.61,cfg.jawL*.5+.04,Math.PI/2,0,0);
     // Dorsal fin
     const dfGeo=new THREE.PlaneGeometry(cfg.dorsalH*.5,cfg.dorsalL*.5);
     add(dfGeo,.03+cfg.dorsalH*.25,.3,0,0,Math.PI/2,0,finMat);
@@ -84,12 +85,12 @@ function buildFish(scene, cfg) {
   }
 
   // Standard fish — body
-  const bodyGeo=new THREE.SphereGeometry(.5,12,8);
+  const bodyGeo=new THREE.SphereGeometry(.5,Q(quality).sphere,Q(quality).sphereH);
   const body=new THREE.Mesh(bodyGeo,mat.clone());
   body.scale.set(bW,bH,bL); body.position.set(0,.3,0); body.castShadow=true; scene.add(body); ms.push(body);
 
   // Head
-  const headGeo=new THREE.SphereGeometry(cfg.headSc,10,8);
+  const headGeo=new THREE.SphereGeometry(cfg.headSc,Q(quality).sphere,Q(quality).sphereH);
   const head=new THREE.Mesh(headGeo,mat.clone());
   head.scale.set(1,1,1.15); head.position.set(0,.3,bL*.45); scene.add(head); ms.push(head);
 
@@ -104,9 +105,9 @@ function buildFish(scene, cfg) {
   // Eyes
   if(cfg.eyeSz>.02){
     [-1,1].forEach(s=>{
-      add(new THREE.SphereGeometry(cfg.eyeSz,8,6),s*cfg.headSc*.65,.3+cfg.headSc*.18,bL*.45+cfg.headSc*.55,0,0,0,
+      add(new THREE.SphereGeometry(cfg.eyeSz,Q(quality).sphere,Q(quality).sphereH),s*cfg.headSc*.65,.3+cfg.headSc*.18,bL*.45+cfg.headSc*.55,0,0,0,
         new THREE.MeshStandardMaterial({color:0xffffff,roughness:.05,emissive:cfg.biolum?new THREE.Color(cfg.eyeColor):new THREE.Color(0),emissiveIntensity:cfg.biolum?.6:0}));
-      add(new THREE.SphereGeometry(cfg.eyeSz*.55,6,5),s*cfg.headSc*.7,.3+cfg.headSc*.18,bL*.45+cfg.headSc*.65,0,0,0,
+      add(new THREE.SphereGeometry(cfg.eyeSz*.55,Q(quality).sphere,Q(quality).sphereH),s*cfg.headSc*.7,.3+cfg.headSc*.18,bL*.45+cfg.headSc*.65,0,0,0,
         new THREE.MeshStandardMaterial({color:new THREE.Color(cfg.eyeColor)}));
     });
   }
@@ -167,7 +168,7 @@ function buildFish(scene, cfg) {
   if(cfg.spines){
     for(let i=0;i<5;i++){
       const sz=-bL*.1+i*bL*.08;
-      add(new THREE.ConeGeometry(bW*.04,cfg.dorsalH*.4,4),0,.3+bH/2+cfg.dorsalH*.5+i*.01,sz,.1,0,0,
+      add(new THREE.ConeGeometry(bW*.04,cfg.dorsalH*.4,Q(quality).cone),0,.3+bH/2+cfg.dorsalH*.5+i*.01,sz,.1,0,0,
         new THREE.MeshStandardMaterial({color:new THREE.Color(cfg.finColor),roughness:.6}));
     }
   }
@@ -177,15 +178,15 @@ function buildFish(scene, cfg) {
     const isAnglerfish = cfg.biolum && cfg.jawGape>.7;
     if(isAnglerfish){
       // Lure on dorsal spine
-      add(new THREE.CylinderGeometry(.01,.008,.35,5),0,.3+bH/2+.4,bL*.2,.3,0,0);
-      add(new THREE.SphereGeometry(.04,7,5),0,.3+bH/2+.75,bL*.2+.05,0,0,0,
+      add(new THREE.CylinderGeometry(.01,.008,.35,Q(quality).cylinder),0,.3+bH/2+.4,bL*.2,.3,0,0);
+      add(new THREE.SphereGeometry(.04,Q(quality).sphere,Q(quality).sphereH),0,.3+bH/2+.75,bL*.2+.05,0,0,0,
         new THREE.MeshStandardMaterial({color:0x00ffaa,emissive:new THREE.Color(0x00ffaa),emissiveIntensity:.8,roughness:.1}));
       if(cfg.biolum){const pl=new THREE.PointLight(0x00ffaa,.5,1.2);pl.position.set(0,.3+bH/2+.78,bL*.2+.06);scene.add(pl);ms.push(pl);}
     } else {
       // Barbels around mouth
       for(let b=0;b<4;b++){
         const bx=(b%2===0?-1:1)*(b<2?.06:.03), blen=.08+Math.random()*.06;
-        add(new THREE.CylinderGeometry(.004,.003,blen,4),bx,.3+cfg.headSc*(cfg.mouthPos-.5)*.4-.03,bL*.45+cfg.headSc+cfg.jawL*.5+blen*.3,-.2,0,.2*(b<2?1:-1),
+        add(new THREE.CylinderGeometry(.004,.003,blen,Q(quality).cylinder),bx,.3+cfg.headSc*(cfg.mouthPos-.5)*.4-.03,bL*.45+cfg.headSc+cfg.jawL*.5+blen*.3,-.2,0,.2*(b<2?1:-1),
           new THREE.MeshStandardMaterial({color:new THREE.Color(cfg.color),roughness:.9}));
       }
     }
@@ -194,7 +195,7 @@ function buildFish(scene, cfg) {
   // Stripe pattern overlay
   if(cfg.stripeColor !== cfg.color){
     for(let s=0;s<2;s++){
-      const sg=new THREE.SphereGeometry(.49,10,6);
+      const sg=new THREE.SphereGeometry(.49,Q(quality).sphere,Q(quality).sphereH);
       const sm=new THREE.Mesh(sg,new THREE.MeshStandardMaterial({color:new THREE.Color(cfg.stripeColor),transparent:true,opacity:.7,roughness:.4,metalness:.2}));
       sm.scale.set(bW*.85,bH*.3,bL*.25);
       sm.position.set(0,.3,bL*(s-.25)*.6);
@@ -231,6 +232,7 @@ const CTRL=[
 
 export default function FishGeneratorPanel({ scene }) {
   const [preset,setPreset] = useState("Tropical Fish");
+  const [quality, setQuality] = useState('Mid');
   const [cfg,setCfg]       = useState({...FISH_PRESETS["Tropical Fish"]});
   const [colors,setColors] = useState({color:"#ff8800",stripeColor:"#ffffff",finColor:"#ff4400",eyeColor:"#000000"});
   const [spines,setSpines] = useState(false);
@@ -258,7 +260,9 @@ export default function FishGeneratorPanel({ scene }) {
   return(
     <div style={S.root}>
       <div style={S.h2}>🐟 FISH GENERATOR</div>
-      <div style={S.sec}>
+      
+      <PolyQualityBar quality={quality} onChange={setQuality}/>
+<div style={S.sec}>
         <label style={S.lbl}>Fish/Aquatic Preset</label>
         <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
           {Object.keys(FISH_PRESETS).map(p=><button key={p} style={{...S.btnSm,background:preset===p?T.teal:T.panel,color:preset===p?T.bg:T.teal}} onClick={()=>loadPreset(p)}>{p}</button>)}

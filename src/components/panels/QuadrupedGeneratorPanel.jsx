@@ -1,5 +1,6 @@
 
 import React, { useState, useRef } from "react";
+import { PolyQualityBar, Q, estimateTris, formatTris } from './PolyQualityUtil';
 import * as THREE from "three";
 
 const T={bg:"#06060f",panel:"#0d0d1a",border:"#1a1a2e",teal:"#00ffc8",orange:"#FF6600",text:"#e0e0e0",muted:"#aaa",font:"JetBrains Mono,monospace"};
@@ -36,7 +37,7 @@ function buildQuadruped(scene, cfg) {
   // Body
   add(new THREE.BoxGeometry(bW, bH, bL), 0, baseY + bH/2, 0);
   // Neck
-  const neckGeo = new THREE.CylinderGeometry(cfg.headSc*0.22, cfg.headSc*0.28, cfg.neckL, 8);
+  const neckGeo = new THREE.CylinderGeometry(cfg.headSc*0.22, cfg.headSc*0.28, cfg.neckL,Q(quality).cylinder);
   add(neckGeo, 0, baseY+bH+cfg.neckL/2, bL/2-0.1, -0.3, 0, 0);
   // Head
   const headGeo = new THREE.BoxGeometry(cfg.headSc*0.7, cfg.headSc*0.6, cfg.headSc*0.85);
@@ -49,7 +50,7 @@ function buildQuadruped(scene, cfg) {
   // Ears
   if (cfg.earSz > 0.05) {
     [-1,1].forEach(s => {
-      const earGeo = new THREE.ConeGeometry(cfg.earSz*0.5, cfg.earSz, 5);
+      const earGeo = new THREE.ConeGeometry(cfg.earSz*0.5, cfg.earSz,Q(quality).cone);
       const ey = cfg.earUp ? baseY+bH+cfg.neckL+cfg.headSc*0.55 : baseY+bH+cfg.neckL+cfg.headSc*0.3;
       const ez = cfg.earUp ? 0.1 : -0.1;
       add(earGeo, s*cfg.headSc*0.3, ey, bL/2+0.05+ez, cfg.earUp?0:Math.PI/2, 0, s*0.3);
@@ -59,9 +60,9 @@ function buildQuadruped(scene, cfg) {
   [[-1,1],[-1,-1],[1,1],[1,-1]].forEach(([sx,sz]) => {
     const lgx = sx*bW/2*0.7, lgz = sz*bL/2*0.65;
     // Upper leg
-    add(new THREE.CylinderGeometry(lW*0.9, lW*0.75, lL*0.55, 8), lgx, baseY-lL*0.55/2, lgz);
+    add(new THREE.CylinderGeometry(lW*0.9, lW*0.75, lL*0.55,Q(quality).cylinder), lgx, baseY-lL*0.55/2, lgz);
     // Lower leg
-    add(new THREE.CylinderGeometry(lW*0.7, lW*0.55, lL*0.45, 8), lgx, baseY-lL*0.55-lL*0.45/2, lgz);
+    add(new THREE.CylinderGeometry(lW*0.7, lW*0.55, lL*0.45,Q(quality).cylinder), lgx, baseY-lL*0.55-lL*0.45/2, lgz);
     // Paw
     add(new THREE.BoxGeometry(cfg.pawSz, cfg.pawSz*0.35, cfg.pawSz*1.1), lgx, 0.08, lgz+cfg.pawSz*0.1);
   });
@@ -78,7 +79,7 @@ function buildQuadruped(scene, cfg) {
     }
   }
   // Eyes
-  const eyeGeo = new THREE.SphereGeometry(cfg.headSc*0.06, 6, 4);
+  const eyeGeo = new THREE.SphereGeometry(cfg.headSc*0.06,Q(quality).sphere,Q(quality).sphereH);
   const eyeMat = new THREE.MeshStandardMaterial({ color: 0x224488, roughness: 0.05 });
   [-1,1].forEach(s => add(eyeGeo, s*cfg.headSc*0.22, baseY+bH+cfg.neckL+cfg.headSc*0.18, bL/2+cfg.headSc*0.75, 0,0,0, eyeMat));
 
@@ -109,6 +110,7 @@ const CTRL = [
 
 export default function QuadrupedGeneratorPanel({ scene }) {
   const [preset, setPreset] = useState("Dog/Wolf");
+  const [quality, setQuality] = useState('Mid');
   const [cfg, setCfg]       = useState({ ...PRESETS["Dog/Wolf"] });
   const [color, setColor]   = useState("#886644");
   const [status, setStatus] = useState("");
@@ -127,7 +129,9 @@ export default function QuadrupedGeneratorPanel({ scene }) {
   return (
     <div style={S.root}>
       <div style={S.h2}>🐾 QUADRUPED GENERATOR</div>
-      <div style={S.sec}>
+      
+      <PolyQualityBar quality={quality} onChange={setQuality}/>
+<div style={S.sec}>
         <label style={S.lbl}>Animal Preset</label>
         <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
           {Object.keys(PRESETS).map(p=><button key={p} style={{...S.btnSm,background:preset===p?T.teal:T.panel,color:preset===p?T.bg:T.teal}} onClick={()=>loadPreset(p)}>{p}</button>)}
