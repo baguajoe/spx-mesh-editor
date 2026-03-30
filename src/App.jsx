@@ -1,4 +1,13 @@
 import { WORKSPACES, DEFAULT_WORKSPACE } from "./pro-ui/workspaceMap";
+import CityGeneratorPanel from './components/panels/CityGeneratorPanel';
+import VRPreviewPanel from './components/panels/VRPreviewPanel';
+import CrowdGeneratorPanel from './components/panels/CrowdGeneratorPanel';
+import EnvironmentGeneratorPanel from './components/panels/EnvironmentGeneratorPanel';
+import BuildingSimulatorPanel from './components/panels/BuildingSimulatorPanel';
+import PhysicsSimulationPanel from './components/panels/PhysicsSimulationPanel';
+import TerrainSculptingPanel from './components/panels/TerrainSculptingPanel';
+import LightingStudioPanel from './components/panels/LightingStudioPanel';
+import MaterialTexturePanel from './components/panels/MaterialTexturePanel';
 import { ViewportHeader } from "./components/ViewportHeader";
 import { PropertyInspector } from "./components/PropertyInspector";
 import { Outliner } from "./components/Outliner";
@@ -160,15 +169,7 @@ import {
   exportUVLayoutGLB
 } from "./mesh/uv/UVUnwrap.js";
 import {
-import CityGeneratorPanel from './panels/CityGeneratorPanel';
-import VRPreviewPanel from './panels/VRPreviewPanel';
-import CrowdGeneratorPanel from './panels/CrowdGeneratorPanel';
-import EnvironmentGeneratorPanel from './panels/EnvironmentGeneratorPanel';
-import BuildingSimulatorPanel from './panels/BuildingSimulatorPanel';
-import PhysicsSimulationPanel from './panels/PhysicsSimulationPanel';
-import TerrainSculptingPanel from './panels/TerrainSculptingPanel';
-import LightingStudioPanel from './panels/LightingStudioPanel';
-import MaterialTexturePanel from './panels/MaterialTexturePanel';
+
   createQuadCameraSet,
   resizeQuadCameraSet,
   renderViewportSet,
