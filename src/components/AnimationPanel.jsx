@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import MotionLibraryPanel from "./animation/MotionLibraryPanel";
 
 function Section({ title, children, defaultOpen = true }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -57,10 +58,13 @@ export function AnimationPanel({ onApplyFunction,
   const [procType, setProcType] = useState("float");
   const [procEnabled, setProcEnabled] = useState(false);
 
+  // Motion Library
+  const [motionLibOpen, setMotionLibOpen] = useState(true);
+
   return (
     <div className="spnl-root">
-      <div className="spnl-tabs" style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr" }}>
-        {[["keyframes","Keys"],["nla","NLA"],["shapekeys","Shapes"],["drivers","Drivers"],["procedural","Proc"]].map(([id,lbl]) => (
+      <div className="spnl-tabs" style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 1fr" }}>
+        {[["keyframes","Keys"],["nla","NLA"],["shapekeys","Shapes"],["drivers","Drivers"],["procedural","Proc"],["motion","Motion"]].map(([id,lbl]) => (
           <button key={id} className={`spnl-tab${tab===id?" spnl-tab--active":""}`}
             onClick={() => setTab(id)}>
             {lbl}
@@ -308,6 +312,20 @@ export function AnimationPanel({ onApplyFunction,
           </Section>
 
         </>)}
+        {/* ── MOTION LIBRARY ── */}
+        {tab === "motion" && (
+          <div style={{ height: "100%", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+            <MotionLibraryPanel
+              onOpenGamepadAnimator={() => {
+                window.dispatchEvent(new CustomEvent('spx:openGamepadAnimator'));
+              }}
+              onClipApplied={(id, meta) => {
+                onApplyFunction && onApplyFunction("motionClipApplied", { id, meta });
+              }}
+            />
+          </div>
+        )}
+
       </div>
     </div>
   );

@@ -123,6 +123,7 @@ import CollaboratePanel from "./components/collaboration/CollaboratePanel.jsx";
 import LightingCameraPanel from "./components/scene/LightingCameraPanel.jsx";
 // ── Gamepad + Pro Mesh ──
 import GamepadAnimator from "./components/animation/GamepadAnimator.jsx";
+import MotionLibraryPanel from "./components/animation/MotionLibraryPanel";
 import ProMeshPanel   from "./components/mesh/ProMeshPanel.jsx";
 
 // ── VFX Panels ──
@@ -3471,6 +3472,11 @@ export default function App() {
       )}
 
       
+
+      {/* ── Motion Library BVH + GamepadAnimator event bridge ── */}
+      {/* spx:applyBVH is dispatched by MotionLibraryPanel when no bvhImporter prop is passed */}
+      {/* spx:openGamepadAnimator is dispatched by MotionLibraryPanel Record New button */}
+
       {/* ── Gamepad Animator ── */}
       {gamepadOpen && (
         <div style={{position:"fixed",top:0,right:0,width:360,height:"100vh",zIndex:65,overflow:"hidden",display:"flex",flexDirection:"column"}}>
