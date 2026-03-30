@@ -121,6 +121,9 @@ import "./styles/hair-advanced.css";
 import HairFXPanel from "./components/hair/HairFXPanel.jsx";
 import CollaboratePanel from "./components/collaboration/CollaboratePanel.jsx";
 import LightingCameraPanel from "./components/scene/LightingCameraPanel.jsx";
+// ── Gamepad + Pro Mesh ──
+import GamepadAnimator from "./components/animation/GamepadAnimator.jsx";
+import ProMeshPanel   from "./components/mesh/ProMeshPanel.jsx";
 
 // ── VFX Panels ──
 import FluidPanel            from "./components/vfx/FluidPanel.jsx";
@@ -248,6 +251,8 @@ export default function App() {
     else if (toolId === "camera") setLightingCameraPanelOpen?.(true);
     else if (toolId === "lighting_camera") setLightingCameraPanelOpen?.(true);
     else if (toolId === "grease_pencil") setGreasePencilPanelOpen?.(true);
+    else if (toolId === "gamepad")    setGamepadOpen?.(true);
+    else if (toolId === "pro_mesh")   setProMeshOpen?.(true);
     else if (toolId === "fluid")        setFluidPanelOpen?.(true);
     else if (toolId === "weather")      setWeatherPanelOpen?.(true);
     else if (toolId === "destruction")  setDestructionPanelOpen?.(true);
@@ -330,6 +335,9 @@ export default function App() {
   const [hairPanelOpen, setHairPanelOpen] = useState(false);
   const [collaboratePanelOpen, setCollaboratePanelOpen] = useState(false);
   const [lightingCameraPanelOpen, setLightingCameraPanelOpen] = useState(false);
+  // ── Gamepad Animator + Pro Mesh ──
+  const [gamepadOpen,   setGamepadOpen]   = useState(false);
+  const [proMeshOpen,   setProMeshOpen]   = useState(false);
   // ── VFX panels ──
   const [fluidPanelOpen,       setFluidPanelOpen]       = useState(false);
   const [weatherPanelOpen,     setWeatherPanelOpen]     = useState(false);
@@ -455,6 +463,8 @@ export default function App() {
     setAutoRigOpen(false);
     setAdvancedRigOpen(false);
     setMocapWorkspaceOpen?.(false);
+    setGamepadOpen?.(false);
+    setProMeshOpen?.(false);
     setFluidPanelOpen(false);
     setWeatherPanelOpen(false);
     setDestructionPanelOpen(false);
@@ -2593,6 +2603,9 @@ export default function App() {
     if (fn === "vfx_burst")           { if(typeof window.burstEmit==="function"){window.burstEmit(null,meshRef.current?.position,100);setStatus("Burst emitted");} return; }
     if (fn === "fluid_water")         { if(typeof window.createFluidSettings==="function"&&window.FLUID_PRESETS){window.createFluidSettings(window.FLUID_PRESETS.water);setStatus("Water fluid created");} return; }
     
+    
+    if (fn === "open_gamepad")   { setGamepadOpen(true); return; }
+    if (fn === "open_pro_mesh")  { setProMeshOpen(true); return; }
     if (fn === "open_fluid")        { setFluidPanelOpen(true); return; }
     if (fn === "open_weather")      { setWeatherPanelOpen(true); return; }
     if (fn === "open_destruction")  { setDestructionPanelOpen(true); return; }
@@ -3178,6 +3191,14 @@ export default function App() {
           <span className="spx-native-workspace-tab-label">SPX Performance</span>
           <span className="spx-native-workspace-tab-hint">P</span>
         </button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("gamepad")}>
+          <span className="spx-native-workspace-tab-label">🎮 Gamepad</span>
+          <span className="spx-native-workspace-tab-hint">Animate</span>
+        </button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("pro_mesh")}>
+          <span className="spx-native-workspace-tab-label">✂ Pro Mesh</span>
+          <span className="spx-native-workspace-tab-hint">Shift+P</span>
+        </button>
         {/* ── VFX Tabs ── */}
         <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("fluid")}>
           <span className="spx-native-workspace-tab-label">💧 Fluid</span>
@@ -3446,6 +3467,46 @@ export default function App() {
             <button onClick={() => setTerrainOpen(false)} style={{marginLeft:"auto",background:"none",border:"1px solid #1a2a3a",borderRadius:3,color:"#5a7088",cursor:"pointer",padding:"3px 10px",fontFamily:"JetBrains Mono,monospace",fontSize:10}}>✕ CLOSE</button>
           </div>
           <div style={{flex:1,overflow:"hidden"}}><TerrainSculpting /></div>
+        </div>
+      )}
+
+      
+      {/* ── Gamepad Animator ── */}
+      {gamepadOpen && (
+        <div style={{position:"fixed",top:0,right:0,width:360,height:"100vh",zIndex:65,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+          <GamepadAnimator
+            open={gamepadOpen}
+            onClose={() => setGamepadOpen(false)}
+            sceneRef={sceneRef}
+            meshRef={meshRef}
+            setStatus={setStatus}
+            onApplyFunction={handleApplyFunction}
+            currentFrame={currentFrame}
+            setCurrentFrame={setCurrentFrame}
+            isPlaying={isPlaying}
+            setIsPlaying={setIsPlaying}
+          />
+        </div>
+      )}
+
+      {/* ── Pro Mesh Panel (full-screen) ── */}
+      {proMeshOpen && (
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:80,background:"#06060f",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",alignItems:"center",padding:"6px 12px",background:"#0a0a14",borderBottom:"1px solid #1a2a3a",gap:8,flexShrink:0}}>
+            <span style={{color:"#00ffc8",fontFamily:"JetBrains Mono,monospace",fontSize:11,fontWeight:700}}>✂ PRO MESH EDITOR</span>
+            <span style={{fontSize:9,color:"#5a7088"}}>Best-in-class mesh tools</span>
+            <button onClick={() => setProMeshOpen(false)} style={{marginLeft:"auto",background:"none",border:"1px solid #1a2a3a",borderRadius:3,color:"#5a7088",cursor:"pointer",padding:"3px 10px",fontFamily:"JetBrains Mono,monospace",fontSize:10}}>✕ CLOSE</button>
+          </div>
+          <div style={{flex:1,overflow:"hidden"}}>
+            <ProMeshPanel
+              open={proMeshOpen}
+              onClose={() => setProMeshOpen(false)}
+              meshRef={meshRef}
+              sceneRef={sceneRef}
+              setStatus={setStatus}
+              onApplyFunction={handleApplyFunction}
+            />
+          </div>
         </div>
       )}
 
