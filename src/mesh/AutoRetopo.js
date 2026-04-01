@@ -1,195 +1,277 @@
-import * as THREE from "three";
+// AutoRetopo.js — Retopology Engine UPGRADE
+// SPX Mesh Editor | StreamPireX
+// Features: snap-to-surface, PolyBuild interactive retopo, auto-retopo via voxel remesh
 
-// ── Auto-retopology settings ──────────────────────────────────────────────────
-export function createRetopoSettings(options = {}) {
-  return {
-    targetFaces:     options.targetFaces     || 1000,
-    preserveHard:    options.preserveHard    || true,
-    hardAngle:       options.hardAngle       || 60,
-    edgeFlowBias:    options.edgeFlowBias    || 0.5,
-    creaseWeight:    options.creaseWeight    || 0.8,
-    symmetry:        options.symmetry        || false,
-    symmetryAxis:    options.symmetryAxis    || "x",
-    preserveUVBorder:options.preserveUVBorder || true,
-  };
-}
+import * as THREE from 'three';
 
-// ── Detect hard edges by angle ────────────────────────────────────────────────
-export function detectHardEdges(geo, angleThreshold = 60) {
-  const pos    = geo.attributes.position;
-  const nor    = geo.attributes.normal;
-  const idx    = geo.index;
-  if (!pos || !idx) return new Set();
+// ─── Voxel-based Auto Retopology ──────────────────────────────────────────────
 
-  const arr        = idx.array;
-  const hardEdges  = new Set();
-  const edgeNormals = new Map();
+export function autoRetopo(sourceMesh, targetPolyCount = 2000) {
+  const geo = sourceMesh.geometry.clone();
+  geo.computeVertexNormals();
 
-  for (let i = 0; i < arr.length; i += 3) {
-    // Compute face normal
-    const a = new THREE.Vector3(pos.getX(arr[i]),   pos.getY(arr[i]),   pos.getZ(arr[i]));
-    const b = new THREE.Vector3(pos.getX(arr[i+1]), pos.getY(arr[i+1]), pos.getZ(arr[i+1]));
-    const c = new THREE.Vector3(pos.getX(arr[i+2]), pos.getY(arr[i+2]), pos.getZ(arr[i+2]));
-    const fn = new THREE.Triangle(a,b,c).getNormal(new THREE.Vector3());
+  // Build voxel grid from source mesh
+  const bbox = new THREE.Box3().setFromBufferAttribute(geo.attributes.position);
+  const size = new THREE.Vector3();
+  bbox.getSize(size);
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const voxelSize = maxDim / Math.cbrt(targetPolyCount * 6);
 
-    for (let k = 0; k < 3; k++) {
-      const vi = arr[i+k], vj = arr[i+(k+1)%3];
-      const key  = Math.min(vi,vj) + "_" + Math.max(vi,vj);
-      const tkey = key + "_twin";
-      if (edgeNormals.has(key)) {
-        // Compare normals
-        const other = edgeNormals.get(key);
-        const angle = THREE.MathUtils.radToDeg(fn.angleTo(other));
-        if (angle > angleThreshold) hardEdges.add(key);
-      } else {
-        edgeNormals.set(key, fn.clone());
-      }
-    }
-  }
-  return hardEdges;
-}
+  const nx = Math.ceil(size.x / voxelSize);
+  const ny = Math.ceil(size.y / voxelSize);
+  const nz = Math.ceil(size.z / voxelSize);
 
-// ── Compute edge flow hints from normals ──────────────────────────────────────
-export function computeEdgeFlow(geo) {
-  const pos    = geo.attributes.position;
-  const nor    = geo.attributes.normal;
-  if (!pos || !nor) return [];
+  const grid = new Uint8Array(nx * ny * nz);
+  const pos = geo.attributes.position;
 
-  const flow = [];
+  // Mark occupied voxels
   for (let i = 0; i < pos.count; i++) {
-    const n = new THREE.Vector3(nor.getX(i), nor.getY(i), nor.getZ(i)).normalize();
-    // Principal curvature direction (simplified — tangent to normal)
-    const t = new THREE.Vector3(1,0,0);
-    if (Math.abs(n.dot(t)) > 0.9) t.set(0,1,0);
-    const bitangent = n.clone().cross(t).normalize();
-    flow.push({ position: new THREE.Vector3(pos.getX(i),pos.getY(i),pos.getZ(i)), direction: bitangent });
-  }
-  return flow;
-}
-
-// ── Quad-dominant decimation ───────────────────────────────────────────────────
-export function quadDominantRetopo(mesh, settings) {
-  const geo    = mesh.geometry;
-  const pos    = geo.attributes.position;
-  const idx    = geo.index;
-  if (!pos || !idx) return mesh;
-
-  const currentFaces = Math.floor(idx.count / 3);
-  const ratio        = settings.targetFaces / Math.max(currentFaces, 1);
-
-  if (ratio >= 1) return mesh; // no need to decimate
-
-  // Detect hard edges to preserve
-  const hardEdges    = settings.preserveHard
-    ? detectHardEdges(geo, settings.hardAngle)
-    : new Set();
-
-  // Simple edge collapse decimation
-  const arr          = [...idx.array];
-  const positions    = new Float32Array(pos.array);
-  const targetTris   = Math.max(4, settings.targetFaces);
-  const collapseEvery = Math.max(2, Math.floor(currentFaces / targetTris));
-
-  const newIdx = [];
-  for (let i = 0; i < arr.length; i += 3 * collapseEvery) {
-    if (i + 2 < arr.length) {
-      newIdx.push(arr[i], arr[i+1], arr[i+2]);
+    const x = Math.floor((pos.getX(i) - bbox.min.x) / voxelSize);
+    const y = Math.floor((pos.getY(i) - bbox.min.y) / voxelSize);
+    const z = Math.floor((pos.getZ(i) - bbox.min.z) / voxelSize);
+    if (x >= 0 && x < nx && y >= 0 && y < ny && z >= 0 && z < nz) {
+      grid[x + y * nx + z * nx * ny] = 1;
     }
   }
 
-  const newGeo = geo.clone();
-  newGeo.setIndex(newIdx);
-  newGeo.computeVertexNormals();
+  // Extract surface quads from voxel grid (naive surface nets)
+  const vertices = [];
+  const indices = [];
 
-  // Post-process — convert tris to quads where possible
-  const quadGeo = triToQuad(newGeo, settings.edgeFlowBias);
+  for (let x = 0; x < nx - 1; x++) {
+    for (let y = 0; y < ny - 1; y++) {
+      for (let z = 0; z < nz - 1; z++) {
+        const v = grid[x + y * nx + z * nx * ny];
+        const vx = grid[(x+1) + y * nx + z * nx * ny];
+        const vy = grid[x + (y+1) * nx + z * nx * ny];
+        const vz = grid[x + y * nx + (z+1) * nx * ny];
 
-  const newMesh = new THREE.Mesh(quadGeo, mesh.material.clone());
-  newMesh.name  = mesh.name + "_retopo";
-  return newMesh;
-}
-
-// ── Convert triangles to quads (merge co-planar pairs) ───────────────────────
-function triToQuad(geo, bias = 0.5) {
-  const pos    = geo.attributes.position;
-  const idx    = geo.index;
-  if (!pos || !idx) return geo;
-
-  const arr      = idx.array;
-  const merged   = new Set();
-  const newIdx   = [];
-
-  for (let i = 0; i < arr.length; i += 3) {
-    if (merged.has(i)) continue;
-    const a = arr[i], b = arr[i+1], c = arr[i+2];
-    let paired = false;
-
-    // Look for adjacent triangle sharing edge (b,c)
-    for (let j = i+3; j < arr.length; j += 3) {
-      if (merged.has(j)) continue;
-      const d = arr[j], e = arr[j+1], f = arr[j+2];
-      const sharedEdge = findSharedEdge([a,b,c],[d,e,f]);
-      if (sharedEdge) {
-        const opposite = [a,b,c].find(v => !sharedEdge.includes(v));
-        const opposite2 = [d,e,f].find(v => !sharedEdge.includes(v));
-        if (opposite !== undefined && opposite2 !== undefined) {
-          // Check planarity
-          const pa = new THREE.Vector3(pos.getX(a),pos.getY(a),pos.getZ(a));
-          const pb = new THREE.Vector3(pos.getX(b),pos.getY(b),pos.getZ(b));
-          const pc = new THREE.Vector3(pos.getX(c),pos.getY(c),pos.getZ(c));
-          const pd = new THREE.Vector3(pos.getX(opposite2),pos.getY(opposite2),pos.getZ(opposite2));
-          const n1 = new THREE.Triangle(pa,pb,pc).getNormal(new THREE.Vector3());
-          const n2 = new THREE.Triangle(pa,pb,pd).getNormal(new THREE.Vector3());
-          if (n1.dot(n2) > 1 - bias * 0.5) {
-            // Merge as quad (two triangles)
-            newIdx.push(opposite, sharedEdge[0], opposite2, sharedEdge[0], sharedEdge[1], opposite2);
-            merged.add(i); merged.add(j);
-            paired = true;
-            break;
-          }
+        if (v !== vx) {
+          const wx = bbox.min.x + (x + 0.5) * voxelSize;
+          const wy = bbox.min.y + (y + 0.5) * voxelSize;
+          const wz = bbox.min.z + (z + 0.5) * voxelSize;
+          const vi = vertices.length / 3;
+          vertices.push(wx, wy, wz, wx, wy + voxelSize, wz, wx, wy + voxelSize, wz + voxelSize, wx, wy, wz + voxelSize);
+          indices.push(vi, vi+1, vi+2, vi, vi+2, vi+3);
         }
       }
     }
-    if (!paired) newIdx.push(a, b, c);
   }
 
-  const newGeo = geo.clone();
-  newGeo.setIndex(newIdx);
+  if (vertices.length === 0) {
+    console.warn('[AutoRetopo] No surface found — returning original');
+    return geo;
+  }
+
+  const newGeo = new THREE.BufferGeometry();
+  newGeo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  newGeo.setIndex(indices);
   newGeo.computeVertexNormals();
+
+  // Project vertices back onto original surface
+  projectToSurface(newGeo, sourceMesh);
+
   return newGeo;
 }
 
-function findSharedEdge(tri1, tri2) {
-  const shared = tri1.filter(v => tri2.includes(v));
-  return shared.length === 2 ? shared : null;
+// ─── Snap-to-Surface ─────────────────────────────────────────────────────────
+
+export function projectToSurface(retopGeo, targetMesh) {
+  const raycaster = new THREE.Raycaster();
+  const pos = retopGeo.attributes.position;
+  const norm = retopGeo.attributes.normal;
+
+  if (!norm) { retopGeo.computeVertexNormals(); }
+
+  for (let i = 0; i < pos.count; i++) {
+    const origin = new THREE.Vector3().fromBufferAttribute(pos, i);
+    const normal = new THREE.Vector3().fromBufferAttribute(retopGeo.attributes.normal, i).normalize();
+
+    // Cast ray both ways along normal
+    for (const dir of [normal, normal.clone().negate()]) {
+      raycaster.set(origin, dir);
+      const hits = raycaster.intersectObject(targetMesh, false);
+      if (hits.length > 0 && hits[0].distance < 2) {
+        const hp = hits[0].point;
+        pos.setXYZ(i, hp.x, hp.y, hp.z);
+        break;
+      }
+    }
+  }
+
+  pos.needsUpdate = true;
+  retopGeo.computeVertexNormals();
 }
 
-// ── Symmetry retopo ───────────────────────────────────────────────────────────
-export function applySymmetryRetopo(mesh, axis = "x") {
-  const geo = mesh.geometry;
+// ─── PolyBuild Interactive Retopo ─────────────────────────────────────────────
+
+export class PolyBuildTool {
+  constructor(scene, camera, renderer, targetMesh) {
+    this.scene = scene;
+    this.camera = camera;
+    this.renderer = renderer;
+    this.targetMesh = targetMesh;
+    this.raycaster = new THREE.Raycaster();
+    this.vertices = [];
+    this.faces = [];
+    this.previewMesh = null;
+    this.snapRadius = 0.05;
+    this.active = false;
+    this._onPointerDown = this._onPointerDown.bind(this);
+  }
+
+  enable() {
+    this.active = true;
+    this.renderer.domElement.addEventListener('pointerdown', this._onPointerDown);
+    this._initPreviewMesh();
+  }
+
+  disable() {
+    this.active = false;
+    this.renderer.domElement.removeEventListener('pointerdown', this._onPointerDown);
+  }
+
+  _initPreviewMesh() {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute([], 3));
+    const mat = new THREE.MeshBasicMaterial({ color: 0x00ffc8, wireframe: true, side: THREE.DoubleSide });
+    this.previewMesh = new THREE.Mesh(geo, mat);
+    this.scene.add(this.previewMesh);
+  }
+
+  _onPointerDown(event) {
+    if (!this.active) return;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -((event.clientY - rect.top) / rect.height) * 2 + 1,
+    );
+
+    this.raycaster.setFromCamera(ndc, this.camera);
+    const hits = this.raycaster.intersectObject(this.targetMesh, false);
+    if (!hits.length) return;
+
+    const point = hits[0].point.clone();
+
+    // Snap to existing vertex if close enough
+    const snapped = this._snapToExisting(point);
+    const vertIdx = snapped !== null ? snapped : this._addVertex(point);
+
+    if (this.vertices.length >= 3) {
+      // Auto-complete quad on 4th vertex
+      if (this._pendingVerts && this._pendingVerts.length === 3) {
+        this._pendingVerts.push(vertIdx);
+        this._addFace(...this._pendingVerts);
+        this._pendingVerts = [];
+      } else {
+        this._pendingVerts = [vertIdx];
+      }
+    } else {
+      this._pendingVerts = this._pendingVerts ?? [];
+      this._pendingVerts.push(vertIdx);
+    }
+
+    this._updatePreview();
+  }
+
+  _addVertex(point) {
+    this.vertices.push(point.clone());
+    return this.vertices.length - 1;
+  }
+
+  _snapToExisting(point) {
+    for (let i = 0; i < this.vertices.length; i++) {
+      if (this.vertices[i].distanceTo(point) < this.snapRadius) return i;
+    }
+    return null;
+  }
+
+  _addFace(a, b, c, d) {
+    if (d !== undefined) {
+      this.faces.push([a, b, c], [a, c, d]); // quad as 2 tris
+    } else {
+      this.faces.push([a, b, c]);
+    }
+    this._updatePreview();
+  }
+
+  _updatePreview() {
+    if (!this.previewMesh) return;
+    const positions = this.vertices.flatMap(v => [v.x, v.y, v.z]);
+    const indices = this.faces.flat();
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    if (indices.length) geo.setIndex(indices);
+    geo.computeVertexNormals();
+    this.previewMesh.geometry.dispose();
+    this.previewMesh.geometry = geo;
+  }
+
+  extractGeometry() {
+    const positions = this.vertices.flatMap(v => [v.x, v.y, v.z]);
+    const indices = this.faces.flat();
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    if (indices.length) geo.setIndex(indices);
+    geo.computeVertexNormals();
+    return geo;
+  }
+
+  clear() {
+    this.vertices = [];
+    this.faces = [];
+    this._pendingVerts = [];
+    this._updatePreview();
+  }
+
+  dispose() {
+    this.disable();
+    if (this.previewMesh) {
+      this.scene.remove(this.previewMesh);
+      this.previewMesh.geometry.dispose();
+    }
+  }
+}
+
+export default { autoRetopo, projectToSurface, PolyBuildTool };
+
+
+// ─── Legacy functional exports (App.jsx compat) ───────────────────────────────
+
+export function quadDominantRetopo(sourceMesh, targetPolyCount = 2000) {
+  return autoRetopo(sourceMesh, targetPolyCount);
+}
+
+export function detectHardEdges(geometry, angleThreshold = Math.PI / 4) {
+  const { SeamManager } = require('./UVUnwrap.js');
+  const sm = new SeamManager();
+  sm.markSharpEdgesAsSeams(geometry, angleThreshold);
+  return Array.from(sm.seams);
+}
+
+export function applySymmetryRetopo(geometry, axis = 'x') {
+  const geo = geometry.clone();
   const pos = geo.attributes.position;
   for (let i = 0; i < pos.count; i++) {
-    if (axis === "x" && pos.getX(i) > 0) {
-      // Mirror from negative side
-      const mirrorX = -pos.getX(i);
-      pos.setX(i, Math.min(pos.getX(i), 0));
-    }
+    if (axis === 'x' && pos.getX(i) < 0) pos.setX(i, Math.abs(pos.getX(i)));
+    if (axis === 'y' && pos.getY(i) < 0) pos.setY(i, Math.abs(pos.getY(i)));
+    if (axis === 'z' && pos.getZ(i) < 0) pos.setZ(i, Math.abs(pos.getZ(i)));
   }
   pos.needsUpdate = true;
   geo.computeVertexNormals();
+  return geo;
 }
 
-// ── Get retopo stats ──────────────────────────────────────────────────────────
-export function getRetopoStats(original, retopo) {
-  const origV = original.geometry.attributes.position?.count || 0;
-  const origF = original.geometry.index ? Math.floor(original.geometry.index.count/3) : 0;
-  const retoV = retopo.geometry.attributes.position?.count || 0;
-  const retoF = retopo.geometry.index ? Math.floor(retopo.geometry.index.count/3) : 0;
+export function getRetopoStats(geometry) {
+  const pos = geometry?.attributes?.position;
+  const idx = geometry?.index;
   return {
-    originalVerts:   origV,
-    originalFaces:   origF,
-    retopoVerts:     retoV,
-    retopoFaces:     retoF,
-    reductionRatio:  origF > 0 ? Math.round((1 - retoF/origF)*100) + "%" : "0%",
+    vertices: pos?.count ?? 0,
+    faces: idx ? idx.count / 3 : (pos?.count ?? 0) / 3,
+    edges: idx ? idx.count / 2 : 0,
   };
+}
+
+export function createRetopoSettings(options = {}) {
+  return { targetPolyCount: 2000, axis: 'x', snapToSurface: true, usePolyBuild: false, ...options };
 }

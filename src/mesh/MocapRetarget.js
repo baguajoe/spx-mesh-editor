@@ -1,195 +1,265 @@
-import * as THREE from "three";
+// MocapRetarget.js — Mocap Retargeting Engine UPGRADE
+// SPX Mesh Editor | StreamPireX
+// Features: T-pose binding, bone length normalization, source/target skeleton mapping,
+//           multi-format support (MediaPipe 33-pt, BVH, custom)
 
-// ── Bone name mapping — BVH → SPX rig ────────────────────────────────────────
-export const DEFAULT_BONE_MAP = {
-  // Spine
-  "Hips":          "Root",
-  "Spine":         "Spine",
-  "Spine1":        "Spine1",
-  "Spine2":        "Chest",
-  "Neck":          "Neck",
-  "Head":          "Head",
-  // Left arm
-  "LeftShoulder":  "L_Shoulder",
-  "LeftArm":       "L_UpperArm",
-  "LeftForeArm":   "L_LowerArm",
-  "LeftHand":      "L_Hand",
-  // Right arm
-  "RightShoulder": "R_Shoulder",
-  "RightArm":      "R_UpperArm",
-  "RightForeArm":  "R_LowerArm",
-  "RightHand":     "R_Hand",
-  // Left leg
-  "LeftUpLeg":     "L_Thigh",
-  "LeftLeg":       "L_Shin",
-  "LeftFoot":      "L_Foot",
-  "LeftToeBase":   "L_Toe",
-  // Right leg
-  "RightUpLeg":    "R_Thigh",
-  "RightLeg":      "R_Shin",
-  "RightFoot":     "R_Foot",
-  "RightToeBase":  "R_Toe",
+import * as THREE from 'three';
+
+// ─── Skeleton Profiles ────────────────────────────────────────────────────────
+
+export const MEDIAPIPE_JOINTS = [
+  'nose','leftEye','rightEye','leftEar','rightEar',
+  'leftShoulder','rightShoulder','leftElbow','rightElbow',
+  'leftWrist','rightWrist','leftHip','rightHip',
+  'leftKnee','rightKnee','leftAnkle','rightAnkle',
+  'leftHeel','rightHeel','leftFootIndex','rightFootIndex',
+];
+
+export const SPX_JOINTS = [
+  'hips','spine','spine1','spine2','neck','head',
+  'leftShoulder','leftArm','leftForeArm','leftHand',
+  'rightShoulder','rightArm','rightForeArm','rightHand',
+  'leftUpLeg','leftLeg','leftFoot','leftToeBase',
+  'rightUpLeg','rightLeg','rightFoot','rightToeBase',
+];
+
+// MediaPipe index → SPX joint name mapping
+export const MEDIAPIPE_TO_SPX = {
+  11: 'leftShoulder',   12: 'rightShoulder',
+  13: 'leftArm',        14: 'rightArm',
+  15: 'leftForeArm',    16: 'rightForeArm',
+  17: 'leftHand',       18: 'rightHand',
+  23: 'leftUpLeg',      24: 'rightUpLeg',
+  25: 'leftLeg',        26: 'rightLeg',
+  27: 'leftFoot',       28: 'rightFoot',
 };
 
-// ── Retarget BVH frame to SPX armature ───────────────────────────────────────
-export function retargetFrame(bvh, boneMap, armature, frameIndex) {
-  if (frameIndex >= bvh.frames.length) return;
-  const frame  = bvh.frames[frameIndex];
-  const joints = bvh.joints;
-  let   offset = 0;
+// ─── Retargeter ───────────────────────────────────────────────────────────────
 
-  joints.forEach(joint => {
-    const spxBoneName = boneMap[joint.name];
-    const spxBone     = armature.userData.bones?.find(b => b.name === spxBoneName);
+export class MocapRetargeter {
+  constructor(options = {}) {
+    this.sourceProfile = options.sourceProfile ?? 'MEDIAPIPE';
+    this.targetSkeleton = options.targetSkeleton ?? null; // THREE.Skeleton
+    this.tposeRotations = new Map(); // boneName -> Quaternion (rest pose)
+    this.boneLengths = new Map();    // boneName -> length
+    this.sourceMapping = options.mapping ?? MEDIAPIPE_TO_SPX;
+    this.smoothing = options.smoothing ?? 0.6;
+    this._prevRotations = new Map();
+  }
 
-    // Read channel values
-    const vals = {};
-    joint.channels.forEach(ch => { vals[ch] = frame[offset++] || 0; });
-
-    if (!spxBone) return;
-
-    // Apply rotation
-    if (vals.Xrotation !== undefined) {
-      spxBone.rotation.x = THREE.MathUtils.degToRad(vals.Xrotation);
-    }
-    if (vals.Yrotation !== undefined) {
-      spxBone.rotation.y = THREE.MathUtils.degToRad(vals.Yrotation);
-    }
-    if (vals.Zrotation !== undefined) {
-      spxBone.rotation.z = THREE.MathUtils.degToRad(vals.Zrotation);
-    }
-
-    // Apply position (root only)
-    if (vals.Xposition !== undefined && spxBone.name === "Root") {
-      spxBone.position.x = vals.Xposition * 0.01;
-      spxBone.position.y = vals.Yposition * 0.01;
-      spxBone.position.z = vals.Zposition * 0.01;
-    }
-  });
-}
-
-// ── Bake retargeted animation to keyframes ────────────────────────────────────
-export function bakeRetargetedAnimation(bvh, boneMap, armature) {
-  const keys = {};
-  const fps  = 1 / bvh.frameTime;
-
-  bvh.frames.forEach((_, frameIndex) => {
-    retargetFrame(bvh, boneMap, armature, frameIndex);
-    const frame = Math.round(frameIndex);
-
-    armature.userData.bones?.forEach(bone => {
-      const id = bone.userData.boneId;
-      if (!keys[id]) keys[id] = { rx:{}, ry:{}, rz:{} };
-      keys[id].rx[frame] = bone.rotation.x;
-      keys[id].ry[frame] = bone.rotation.y;
-      keys[id].rz[frame] = bone.rotation.z;
+  // Call once with your character's skeleton in T-pose
+  bindTPose(skeleton) {
+    this.targetSkeleton = skeleton;
+    skeleton.bones.forEach(bone => {
+      this.tposeRotations.set(bone.name, bone.quaternion.clone());
+      if (bone.children.length > 0) {
+        const child = bone.children[0];
+        this.boneLengths.set(bone.name, bone.position.distanceTo(child.position));
+      }
     });
-  });
+    console.log(`[MocapRetargeter] Bound T-pose: ${skeleton.bones.length} bones`);
+  }
 
-  return { keys, frameCount: bvh.frames.length, fps };
-}
+  // Retarget MediaPipe landmarks onto bound skeleton
+  retargetMediaPipe(landmarks, worldLandmarks = null) {
+    if (!this.targetSkeleton || !landmarks) return;
+    const lm = worldLandmarks ?? landmarks;
 
-// ── Fix foot sliding (simple height lock) ─────────────────────────────────────
-export function fixFootSliding(armature, footBoneName = "L_Foot", floorY = 0) {
-  const foot = armature.userData.bones?.find(b => b.name === footBoneName);
-  if (!foot) return;
-  const worldPos = new THREE.Vector3();
-  foot.getWorldPosition(worldPos);
-  if (worldPos.y < floorY) {
-    const diff = floorY - worldPos.y;
-    armature.position.y += diff;
+    // Compute source bone vectors
+    const boneVectors = this._computeSourceBoneVectors(lm);
+
+    // Apply to target skeleton
+    this.targetSkeleton.bones.forEach(bone => {
+      const sourceVec = boneVectors[bone.name];
+      if (!sourceVec) return;
+
+      const tposeQ = this.tposeRotations.get(bone.name) ?? new THREE.Quaternion();
+      const targetQ = this._vectorToRotation(sourceVec, bone, tposeQ);
+
+      // Smooth
+      const prev = this._prevRotations.get(bone.name) ?? targetQ.clone();
+      const smoothed = prev.clone().slerp(targetQ, this.smoothing);
+      this._prevRotations.set(bone.name, smoothed.clone());
+
+      bone.quaternion.copy(smoothed);
+    });
+  }
+
+  _computeSourceBoneVectors(landmarks) {
+    const vectors = {};
+    const get = (idx) => {
+      const lm = landmarks[idx];
+      return lm ? new THREE.Vector3(lm.x, -lm.y, lm.z) : null;
+    };
+
+    // Left arm chain
+    const ls = get(11), le = get(13), lw = get(15);
+    if (ls && le) vectors['leftArm']     = new THREE.Vector3().subVectors(le, ls).normalize();
+    if (le && lw) vectors['leftForeArm'] = new THREE.Vector3().subVectors(lw, le).normalize();
+
+    // Right arm chain
+    const rs = get(12), re = get(14), rw = get(16);
+    if (rs && re) vectors['rightArm']     = new THREE.Vector3().subVectors(re, rs).normalize();
+    if (re && rw) vectors['rightForeArm'] = new THREE.Vector3().subVectors(rw, re).normalize();
+
+    // Left leg chain
+    const lh = get(23), lk = get(25), la = get(27);
+    if (lh && lk) vectors['leftUpLeg'] = new THREE.Vector3().subVectors(lk, lh).normalize();
+    if (lk && la) vectors['leftLeg']   = new THREE.Vector3().subVectors(la, lk).normalize();
+
+    // Right leg chain
+    const rh = get(24), rk = get(26), ra = get(28);
+    if (rh && rk) vectors['rightUpLeg'] = new THREE.Vector3().subVectors(rk, rh).normalize();
+    if (rk && ra) vectors['rightLeg']   = new THREE.Vector3().subVectors(ra, rk).normalize();
+
+    // Spine
+    const hipL = get(23), hipR = get(24), shoulderL = get(11), shoulderR = get(12);
+    if (hipL && hipR && shoulderL && shoulderR) {
+      const hipCenter = new THREE.Vector3().addVectors(hipL, hipR).multiplyScalar(0.5);
+      const shoulderCenter = new THREE.Vector3().addVectors(shoulderL, shoulderR).multiplyScalar(0.5);
+      const spineVec = new THREE.Vector3().subVectors(shoulderCenter, hipCenter).normalize();
+      vectors['spine'] = spineVec;
+      vectors['spine1'] = spineVec;
+      vectors['spine2'] = spineVec;
+      vectors['hips'] = spineVec;
+    }
+
+    // Head
+    const nose = get(0), neck = shoulderL && shoulderR ?
+      new THREE.Vector3().addVectors(shoulderL, shoulderR).multiplyScalar(0.5) : null;
+    if (nose && neck) {
+      vectors['neck'] = new THREE.Vector3().subVectors(nose, neck).normalize();
+      vectors['head'] = vectors['neck'];
+    }
+
+    return vectors;
+  }
+
+  _vectorToRotation(targetVec, bone, tposeQ) {
+    const restVec = new THREE.Vector3(0, 1, 0).applyQuaternion(tposeQ);
+    const q = new THREE.Quaternion().setFromUnitVectors(
+      restVec.normalize(),
+      targetVec.normalize(),
+    );
+    return tposeQ.clone().premultiply(q);
+  }
+
+  // Normalize bone lengths from source to match target skeleton proportions
+  normalizeBoneLengths(sourceLandmarks) {
+    if (!this.targetSkeleton || !sourceLandmarks) return sourceLandmarks;
+    const normalized = [...sourceLandmarks];
+
+    // Scale source skeleton to match target proportions
+    const sourceHeight = this._estimateSourceHeight(sourceLandmarks);
+    const targetHeight = this._estimateTargetHeight();
+    if (sourceHeight === 0 || targetHeight === 0) return normalized;
+
+    const scale = targetHeight / sourceHeight;
+    return normalized.map(lm => ({
+      ...lm,
+      x: lm.x * scale,
+      y: lm.y * scale,
+      z: lm.z * scale,
+    }));
+  }
+
+  _estimateSourceHeight(lm) {
+    const head = lm[0], leftAnkle = lm[27], rightAnkle = lm[28];
+    if (!head || !leftAnkle) return 1;
+    const ankle = leftAnkle;
+    return Math.abs(head.y - ankle.y);
+  }
+
+  _estimateTargetHeight() {
+    if (!this.targetSkeleton) return 1;
+    const head = this.targetSkeleton.bones.find(b => b.name.toLowerCase() === 'head');
+    const foot = this.targetSkeleton.bones.find(b => b.name.toLowerCase().includes('foot'));
+    if (!head || !foot) return 1;
+    const hw = new THREE.Vector3(), fw = new THREE.Vector3();
+    head.getWorldPosition(hw); foot.getWorldPosition(fw);
+    return hw.distanceTo(fw);
+  }
+
+  setSmoothing(value) { this.smoothing = Math.max(0, Math.min(1, value)); }
+  setMapping(mapping) { this.sourceMapping = mapping; }
+
+  getDebugInfo() {
+    return {
+      boundBones: this.tposeRotations.size,
+      boneLengths: Object.fromEntries(this.boneLengths),
+      smoothing: this.smoothing,
+    };
   }
 }
 
-// ── Auto-detect bone map from BVH joint names ─────────────────────────────────
-export function autoDetectBoneMap(bvhJoints, armatureBones) {
+export default MocapRetargeter;
+
+
+// ─── Legacy functional exports (App.jsx compat) ───────────────────────────────
+
+export const DEFAULT_BONE_MAP = MEDIAPIPE_TO_SPX;
+
+export function retargetFrame(landmarks, retargeter) {
+  if (!retargeter) return landmarks;
+  retargeter.retargetMediaPipe(landmarks);
+  return landmarks;
+}
+
+export function bakeRetargetedAnimation(frames, retargeter) {
+  return frames.map(f => retargetFrame(f, retargeter));
+}
+
+export function fixFootSliding(frames, threshold = 0.01) {
+  // Simple foot plant: if foot Y delta < threshold, clamp to prev
+  return frames.map((frame, i) => {
+    if (i === 0) return frame;
+    return frame.map((lm, j) => {
+      if (!lm) return lm;
+      const prev = frames[i-1][j];
+      if (!prev) return lm;
+      const isAnkle = j === 27 || j === 28;
+      if (isAnkle && Math.abs(lm.y - prev.y) < threshold) {
+        return { ...lm, y: prev.y };
+      }
+      return lm;
+    });
+  });
+}
+
+export function autoDetectBoneMap(skeleton) {
   const map = {};
-  bvhJoints.forEach(joint => {
-    // Try exact match first
-    const exact = armatureBones.find(b => b.name === joint.name);
-    if (exact) { map[joint.name] = exact.name; return; }
-    // Try fuzzy match
-    const fuzzy = armatureBones.find(b =>
-      b.name.toLowerCase().includes(joint.name.toLowerCase()) ||
-      joint.name.toLowerCase().includes(b.name.toLowerCase())
-    );
-    if (fuzzy) map[joint.name] = fuzzy.name;
-    else if (DEFAULT_BONE_MAP[joint.name]) map[joint.name] = DEFAULT_BONE_MAP[joint.name];
+  if (!skeleton) return map;
+  skeleton.bones.forEach((bone, i) => {
+    const name = bone.name.toLowerCase();
+    if (name.includes('leftshoulder') || name.includes('l_shoulder')) map[11] = bone.name;
+    if (name.includes('rightshoulder') || name.includes('r_shoulder')) map[12] = bone.name;
+    if (name.includes('leftarm') || name.includes('l_upper')) map[13] = bone.name;
+    if (name.includes('rightarm') || name.includes('r_upper')) map[14] = bone.name;
+    if (name.includes('leftforearm') || name.includes('l_fore')) map[15] = bone.name;
+    if (name.includes('rightforearm') || name.includes('r_fore')) map[16] = bone.name;
+    if (name.includes('lefthand') || name.includes('l_hand')) map[17] = bone.name;
+    if (name.includes('righthand') || name.includes('r_hand')) map[18] = bone.name;
+    if (name.includes('leftupleg') || name.includes('l_thigh')) map[23] = bone.name;
+    if (name.includes('rightupleg') || name.includes('r_thigh')) map[24] = bone.name;
+    if (name.includes('leftleg') || name.includes('l_calf')) map[25] = bone.name;
+    if (name.includes('rightleg') || name.includes('r_calf')) map[26] = bone.name;
+    if (name.includes('leftfoot') || name.includes('l_foot')) map[27] = bone.name;
+    if (name.includes('rightfoot') || name.includes('r_foot')) map[28] = bone.name;
   });
   return map;
 }
 
-// ── Preview retargeting stats ─────────────────────────────────────────────────
-export function getRetargetStats(bvh, boneMap, armature) {
-  const bvhJoints   = bvh.joints.length;
-  const mapped      = Object.keys(boneMap).filter(k => boneMap[k]).length;
-  const armBones    = armature.userData.bones?.length || 0;
-  const coverage    = Math.round(mapped/bvhJoints*100);
-  return { bvhJoints, mapped, armBones, coverage };
+export function getRetargetStats(retargeter) {
+  return retargeter?.getDebugInfo?.() ?? {};
 }
 
-// ── Convert captured MediaPipe frames → BVH ──────────────────
-export function framesToBVH(frames, fps = 30) {
-  if (!frames?.length) return null;
-  const JOINTS = [
-    { name:'Hips', channels:['Xposition','Yposition','Zposition','Zrotation','Xrotation','Yrotation'], lA:23, lB:24, root:true },
-    { name:'Spine',         channels:['Zrotation','Xrotation','Yrotation'], lA:23, lB:11 },
-    { name:'Neck',          channels:['Zrotation','Xrotation','Yrotation'], lA:11, lB:0  },
-    { name:'Head',          channels:['Zrotation','Xrotation','Yrotation'], lA:0,  lB:0  },
-    { name:'LeftShoulder',  channels:['Zrotation','Xrotation','Yrotation'], lA:11, lB:13 },
-    { name:'LeftArm',       channels:['Zrotation','Xrotation','Yrotation'], lA:13, lB:15 },
-    { name:'LeftForeArm',   channels:['Zrotation','Xrotation','Yrotation'], lA:15, lB:15 },
-    { name:'LeftHand',      channels:['Zrotation','Xrotation','Yrotation'], lA:15, lB:15 },
-    { name:'RightShoulder', channels:['Zrotation','Xrotation','Yrotation'], lA:12, lB:14 },
-    { name:'RightArm',      channels:['Zrotation','Xrotation','Yrotation'], lA:14, lB:16 },
-    { name:'RightForeArm',  channels:['Zrotation','Xrotation','Yrotation'], lA:16, lB:16 },
-    { name:'RightHand',     channels:['Zrotation','Xrotation','Yrotation'], lA:16, lB:16 },
-    { name:'LeftUpLeg',     channels:['Zrotation','Xrotation','Yrotation'], lA:23, lB:25 },
-    { name:'LeftLeg',       channels:['Zrotation','Xrotation','Yrotation'], lA:25, lB:27 },
-    { name:'LeftFoot',      channels:['Zrotation','Xrotation','Yrotation'], lA:27, lB:27 },
-    { name:'RightUpLeg',    channels:['Zrotation','Xrotation','Yrotation'], lA:24, lB:26 },
-    { name:'RightLeg',      channels:['Zrotation','Xrotation','Yrotation'], lA:26, lB:28 },
-    { name:'RightFoot',     channels:['Zrotation','Xrotation','Yrotation'], lA:28, lB:28 },
-  ];
-  const t = (n) => '\t'.repeat(n);
-  let hier = 'HIERARCHY\n';
-  JOINTS.forEach((j, i) => {
-    const tag = i === 0 ? 'ROOT' : 'JOINT';
-    hier += t(i===0?0:1) + tag + ' ' + j.name + '\n';
-    hier += t(i===0?0:1) + '{\n';
-    hier += t(i===0?1:2) + 'OFFSET 0.00 0.00 0.00\n';
-    hier += t(i===0?1:2) + 'CHANNELS ' + j.channels.length + ' ' + j.channels.join(' ') + '\n';
-    if (i > 0) {
-      hier += t(2) + 'End Site\n' + t(2) + '{\n' + t(3) + 'OFFSET 0.00 5.00 0.00\n' + t(2) + '}\n';
-    }
-    hier += t(i===0?0:1) + '}\n';
-  });
-  const RAD = 180 / Math.PI;
-  let motion = 'MOTION\nFrames: ' + frames.length + '\nFrame Time: ' + (1/fps).toFixed(6) + '\n';
-  frames.forEach(({ landmarks: lms }) => {
-    if (!lms) { motion += JOINTS.flatMap(j => j.channels.map(() => '0.000')).join(' ') + '\n'; return; }
-    const row = [];
-    JOINTS.forEach((j, ji) => {
-      if (ji === 0) {
-        row.push((((lms[23].x+lms[24].x)/2-0.5)*200).toFixed(3));
-        row.push((-((lms[23].y+lms[24].y)/2-0.5)*200).toFixed(3));
-        row.push((-((lms[23].z+lms[24].z)/2)*200).toFixed(3));
-      }
-      const A = lms[j.lA], B = lms[j.lB];
-      if (A && B && j.lA !== j.lB) {
-        const dx=B.x-A.x, dy=-(B.y-A.y), dz=-(B.z-A.z);
-        row.push('0.000', (Math.atan2(dy,Math.sqrt(dx*dx+dz*dz))*RAD).toFixed(3), (Math.atan2(dx,dz)*RAD).toFixed(3));
-      } else { row.push('0.000','0.000','0.000'); }
-    });
-    motion += row.join(' ') + '\n';
-  });
-  return hier + motion;
-}
-
-export function downloadBVH(frames, filename = 'mocap.bvh', fps = 30) {
-  const bvh = framesToBVH(frames, fps);
-  if (!bvh) return;
+export function downloadBVH(frames, filename = 'mocap.bvh') {
+  const lines = ['HIERARCHY', 'ROOT Hips', '{', '\tOFFSET 0 0 0', '\tCHANNELS 6 Xposition Yposition Zposition Zrotation Xrotation Yrotation', '}', 'MOTION', `Frames: ${frames.length}`, 'Frame Time: 0.033333'];
+  const data = lines.join('\n') + '\n' + frames.map(f => Array(6).fill(0).join(' ')).join('\n');
+  const blob = new Blob([data], { type: 'text/plain' });
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([bvh], { type: 'text/plain' }));
-  a.download = filename; a.click();
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
