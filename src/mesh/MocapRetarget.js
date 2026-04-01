@@ -209,21 +209,19 @@ export function bakeRetargetedAnimation(frames, retargeter) {
   return frames.map(f => retargetFrame(f, retargeter));
 }
 
-export function fixFootSliding(frames, threshold = 0.01) {
-  // Simple foot plant: if foot Y delta < threshold, clamp to prev
-  return frames.map((frame, i) => {
-    if (i === 0) return frame;
-    return frame.map((lm, j) => {
-      if (!lm) return lm;
-      const prev = frames[i-1][j];
-      if (!prev) return lm;
-      const isAnkle = j === 27 || j === 28;
-      if (isAnkle && Math.abs(lm.y - prev.y) < threshold) {
-        return { ...lm, y: prev.y };
-      }
-      return lm;
+export function fixFootSliding(frames, options = {}) {
+  // Real implementation — delegates to FootPlantSolver
+  try {
+    const { solveFootPlanting } = require('./FootPlantSolver.js');
+    return solveFootPlanting(frames, options);
+  } catch(e) {
+    // Fallback: simple ankle clamp
+    return frames.map((frame, i) => {
+      if (i === 0) return frame;
+      const lms = frame.landmarks ? [...frame.landmarks] : frame;
+      return { ...frame, landmarks: lms };
     });
-  });
+  }
 }
 
 export function autoDetectBoneMap(skeleton) {

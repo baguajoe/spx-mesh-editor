@@ -1,4 +1,10 @@
-// MocapWorkspace.jsx — SPX Full-body MoCap Workspace
+#!/usr/bin/env python3
+import os
+
+TARGET = "/workspaces/spx-mesh-editor/src/workspaces/mocap/MocapWorkspace.jsx"
+os.makedirs(os.path.dirname(TARGET), exist_ok=True)
+
+CODE = r'''// MocapWorkspace.jsx — SPX Full-body MoCap Workspace
 // Tabs: Live Capture | Video MoCap | Playback
 // Wired: MultiPersonMocap, DepthEstimator, MocapRetargeter, Kalman/OneEuro/EMA smoothing
 
@@ -9,7 +15,6 @@ import useFaceMocap      from '../../front/js/hooks/useFaceMocap.js';
 import useHandMocap      from '../../front/js/hooks/useHandMocap.js';
 import { createSmoothingPipeline } from '../../front/js/utils/smoothPose.js';
 import { downloadBVH, MocapRetargeter } from '../../mesh/MocapRetarget.js';
-import { solveFootPlanting, getFootPlantStats } from '../../mesh/FootPlantSolver.js';
 import { MultiPersonMocap } from '../../mesh/MultiPersonMocap.js';
 import { DepthEstimator } from '../../mesh/DepthEstimator.js';
 import '../../front/styles/VideoMocap.css';
@@ -169,8 +174,6 @@ function LiveCaptureTab({ onExportGlb }) {
   const [showDepthMap,    setShowDepthMap]    = useState(false);
   const [retargetEnabled, setRetargetEnabled] = useState(false);
   const [retargetStats,   setRetargetStats]   = useState(null);
-  const [footPlant,       setFootPlant]       = useState(true);
-  const [footPlantStats,  setFootPlantStats]  = useState(null);
   const [modelComplexity, setModelComplexity] = useState(1);
   const [minDetect,       setMinDetect]       = useState(0.5);
   const [minTrack,        setMinTrack]        = useState(0.5);
@@ -357,20 +360,12 @@ function LiveCaptureTab({ onExportGlb }) {
     setIsRecording(false); setRecordedFrames([...recordingRef.current]); recordingRef.current = [];
   }, []);
 
-  const processFramesForExport = useCallback((frames) => {
-    if (!footPlant) return frames;
-    const fixed = solveFootPlanting(frames);
-    setFootPlantStats(getFootPlantStats(fixed));
-    return fixed;
-  }, [footPlant]);
-
   const exportJSON = useCallback(() => {
     if (!recordedFrames?.length) return;
-    const frames = processFramesForExport(recordedFrames);
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify({ frames }, null, 2)], { type: 'application/json' }));
+    a.href = URL.createObjectURL(new Blob([JSON.stringify({ frames: recordedFrames }, null, 2)], { type: 'application/json' }));
     a.download = `mocap_${Date.now()}.json`; a.click();
-  }, [recordedFrames, processFramesForExport]);
+  }, [recordedFrames]);
 
   const saveToBackend = useCallback(async () => {
     if (!recordedFrames?.length) return;
@@ -501,23 +496,6 @@ function LiveCaptureTab({ onExportGlb }) {
           </div>
         )}
 
-        {/* ── NEW: Foot Plant ── */}
-        <SectionLabel style={{marginTop:10}}>Foot Plant Fix</SectionLabel>
-        <label className="mw-check">
-          <input type="checkbox" checked={footPlant} onChange={e => setFootPlant(e.target.checked)} />
-          Auto foot plant IK (fixes floating feet)
-        </label>
-        {footPlant && footPlantStats && (
-          <div style={{fontSize:10,color:'#888',marginTop:4,lineHeight:1.6}}>
-            Ground Y: {Number(footPlantStats.groundY).toFixed(3)}<br/>
-            L planted: {footPlantStats.leftPlantedFrames} fr ({Math.round(footPlantStats.leftPlantRatio*100)}%)<br/>
-            R planted: {footPlantStats.rightPlantedFrames} fr ({Math.round(footPlantStats.rightPlantRatio*100)}%)
-          </div>
-        )}
-        {footPlant && !footPlantStats && (
-          <div style={{fontSize:10,color:'#555',marginTop:2}}>Applied on export / BVH download</div>
-        )}
-
         {/* Avatar */}
         <SectionLabel style={{marginTop:10}}>Avatar</SectionLabel>
         <div style={{display:'flex',gap:4,marginBottom:6,flexWrap:'wrap'}}>
@@ -552,7 +530,7 @@ function LiveCaptureTab({ onExportGlb }) {
           <div className="mw-btn-row" style={{flexWrap:'wrap'}}>
             <button className="mw-btn" onClick={() => setIsPlaying(p => !p)}>{isPlaying ? '⏹ Stop' : '▶ Play'}</button>
             <button className="mw-btn" onClick={exportJSON}>💾 JSON</button>
-            <button className="mw-btn" onClick={() => downloadBVH(processFramesForExport(recordedFrames), `mocap_${Date.now()}.bvh`)}>📐 BVH</button>
+            <button className="mw-btn" onClick={() => downloadBVH(recordedFrames, `mocap_${Date.now()}.bvh`)}>📐 BVH</button>
             <button className="mw-btn" onClick={saveToBackend}>☁ Save</button>
             {onExportGlb && <button className="mw-btn" onClick={onExportGlb}>📦 GLB</button>}
           </div>
@@ -761,3 +739,8 @@ export default function MocapWorkspace({ open = false, onClose = null, onExportG
     </div>
   );
 }
+'''
+
+with open(TARGET, 'w') as f:
+    f.write(CODE)
+print(f"✅ Written: {TARGET} ({len(CODE)} chars)")
