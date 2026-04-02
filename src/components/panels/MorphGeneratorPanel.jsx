@@ -92,7 +92,7 @@ function RandBtn({ onClick }) {
     <button onClick={onClick} style={{
       background:'#1a1f2c', color:'#888', border:'1px solid #21262d',
       borderRadius:4, padding:'6px 10px', cursor:'pointer', fontSize:11,
-    }}>\u{1F3B2}</button>
+    }}>🎲</button>
   );
 }
 const P = { fontFamily:'JetBrains Mono, monospace', color:'#e0e0e0', fontSize:12, userSelect:'none', width:'100%' };
@@ -176,7 +176,7 @@ export default function MorphGeneratorPanel({ character, onApply, onReset }) {
 
   return (
     <div style={P}>
-      <Section title="\u{1F9EC} Category">
+      <Section title="🧬 Category">
         <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:6 }}>
           {Object.keys(MORPH_CATEGORIES).map(cat => (
             <button key={cat} onClick={() => setCategory(cat)} style={{
@@ -189,7 +189,7 @@ export default function MorphGeneratorPanel({ character, onApply, onReset }) {
         </div>
       </Section>
 
-      <Section title={`\u{1F3A8} ${category} Morphs`}>
+      <Section title={`🎨 ${category} Morphs`}>
         {activeTargets.map(key => (
           <Slider key={key} label={key}
             value={morphValues[key] ?? 0}
@@ -204,7 +204,7 @@ export default function MorphGeneratorPanel({ character, onApply, onReset }) {
         <Check  label="Symmetry"         value={symmetry}  onChange={setSymmetry}  />
       </Section>
 
-      <Section title="\u{1F4CB} Active Morphs" defaultOpen={false}>
+      <Section title="📋 Active Morphs" defaultOpen={false}>
         {nonZero.length === 0 && <div style={{ fontSize:10, color:'#555' }}>No active morphs</div>}
         {nonZero.map(([k,v]) => (
           <div key={k} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:3 }}>
@@ -219,7 +219,7 @@ export default function MorphGeneratorPanel({ character, onApply, onReset }) {
         ))}
       </Section>
 
-      <Section title="\u{1F4BE} Presets" defaultOpen={false}>
+      <Section title="💾 Presets" defaultOpen={false}>
         <div style={{ display:'flex', gap:4, marginBottom:6 }}>
           <input value={presetName} onChange={e => setPresetName(e.target.value)}
             placeholder="Preset name..." style={{

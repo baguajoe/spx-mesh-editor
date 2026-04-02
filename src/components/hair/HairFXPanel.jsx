@@ -92,7 +92,7 @@ function RandBtn({ onClick }) {
     <button onClick={onClick} style={{
       background:'#1a1f2c', color:'#888', border:'1px solid #21262d',
       borderRadius:4, padding:'6px 10px', cursor:'pointer', fontSize:11,
-    }}>\u{1F3B2}</button>
+    }}>🎲</button>
   );
 }
 const P = { fontFamily:'JetBrains Mono, monospace', color:'#e0e0e0', fontSize:12, userSelect:'none', width:'100%' };
@@ -161,7 +161,7 @@ export default function HairFXPanel({ character, onUpdate }) {
 
   return (
     <div style={P}>
-      <Section title="\u{1F4A7} Wet FX">
+      <Section title="💧 Wet FX">
         <Slider   label="Wetness"         value={wetness}      onChange={setWetness}      />
         {wetness > 0 && <>
           <ColorRow label="Wet Color"     value={wetnessColor} onChange={setWetnessColor} />
@@ -173,7 +173,7 @@ export default function HairFXPanel({ character, onUpdate }) {
         </>}
       </Section>
 
-      <Section title="\u{1F9EA} Subsurface Scatter">
+      <Section title="🧪 Subsurface Scatter">
         <Check    label="Enable SSS"    value={sssEnabled} onChange={setSssEnabled} />
         {sssEnabled && <>
           <Slider   label="SSS Strength" value={sssStr}    onChange={setSssStr}    />
@@ -182,7 +182,7 @@ export default function HairFXPanel({ character, onUpdate }) {
         </>}
       </Section>
 
-      <Section title="\u{1F43E} Fur Shell">
+      <Section title="🐾 Fur Shell">
         <Check label="Enable Fur Shell" value={furEnabled} onChange={setFurEnabled} />
         {furEnabled && <>
           <Slider   label="Shell Count" value={furShells}  min={4} max={64} step={1} onChange={setFurShells}  />
@@ -201,7 +201,7 @@ export default function HairFXPanel({ character, onUpdate }) {
         <ColorRow label="Spec Color"      value={specColor}  onChange={setSpecColor}  />
       </Section>
 
-      <Section title="\u{1F31F} Strand Highlight" defaultOpen={false}>
+      <Section title="🌟 Strand Highlight" defaultOpen={false}>
         <Check  label="Highlight Band"    value={highlightBand} onChange={setHighlightBand} />
         {highlightBand && <>
           <Slider label="Position"  value={highlightPos} onChange={setHighlightPos} />
@@ -210,7 +210,7 @@ export default function HairFXPanel({ character, onUpdate }) {
         </>}
       </Section>
 
-      <Section title="\u{1F3A8} Color Grade" defaultOpen={false}>
+      <Section title="🎨 Color Grade" defaultOpen={false}>
         <Slider   label="Saturation" value={saturation} min={0} max={2} step={0.05} onChange={setSaturation} />
         <Slider   label="Brightness" value={brightness} min={0} max={2} step={0.05} onChange={setBrightness} />
         <Slider   label="Contrast"   value={contrast}   min={0} max={2} step={0.05} onChange={setContrast}   />

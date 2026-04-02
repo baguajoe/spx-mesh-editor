@@ -104,7 +104,7 @@ function RandBtn({ onClick }) {
     <button onClick={onClick} style={{
       background: '#1a1f2c', color: '#888', border: '1px solid #21262d',
       borderRadius: 4, padding: '6px 10px', cursor: 'pointer', fontSize: 11,
-    }}>\u{1F3B2}</button>
+    }}>🎲</button>
   );
 }
 const P = { fontFamily: 'JetBrains Mono, monospace', color: '#e0e0e0', fontSize: 12, userSelect: 'none', width: '100%' };
@@ -196,7 +196,7 @@ export default function FaceGeneratorPanel({ onGenerate }) {
 
   return (
     <div style={P}>
-      <Section title="\u{1F9EC} Base">
+      <Section title="🧬 Base">
         <Badges items={FACE_SHAPES} active={faceShape} onSelect={setFaceShape} />
         <Select label="Ethnicity"  value={ethnicity}  options={ETHNICITIES}  onChange={setEthnicity}  />
         <Select label="Gender"     value={gender}     options={GENDERS}      onChange={setGender}     />
@@ -206,7 +206,7 @@ export default function FaceGeneratorPanel({ onGenerate }) {
         <Slider label="Asymmetry"  value={asymmetry} min={0} max={0.3} step={0.005} onChange={setAsymmetry} />
         <Slider label="Random Seed" value={seed} min={0} max={9999} step={1} onChange={setSeed} />
       </Section>
-      <Section title="\u{1F480} Head Structure">
+      <Section title="💀 Head Structure">
         <Slider label="Jaw Width"        value={jawWidth}   onChange={setJawWidth}   />
         <Slider label="Jaw Sharpness"    value={jawSharp}   onChange={setJawSharp}   />
         <Slider label="Cheekbone"        value={cheekbone}  onChange={setCheekbone}  />
@@ -216,7 +216,7 @@ export default function FaceGeneratorPanel({ onGenerate }) {
         <Slider label="Chin Point"       value={chinPoint}  onChange={setChinPoint}  />
         <Slider label="Chin Width"       value={chinW}      onChange={setChinW}      />
       </Section>
-      <Section title="\u{1F441} Eyes">
+      <Section title="👁 Eyes">
         <Badges items={EYE_SHAPES} active={eyeShape} onSelect={setEyeShape} />
         <Slider label="Spacing"    value={eyeSpacing} onChange={setEyeSpacing} />
         <Slider label="Size"       value={eyeSize}    onChange={setEyeSize}    />
@@ -231,7 +231,7 @@ export default function FaceGeneratorPanel({ onGenerate }) {
         <Slider   label="Thickness" value={browThick}  onChange={setBrowThick}  />
         <ColorRow label="Color"     value={browColor}  onChange={setBrowColor}  />
       </Section>
-      <Section title="\u{1F443} Nose">
+      <Section title="👃 Nose">
         <Badges items={NOSE_TYPES} active={noseType} onSelect={setNoseType} />
         <Slider label="Bridge"        value={noseBridge}   onChange={setNoseBridge}   />
         <Slider label="Width"         value={noseW}        onChange={setNoseW}        />
@@ -239,7 +239,7 @@ export default function FaceGeneratorPanel({ onGenerate }) {
         <Slider label="Tip"           value={noseTip}      onChange={setNoseTip}      />
         <Slider label="Nostril Flare" value={nostrilFlare} onChange={setNostrilFlare} />
       </Section>
-      <Section title="\u{1F444} Lips">
+      <Section title="👄 Lips">
         <Badges items={LIP_TYPES} active={lipType} onSelect={setLipType} />
         <Slider   label="Thickness"   value={lipThick}   onChange={setLipThick}   />
         <Slider   label="Width"       value={lipWidth}   onChange={setLipWidth}   />
@@ -251,7 +251,7 @@ export default function FaceGeneratorPanel({ onGenerate }) {
         <Slider label="Ear Size"  value={earSize}  onChange={setEarSize}  />
         <Slider label="Ear Angle" value={earAngle} onChange={setEarAngle} />
       </Section>
-      <Section title="\u{1F52C} Skin Detail" defaultOpen={false}>
+      <Section title="🔬 Skin Detail" defaultOpen={false}>
         <Slider label="Wrinkles"    value={wrinkles}   onChange={setWrinkles}   />
         <Slider label="Pore Detail" value={pores}      onChange={setPores}      />
         <Slider label="Freckles"    value={freckles}   onChange={setFreckles}   />

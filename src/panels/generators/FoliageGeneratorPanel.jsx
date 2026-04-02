@@ -104,7 +104,7 @@ function RandBtn({ onClick }) {
     <button onClick={onClick} style={{
       background: '#1a1f2c', color: '#888', border: '1px solid #21262d',
       borderRadius: 4, padding: '6px 10px', cursor: 'pointer', fontSize: 11,
-    }}>\u{1F3B2}</button>
+    }}>🎲</button>
   );
 }
 const P = { fontFamily: 'JetBrains Mono, monospace', color: '#e0e0e0', fontSize: 12, userSelect: 'none', width: '100%' };
@@ -181,12 +181,12 @@ export default function FoliageGeneratorPanel({ onGenerate }) {
 
   return (
     <div style={P}>
-      <Section title="\u{1F333} Foliage Type">
+      <Section title="🌳 Foliage Type">
         <Badges items={FOLIAGE_TYPES} active={foliageType} onSelect={setFoliageType} />
         <Select label="Season"      value={season} options={SEASONS} onChange={setSeason} />
         <Slider label="Random Seed" value={seed} min={0} max={9999} step={1} onChange={setSeed} />
       </Section>
-      <Section title="\u{1FAB5} Trunk">
+      <Section title="🪵 Trunk">
         <Slider label="Height"          value={trunkH}     onChange={setTrunkH}     />
         <Slider label="Girth"           value={trunkGirth}  onChange={setTrunkGirth}  />
         <Slider label="Taper"           value={trunkTaper}  onChange={setTrunkTaper}  />
@@ -210,7 +210,7 @@ export default function FoliageGeneratorPanel({ onGenerate }) {
         <Slider label="Taper"       value={branchTaper}    onChange={setBranchTaper}    />
         <Slider label="Randomness"  value={branchRandness} onChange={setBranchRandness} />
       </Section>
-      <Section title="\u{1F343} Leaves">
+      <Section title="🍃 Leaves">
         <Badges items={LEAF_SHAPES} active={leafShape} onSelect={setLeafShape} />
         <Slider label="Density"      value={leafDensity}       onChange={setLeafDensity}       />
         <Slider label="Size"         value={leafSize}          onChange={setLeafSize}          />
@@ -221,7 +221,7 @@ export default function FoliageGeneratorPanel({ onGenerate }) {
         <ColorRow label="Leaf Color 2" value={leafColor2} onChange={setLeafColor2} />
         <ColorRow label="Leaf Color 3" value={leafColor3} onChange={setLeafColor3} />
       </Section>
-      <Section title="\u{1F4A8} Wind" defaultOpen={false}>
+      <Section title="💨 Wind" defaultOpen={false}>
         <Slider label="Response"   value={windResp}       onChange={setWindResp}       />
         <Slider label="Frequency"  value={windFreq}       onChange={setWindFreq}       />
         <Slider label="Turbulence" value={windTurbulence} onChange={setWindTurbulence} />

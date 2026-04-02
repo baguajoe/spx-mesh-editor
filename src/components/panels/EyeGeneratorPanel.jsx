@@ -114,7 +114,7 @@ function RandBtn({ onClick }) {
     <button onClick={onClick} style={{
       background: '#1a1f2c', color: '#888', border: '1px solid #21262d',
       borderRadius: 4, padding: '6px 10px', cursor: 'pointer', fontSize: 11,
-    }}>\u{1F3B2}</button>
+    }}>🎲</button>
   );
 }
 
@@ -175,11 +175,11 @@ export default function EyeGeneratorPanel({ onGenerate }) {
 
   return (
     <div style={P}>
-      <Section title="\u{1F441} Eye Type">
+      <Section title="👁 Eye Type">
         <Badges items={EYE_TYPES} active={eyeType} onSelect={setEyeType} />
         <Slider label="Random Seed" value={seed} min={0} max={9999} step={1} onChange={setSeed} />
       </Section>
-      <Section title="\u{1F308} Iris">
+      <Section title="🌈 Iris">
         <Badges items={IRIS_PATTERNS} active={irisPattern} onSelect={setIrisPattern} />
         <ColorRow label="Iris Color 1"   value={irisColor}    onChange={setIrisColor}    />
         <ColorRow label="Iris Color 2"   value={irisColor2}   onChange={setIrisColor2}   />
@@ -200,7 +200,7 @@ export default function EyeGeneratorPanel({ onGenerate }) {
         <Slider   label="Bloodshot"    value={bloodshot}   onChange={setBloodshot}   />
         <Slider   label="Roughness"    value={scleraRough} onChange={setScleraRough} />
       </Section>
-      <Section title="\u{1F4A7} Surface">
+      <Section title="💧 Surface">
         <Slider label="Wetness"       value={wetness}      onChange={setWetness}      />
         <Slider label="Corneal Bulge" value={cornealBulge} onChange={setCornealBulge} />
         <Slider label="Reflectivity"  value={reflectStr}   onChange={setReflectStr}   />

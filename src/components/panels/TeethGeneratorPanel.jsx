@@ -114,7 +114,7 @@ function RandBtn({ onClick }) {
     <button onClick={onClick} style={{
       background: '#1a1f2c', color: '#888', border: '1px solid #21262d',
       borderRadius: 4, padding: '6px 10px', cursor: 'pointer', fontSize: 11,
-    }}>\u{1F3B2}</button>
+    }}>🎲</button>
   );
 }
 
@@ -171,7 +171,7 @@ export default function TeethGeneratorPanel({ onGenerate }) {
 
   return (
     <div style={P}>
-      <Section title="\u{1F9B7} Teeth Type">
+      <Section title="🦷 Teeth Type">
         <Badges items={TEETH_TYPES} active={teethType} onSelect={setTeethType} />
         <Slider label="Random Seed" value={seed} min={0} max={9999} step={1} onChange={setSeed} />
       </Section>

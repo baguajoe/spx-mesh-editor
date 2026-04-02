@@ -104,7 +104,7 @@ function RandBtn({ onClick }) {
     <button onClick={onClick} style={{
       background: '#1a1f2c', color: '#888', border: '1px solid #21262d',
       borderRadius: 4, padding: '6px 10px', cursor: 'pointer', fontSize: 11,
-    }}>\u{1F3B2}</button>
+    }}>🎲</button>
   );
 }
 const P = { fontFamily: 'JetBrains Mono, monospace', color: '#e0e0e0', fontSize: 12, userSelect: 'none', width: '100%' };
@@ -172,7 +172,7 @@ export default function HybridGeneratorPanel({ onGenerate }) {
 
   return (
     <div style={P}>
-      <Section title="\u{1F9EC} Species">
+      <Section title="🧬 Species">
         <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 9, color: '#888', marginBottom: 3 }}>Species A</div>
@@ -211,7 +211,7 @@ export default function HybridGeneratorPanel({ onGenerate }) {
         {hasMuzzle  && <Slider label="Muzzle Length" value={muzzleLen} onChange={setMuzzleLen} />}
         <Check  label="Ear Tufts"    value={hasEarTufts} onChange={setHasEarTufts} />
       </Section>
-      <Section title="\u{1F3A8} Colors">
+      <Section title="🎨 Colors">
         <ColorRow label="Skin Color"  value={primaryColor} onChange={setPrimaryColor} />
         <ColorRow label="Fur Color"   value={furColor}     onChange={setFurColor}     />
         <ColorRow label="Accent"      value={accentColor}  onChange={setAccentColor}  />

@@ -92,7 +92,7 @@ function RandBtn({ onClick }) {
     <button onClick={onClick} style={{
       background:'#1a1f2c', color:'#888', border:'1px solid #21262d',
       borderRadius:4, padding:'6px 10px', cursor:'pointer', fontSize:11,
-    }}>\u{1F3B2}</button>
+    }}>🎲</button>
   );
 }
 const P = { fontFamily:'JetBrains Mono, monospace', color:'#e0e0e0', fontSize:12, userSelect:'none', width:'100%' };
@@ -165,7 +165,7 @@ export default function HairAdvancedPanel({ character, hairSystem, onUpdate }) {
 
   return (
     <div style={P}>
-      <Section title="\u{1F527} Groom Tools">
+      <Section title="🔧 Groom Tools">
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr 1fr', gap:3, marginBottom:6 }}>
           {GROOM_TOOLS.map(tool => (
             <button key={tool} onClick={() => handleToolChange(tool)} style={{
@@ -184,7 +184,7 @@ export default function HairAdvancedPanel({ character, hairSystem, onUpdate }) {
         <Check  label="Screen Projection" value={screenProj} onChange={setScreenProj} />
       </Section>
 
-      <Section title="\u{1F9F5} Layers">
+      <Section title="🧵 Layers">
         {layers.map(layer => (
           <div key={layer.type} style={{
             display:'flex', alignItems:'center', gap:4, marginBottom:4, padding:'3px 6px',
@@ -193,10 +193,10 @@ export default function HairAdvancedPanel({ character, hairSystem, onUpdate }) {
           }} onClick={() => setActiveLayer(layer.type)}>
             <button onClick={e => { e.stopPropagation(); updateLayer(layer.type,'visible',!layer.visible); }} style={{
               background:'none', border:'none', color: layer.visible ? '#00ffc8' : '#444', cursor:'pointer', fontSize:11, padding:0,
-            }}>{layer.visible ? '\u{1F441}' : '\u{1F576}'}</button>
+            }}>{layer.visible ? '👁' : '🕶'}</button>
             <button onClick={e => { e.stopPropagation(); updateLayer(layer.type,'locked',!layer.locked); }} style={{
               background:'none', border:'none', color: layer.locked ? '#FF6600' : '#555', cursor:'pointer', fontSize:11, padding:0,
-            }}>{layer.locked ? '\u{1F512}' : '\u{1F513}'}</button>
+            }}>{layer.locked ? '🔒' : '🔓'}</button>
             <span style={{ flex:1, fontSize:10, color: activeLayer===layer.type ? '#e0e0e0' : '#888' }}>{layer.type}</span>
             <span style={{ fontSize:9, color:'#555' }}>{Math.round(layer.density*100)}%</span>
           </div>
@@ -209,14 +209,14 @@ export default function HairAdvancedPanel({ character, hairSystem, onUpdate }) {
         </>}
       </Section>
 
-      <Section title="\u{1F4CF} Guide Curves" defaultOpen={false}>
+      <Section title="📏 Guide Curves" defaultOpen={false}>
         <Slider label="Guide Count"  value={guideCount} min={4} max={100} step={1} onChange={setGuideCount} />
         <Slider label="Segments"     value={guideSegs}  min={2} max={20}  step={1} onChange={setGuideSegs}  />
         <Check  label="Show Guides"  value={showGuides} onChange={setShowGuides} />
         {showGuides && <ColorRow label="Guide Color" value={guideColor} onChange={setGuideColor} />}
       </Section>
 
-      <Section title="\u{1F9F7} Clumping" defaultOpen={false}>
+      <Section title="🧷 Clumping" defaultOpen={false}>
         <Check  label="Enable Clumping" value={clumpEnabled} onChange={setClumpEnabled} />
         {clumpEnabled && <>
           <Slider label="Strength"    value={clumpStr}   onChange={setClumpStr}   />
@@ -225,7 +225,7 @@ export default function HairAdvancedPanel({ character, hairSystem, onUpdate }) {
         </>}
       </Section>
 
-      <Section title="\u{1F300} Noise" defaultOpen={false}>
+      <Section title="🌀 Noise" defaultOpen={false}>
         <Check  label="Enable Noise" value={noiseEnabled} onChange={setNoiseEnabled} />
         {noiseEnabled && <>
           <Slider label="Strength"   value={noiseStr}   onChange={setNoiseStr}   />

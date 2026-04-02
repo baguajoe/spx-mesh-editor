@@ -104,7 +104,7 @@ function RandBtn({ onClick }) {
     <button onClick={onClick} style={{
       background: '#1a1f2c', color: '#888', border: '1px solid #21262d',
       borderRadius: 4, padding: '6px 10px', cursor: 'pointer', fontSize: 11,
-    }}>\u{1F3B2}</button>
+    }}>🎲</button>
   );
 }
 const P = { fontFamily: 'JetBrains Mono, monospace', color: '#e0e0e0', fontSize: 12, userSelect: 'none', width: '100%' };
@@ -196,7 +196,7 @@ export default function CharacterSkinStudioPanel({ onUpdate }) {
 
   return (
     <div style={P}>
-      <Section title="\u{1F3A8} Skin Preset">
+      <Section title="🎨 Skin Preset">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
           {Object.keys(SKIN_PRESETS).map(name => (
             <button key={name} onClick={() => applyPreset(name)} style={{
@@ -208,7 +208,7 @@ export default function CharacterSkinStudioPanel({ onUpdate }) {
           ))}
         </div>
       </Section>
-      <Section title="\u{1F308} Base Colors">
+      <Section title="🌈 Base Colors">
         <ColorRow label="Base Color"       value={baseColor}   onChange={setBaseColor}   />
         <ColorRow label="Subsurface Color" value={subColor}    onChange={setSubColor}    />
         <Slider   label="Melanin"          value={melanin}     onChange={setMelanin}     />
@@ -227,7 +227,7 @@ export default function CharacterSkinStudioPanel({ onUpdate }) {
         <Slider   label="SSS Depth"    value={sssDepth}  onChange={setSssDepth}  />
         <ColorRow label="SSS Color"    value={sssColor}  onChange={setSssColor}  />
       </Section>
-      <Section title="\u{1F52C} Micro Detail">
+      <Section title="🔬 Micro Detail">
         <Slider label="Pore Scale"    value={poreScale}     min={0.1} max={3} step={0.05} onChange={setPoreScale}     />
         <Slider label="Pore Depth"    value={poreDepth}     onChange={setPoreDepth}     />
         <Slider label="Pore Rough"    value={poreRoughness} onChange={setPoreRoughness} />
@@ -241,7 +241,7 @@ export default function CharacterSkinStudioPanel({ onUpdate }) {
         {freckles > 0 && <ColorRow label="Freckle Color" value={freckleColor} onChange={setFreckleColor} />}
         <Slider label="Birthmark"     value={birthmark}     onChange={setBirthmark}     />
       </Section>
-      <Section title="\u{1F48B} Lip & Cheek" defaultOpen={false}>
+      <Section title="💋 Lip & Cheek" defaultOpen={false}>
         <ColorRow label="Lip Color"    value={lipColor}    onChange={setLipColor}    />
         <Slider   label="Lip Gloss"    value={lipGloss}    onChange={setLipGloss}    />
         <Slider   label="Lip Rough"    value={lipRough}    onChange={setLipRough}    />
@@ -255,7 +255,7 @@ export default function CharacterSkinStudioPanel({ onUpdate }) {
         <Slider   label="Eye Bag Depth" value={eyebagDepth}   onChange={setEyebagDepth}   />
         <ColorRow label="Eye Bag Color" value={eyebagColor}   onChange={setEyebagColor}   />
       </Section>
-      <Section title="\u{1F5FA} Skin Zones" defaultOpen={false}>
+      <Section title="🗺 Skin Zones" defaultOpen={false}>
         {Object.keys(zones).map(z => (
           <Check key={z} label={z.charAt(0).toUpperCase() + z.slice(1)}
             value={zones[z]} onChange={v => setZones(s => ({ ...s, [z]: v }))} />

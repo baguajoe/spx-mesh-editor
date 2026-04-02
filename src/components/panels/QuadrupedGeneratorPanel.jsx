@@ -114,7 +114,7 @@ function RandBtn({ onClick }) {
     <button onClick={onClick} style={{
       background: '#1a1f2c', color: '#888', border: '1px solid #21262d',
       borderRadius: 4, padding: '6px 10px', cursor: 'pointer', fontSize: 11,
-    }}>\u{1F3B2}</button>
+    }}>🎲</button>
   );
 }
 
@@ -182,11 +182,11 @@ export default function QuadrupedGeneratorPanel({ onGenerate }) {
 
   return (
     <div style={P}>
-      <Section title="\u{1F43E} Animal Type">
+      <Section title="🐾 Animal Type">
         <Badges items={ANIMAL_TYPES} active={animalType} onSelect={setAnimalType} />
         <Slider label="Random Seed" value={seed} min={0} max={9999} step={1} onChange={setSeed} />
       </Section>
-      <Section title="\u{1F418} Body">
+      <Section title="🐘 Body">
         <Slider label="Body Length"     value={bodyLen}   onChange={setBodyLen}   />
         <Slider label="Body Girth"      value={bodyGirth} onChange={setBodyGirth} />
         <Slider label="Shoulder Height" value={shoulderH} onChange={setShoulderH} />
@@ -197,7 +197,7 @@ export default function QuadrupedGeneratorPanel({ onGenerate }) {
         <Slider label="Muzzle Width"    value={muzzleW}   onChange={setMuzzleW}   />
         <Slider label="Jowls"           value={jowls}     onChange={setJowls}     />
       </Section>
-      <Section title="\u{1F9B4} Limbs">
+      <Section title="🦴 Limbs">
         <Slider label="Leg Length"    value={legLen}   onChange={setLegLen}   />
         <Slider label="Leg Thickness" value={legThick} onChange={setLegThick} />
         <Slider label="Paw Size"      value={pawSize}  onChange={setPawSize}  />
@@ -212,7 +212,7 @@ export default function QuadrupedGeneratorPanel({ onGenerate }) {
         <Slider label="Tail Curve"     value={tailCurve} onChange={setTailCurve} />
         <Slider label="Tail Thickness" value={tailThick} onChange={setTailThick} />
       </Section>
-      <Section title="\u{1F4AA} Composition">
+      <Section title="💪 Composition">
         <Slider label="Muscle Definition" value={muscleDef} onChange={setMuscleDef} />
         <Slider label="Fat Layer"         value={fatLayer}  onChange={setFatLayer}  />
         <Slider label="Bone Prominence"   value={boneProm}  onChange={setBoneProm}  />
@@ -230,7 +230,7 @@ export default function QuadrupedGeneratorPanel({ onGenerate }) {
           {undercoat && <ColorRow label="Undercoat Color" value={undercoatColor} onChange={setUndercoatColor} />}
         </>)}
       </Section>
-      <Section title="\u{1F3A8} Markings" defaultOpen={false}>
+      <Section title="🎨 Markings" defaultOpen={false}>
         <Select label="Marking Type" value={markingType} options={MARKINGS} onChange={setMarkingType} />
         {markingType !== 'None' && (<>
           <ColorRow label="Marking Color" value={markingColor}   onChange={setMarkingColor}   />

@@ -114,7 +114,7 @@ function RandBtn({ onClick }) {
     <button onClick={onClick} style={{
       background: '#1a1f2c', color: '#888', border: '1px solid #21262d',
       borderRadius: 4, padding: '6px 10px', cursor: 'pointer', fontSize: 11,
-    }}>\u{1F3B2}</button>
+    }}>🎲</button>
   );
 }
 
@@ -179,7 +179,7 @@ export default function BodyGeneratorPanel({ onGenerate }) {
 
   return (
     <div style={P}>
-      <Section title="\u{1F9EC} Base">
+      <Section title="🧬 Base">
         <Badges items={GENDERS}   active={gender}   onSelect={setGender}   />
         <Select label="Body Type" value={bodyType}  options={BODY_TYPES}   onChange={setBodyType}  />
         <Select label="Age Group" value={ageGroup}  options={AGE_GROUPS}   onChange={setAgeGroup}  />
@@ -189,7 +189,7 @@ export default function BodyGeneratorPanel({ onGenerate }) {
         <NumInput label="Height" value={height} min={120} max={230} onChange={setHeight} unit="cm" />
         <NumInput label="Weight" value={weight} min={35}  max={200} onChange={setWeight} unit="kg" />
       </Section>
-      <Section title="\u{1F4AA} Composition">
+      <Section title="💪 Composition">
         <Slider label="Muscle Definition" value={muscleDef}      onChange={setMuscleDef}      />
         <Slider label="Body Fat %"        value={bodyFat}        onChange={setBodyFat}        />
         <Slider label="Bone Frame"        value={boneFrame}      onChange={setBoneFrame}      />
@@ -220,7 +220,7 @@ export default function BodyGeneratorPanel({ onGenerate }) {
         <Slider label="Ankle"      value={ankleSize}  onChange={setAnkleSize}  />
         <Slider label="Foot Size"  value={footSize}   onChange={setFootSize}   />
       </Section>
-      <Section title="\u{1F3A8} Skin" defaultOpen={false}>
+      <Section title="🎨 Skin" defaultOpen={false}>
         <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:6 }}>
           {SKIN_TONES.map(t => (
             <div key={t} onClick={() => setSkinTone(t)} style={{

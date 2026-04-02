@@ -104,7 +104,7 @@ function RandBtn({ onClick }) {
     <button onClick={onClick} style={{
       background: '#1a1f2c', color: '#888', border: '1px solid #21262d',
       borderRadius: 4, padding: '6px 10px', cursor: 'pointer', fontSize: 11,
-    }}>\u{1F3B2}</button>
+    }}>🎲</button>
   );
 }
 const P = { fontFamily: 'JetBrains Mono, monospace', color: '#e0e0e0', fontSize: 12, userSelect: 'none', width: '100%' };
@@ -174,7 +174,7 @@ export default function EnvironmentGeneratorPanel({ onGenerate }) {
 
   return (
     <div style={P}>
-      <Section title="\u{1F30D} Environment">
+      <Section title="🌍 Environment">
         <Badges items={ENV_TYPES} active={envType} onSelect={setEnvType} />
         <Select label="Season"     value={season}    options={SEASONS} onChange={setSeason}    />
         <Select label="Time of Day" value={timeOfDay} options={TIMES}  onChange={setTimeOfDay} />
@@ -193,7 +193,7 @@ export default function EnvironmentGeneratorPanel({ onGenerate }) {
         <Slider label="Plateau"      value={plateauLevel} onChange={setPlateauLevel} />
         <Slider label="Cliffs"       value={cliffiness}   onChange={setCliffiness}   />
       </Section>
-      <Section title="\u{1F333} Vegetation">
+      <Section title="🌳 Vegetation">
         <Slider label="Tree Density"   value={treeDensity}   onChange={setTreeDensity}   />
         <Slider label="Tree Variety"   value={treeVariety}   onChange={setTreeVariety}   />
         <Slider label="Shrub Density"  value={shrubDensity}  onChange={setShrubDensity}  />
@@ -203,7 +203,7 @@ export default function EnvironmentGeneratorPanel({ onGenerate }) {
         <Slider label="Rock Density"   value={rockDensity}   onChange={setRockDensity}   />
         <Slider label="Rock Size"      value={rockSize}      onChange={setRockSize}      />
       </Section>
-      <Section title="\u{1F30A} Water">
+      <Section title="🌊 Water">
         <Slider   label="Water Level"  value={waterLevel} onChange={setWaterLevel} />
         <Slider   label="Wave Height"  value={waveHeight} onChange={setWaveHeight} />
         <Slider   label="Roughness"    value={waterRough} onChange={setWaterRough} />
@@ -211,7 +211,7 @@ export default function EnvironmentGeneratorPanel({ onGenerate }) {
         <Check    label="River"        value={hasRiver}   onChange={setHasRiver}   />
         <Check    label="Lake"         value={hasLake}    onChange={setHasLake}    />
       </Section>
-      <Section title="\u{1F324} Atmosphere" defaultOpen={false}>
+      <Section title="🌤 Atmosphere" defaultOpen={false}>
         <Slider   label="Fog Density"  value={fogDensity}  onChange={setFogDensity}  />
         <ColorRow label="Fog Color"    value={fogColor}    onChange={setFogColor}    />
         <Slider   label="Ambient"      value={ambientStr}  onChange={setAmbientStr}  />

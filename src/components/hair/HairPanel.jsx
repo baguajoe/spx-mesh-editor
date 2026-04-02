@@ -92,7 +92,7 @@ function RandBtn({ onClick }) {
     <button onClick={onClick} style={{
       background:'#1a1f2c', color:'#888', border:'1px solid #21262d',
       borderRadius:4, padding:'6px 10px', cursor:'pointer', fontSize:11,
-    }}>\u{1F3B2}</button>
+    }}>🎲</button>
   );
 }
 const P = { fontFamily:'JetBrains Mono, monospace', color:'#e0e0e0', fontSize:12, userSelect:'none', width:'100%' };
@@ -173,14 +173,14 @@ export default function HairPanel({ character, scene, onUpdate }) {
 
   return (
     <div style={P}>
-      <Section title="\u{1F9B1} Hair Style">
+      <Section title="🦱 Hair Style">
         <Badges items={HAIR_STYLES.slice(0,9)}  active={hairStyle} onSelect={setHairStyle} />
         <Badges items={HAIR_STYLES.slice(9)}    active={hairStyle} onSelect={setHairStyle} />
         <Select label="Length"     value={hairLength} options={HAIR_LENGTHS} onChange={setHairLength} />
         <Slider label="Random Seed" value={seed} min={0} max={9999} step={1} onChange={setSeed} />
       </Section>
 
-      <Section title="\u{1F308} Color">
+      <Section title="🌈 Color">
         <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:6 }}>
           {HAIR_COLORS.map(c => (
             <div key={c} onClick={() => setRootColor(c)} style={{
@@ -196,7 +196,7 @@ export default function HairPanel({ character, scene, onUpdate }) {
         <Slider   label="Grey Amount"     value={greyAmount}     onChange={setGreyAmount}     />
       </Section>
 
-      <Section title="\u{1F4CA} Density">
+      <Section title="📊 Density">
         <Slider label="Density"          value={density}      onChange={setDensity}      />
         <Slider label="Thickness"        value={thickness}    onChange={setThickness}    />
         <Slider label="Thickness Var"    value={thicknessVar} onChange={setThicknessVar} />
@@ -204,7 +204,7 @@ export default function HairPanel({ character, scene, onUpdate }) {
         <Select label="Part Side"        value={partSide}     options={PART_SIDES}  onChange={setPartSide} />
       </Section>
 
-      <Section title="\u{1F300} Wave & Curl">
+      <Section title="🌀 Wave & Curl">
         <Slider label="Wave Amount"   value={waveAmt}  onChange={setWaveAmt}  />
         <Slider label="Wave Freq"     value={waveFreq} onChange={setWaveFreq} />
         <Slider label="Curl Amount"   value={curlAmt}  onChange={setCurlAmt}  />
@@ -213,14 +213,14 @@ export default function HairPanel({ character, scene, onUpdate }) {
         <Slider label="Flyaways"      value={flyaways} onChange={setFlyaways} />
       </Section>
 
-      <Section title="\u{1F4A8} Physics">
+      <Section title="💨 Physics">
         <Slider label="Stiffness"   value={stiffness} onChange={setStiffness} />
         <Slider label="Damping"     value={damping}   onChange={setDamping}   />
         <Slider label="Wind Resp"   value={windResp}  onChange={setWindResp}  />
         <Slider label="Gravity"     value={gravity}   onChange={setGravity}   />
       </Section>
 
-      <Section title="\u{1F48E} Material" defaultOpen={false}>
+      <Section title="💎 Material" defaultOpen={false}>
         <Select label="Shader"      value={shaderType}  options={SHADER_TYPES}   onChange={setShaderType}   />
         <Slider label="Roughness"   value={roughness}   onChange={setRoughness}   />
         <Slider label="Glossiness"  value={glossiness}  onChange={setGlossiness}  />

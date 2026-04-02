@@ -104,7 +104,7 @@ function RandBtn({ onClick }) {
     <button onClick={onClick} style={{
       background: '#1a1f2c', color: '#888', border: '1px solid #21262d',
       borderRadius: 4, padding: '6px 10px', cursor: 'pointer', fontSize: 11,
-    }}>\u{1F3B2}</button>
+    }}>🎲</button>
   );
 }
 const P = { fontFamily: 'JetBrains Mono, monospace', color: '#e0e0e0', fontSize: 12, userSelect: 'none', width: '100%' };
@@ -176,7 +176,7 @@ export default function CityGeneratorPanel({ onGenerate }) {
 
   return (
     <div style={P}>
-      <Section title="\u{1F3D9} City Style">
+      <Section title="🏙 City Style">
         <Badges items={CITY_STYLES} active={cityStyle} onSelect={setCityStyle} />
         <Slider label="Random Seed" value={seed} min={0} max={9999} step={1} onChange={setSeed} />
       </Section>
@@ -189,7 +189,7 @@ export default function CityGeneratorPanel({ onGenerate }) {
         <Select   label="Road Layout"  value={roadType}  options={ROAD_TYPES} onChange={setRoadType} />
         <Slider   label="Alley Freq"   value={alleyFreq} onChange={setAlleyFreq} />
       </Section>
-      <Section title="\u{1F3E2} Buildings">
+      <Section title="🏢 Buildings">
         <NumInput label="Min Height"    value={minHeight}       min={2}  max={200} onChange={setMinHeight}       unit="m" />
         <NumInput label="Max Height"    value={maxHeight}       min={5}  max={500} onChange={setMaxHeight}       unit="m" />
         <Slider   label="Density"       value={buildingDensity} onChange={setBuildingDensity} />

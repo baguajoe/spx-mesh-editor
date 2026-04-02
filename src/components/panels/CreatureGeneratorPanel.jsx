@@ -104,7 +104,7 @@ function RandBtn({ onClick }) {
     <button onClick={onClick} style={{
       background: '#1a1f2c', color: '#888', border: '1px solid #21262d',
       borderRadius: 4, padding: '6px 10px', cursor: 'pointer', fontSize: 11,
-    }}>\u{1F3B2}</button>
+    }}>🎲</button>
   );
 }
 const P = { fontFamily: 'JetBrains Mono, monospace', color: '#e0e0e0', fontSize: 12, userSelect: 'none', width: '100%' };
@@ -192,7 +192,7 @@ export default function CreatureGeneratorPanel({ onGenerate }) {
 
   return (
     <div style={P}>
-      <Section title="\u{1F409} Archetype">
+      <Section title="🐉 Archetype">
         <Badges items={ARCHETYPES} active={archetype} onSelect={setArchetype} />
         <Select label="Size"        value={size} options={SIZES} onChange={setSize} />
         <Slider label="Random Seed" value={seed} min={0} max={9999} step={1} onChange={setSeed} />
@@ -236,7 +236,7 @@ export default function CreatureGeneratorPanel({ onGenerate }) {
           <Check  label="Tail Spines" value={tailSpines} onChange={setTailSpines} />
         </>)}
       </Section>
-      <Section title="\u{1F3A8} Skin & Color">
+      <Section title="🎨 Skin & Color">
         <Badges items={SKIN_TYPES} active={skinType} onSelect={setSkinType} />
         <ColorRow label="Primary Color" value={primaryColor}   onChange={setPrimaryColor}   />
         <ColorRow label="Secondary"     value={secondColor}    onChange={setSecondColor}    />

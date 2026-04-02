@@ -92,7 +92,7 @@ function RandBtn({ onClick }) {
     <button onClick={onClick} style={{
       background:'#1a1f2c', color:'#888', border:'1px solid #21262d',
       borderRadius:4, padding:'6px 10px', cursor:'pointer', fontSize:11,
-    }}>\u{1F3B2}</button>
+    }}>🎲</button>
   );
 }
 const P = { fontFamily:'JetBrains Mono, monospace', color:'#e0e0e0', fontSize:12, userSelect:'none', width:'100%' };
@@ -165,7 +165,7 @@ export default function EyebrowGeneratorPanel({ character, onApply, onMirror }) 
 
   return (
     <div style={P}>
-      <Section title="\u{1F9B9} Shape">
+      <Section title="🦹 Shape">
         <Badges items={BROW_SHAPES} active={browShape} onSelect={setBrowShape} />
         <Slider label="Arch Height"    value={arch}         onChange={setArch}         />
         <Slider label="Arch Position"  value={archPos}      onChange={setArchPos}      />
@@ -179,11 +179,11 @@ export default function EyebrowGeneratorPanel({ character, onApply, onMirror }) 
         <Slider label="Front Gap"      value={frontGap}     onChange={setFrontGap}     />
       </Section>
 
-      <Section title="\u{1F58C} Style">
+      <Section title="🖌 Style">
         <Badges items={BROW_STYLES} active={browStyle} onSelect={setBrowStyle} />
       </Section>
 
-      <Section title="\u{1F9B1} Hair Properties">
+      <Section title="🦱 Hair Properties">
         <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:6 }}>
           {HAIR_COLORS.map(c => (
             <div key={c} onClick={() => setHairColor(c)} style={{
@@ -207,7 +207,7 @@ export default function EyebrowGeneratorPanel({ character, onApply, onMirror }) 
         <Slider label="Trim Level"      value={trimLevel}     onChange={setTrimLevel}     />
       </Section>
 
-      <Section title="\u{1F9EC} Asymmetry" defaultOpen={false}>
+      <Section title="🧬 Asymmetry" defaultOpen={false}>
         <Slider label="Asymmetry Amount" value={asymmetry} min={0} max={0.4} step={0.01} onChange={setAsymmetry} />
         {asymmetry > 0 && (
           <Select label="Stronger Side" value={asymSide} options={['Left','Right']} onChange={setAsymSide} />
@@ -227,7 +227,7 @@ export default function EyebrowGeneratorPanel({ character, onApply, onMirror }) 
         <button onClick={() => onMirror?.()} style={{
           background:'#1a1f2c', color:'#888', border:'1px solid #21262d',
           borderRadius:4, padding:'6px 10px', cursor:'pointer', fontSize:10,
-        }}>\u{1F503}</button>
+        }}>🔃</button>
         <GenBtn label="\u2713 Apply Brows" onClick={handleApply} />
       </div>
     </div>

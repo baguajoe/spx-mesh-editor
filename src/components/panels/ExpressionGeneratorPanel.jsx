@@ -92,7 +92,7 @@ function RandBtn({ onClick }) {
     <button onClick={onClick} style={{
       background:'#1a1f2c', color:'#888', border:'1px solid #21262d',
       borderRadius:4, padding:'6px 10px', cursor:'pointer', fontSize:11,
-    }}>\u{1F3B2}</button>
+    }}>🎲</button>
   );
 }
 const P = { fontFamily:'JetBrains Mono, monospace', color:'#e0e0e0', fontSize:12, userSelect:'none', width:'100%' };
@@ -217,12 +217,12 @@ export default function ExpressionGeneratorPanel({ character, onApply, onBake })
 
   return (
     <div style={P}>
-      <Section title="\u{1F604} Base Expression">
+      <Section title="😄 Base Expression">
         <Badges items={BASE_EXPRESSIONS.slice(0,8)} active={baseExpr} onSelect={setBaseExpr} />
         <Badges items={BASE_EXPRESSIONS.slice(8)}   active={baseExpr} onSelect={setBaseExpr} />
       </Section>
 
-      <Section title="\u{1F500} Blend">
+      <Section title="🔀 Blend">
         <Select label="Blend Target" value={blendTarget} options={Object.keys(PRESET_EXPRESSIONS)} onChange={setBlendTarget} />
         <Slider label="Blend Weight" value={blendWeight} onChange={setBlendWeight} />
       </Section>
@@ -233,7 +233,7 @@ export default function ExpressionGeneratorPanel({ character, onApply, onBake })
         <Check  label="Symmetry (mirror L→R)" value={symmetry} onChange={setSymmetry} />
       </Section>
 
-      <Section title="\u{1F4CA} Live Values" defaultOpen={false}>
+      <Section title="📊 Live Values" defaultOpen={false}>
         <div style={{ fontSize:9, color:'#555', marginBottom:4 }}>Active morph targets (non-zero):</div>
         {Object.entries(currentValues).filter(([,v]) => v > 0.01).map(([k,v]) => (
           <div key={k} style={{ display:'flex', justifyContent:'space-between', fontSize:10, marginBottom:2 }}>
@@ -246,7 +246,7 @@ export default function ExpressionGeneratorPanel({ character, onApply, onBake })
         )}
       </Section>
 
-      <Section title="\u{1F3A8} Per-Target Override" defaultOpen={false}>
+      <Section title="🎨 Per-Target Override" defaultOpen={false}>
         <div style={{ display:'flex', gap:4, marginBottom:6 }}>
           {Object.keys(CATEGORIES).map(cat => (
             <button key={cat} onClick={() => setActiveCategory(cat)} style={{
