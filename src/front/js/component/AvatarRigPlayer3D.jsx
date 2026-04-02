@@ -436,8 +436,8 @@ const AvatarRigPlayer3D = ({ recordedFrames, avatarUrl, liveFrame, smoothingEnab
 
     // Camera
     const camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 100);
-    camera.position.set(0, 1.5, 3);
-    camera.lookAt(0, 1, 0);
+    camera.position.set(0, 1.0, 7);
+    camera.lookAt(0, 0.8, 0);
     cameraRef.current = camera;
 
     // Renderer — create new one just for this canvas
