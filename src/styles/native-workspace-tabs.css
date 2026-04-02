@@ -118,7 +118,7 @@
   display: flex !important;
   flex-wrap: wrap !important;
   flex-direction: row !important;
-  gap: 4px !important;
+  gap: 3px !important;
   padding: 4px 8px !important;
   overflow: hidden !important;
   max-height: 96px !important;
