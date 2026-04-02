@@ -470,11 +470,15 @@ const AvatarRigPlayer3D = ({ recordedFrames, avatarUrl, liveFrame, smoothingEnab
       model.scale.setScalar(scale);
       model.position.set(-center.x * scale, -box.min.y * scale, -center.z * scale);
       model.traverse(child => {
-        if (child.isMesh) {
+        if (child.isMesh || child.isSkinnedMesh) {
           child.castShadow = true;
           child.receiveShadow = true;
+          child.frustumCulled = false;
           if (child.material) {
             child.material.needsUpdate = true;
+            if (Array.isArray(child.material)) {
+              child.material.forEach(m => { m.needsUpdate = true; });
+            }
           }
         }
       });
