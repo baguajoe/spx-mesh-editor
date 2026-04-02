@@ -110,3 +110,27 @@
 .workspace-toolbar > * {
   margin: 0 !important;
 }
+
+/* =========================================
+   WORKSPACE TABS — 2 ROW WRAP, NO SCROLLBAR
+   ========================================= */
+.spx-native-workspace-tabs {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  flex-direction: row !important;
+  gap: 4px !important;
+  padding: 4px 8px !important;
+  overflow: hidden !important;
+  max-height: 96px !important;
+  right: 330px !important;
+  scrollbar-width: none !important;
+}
+.spx-native-workspace-tabs::-webkit-scrollbar { display: none !important; }
+.spx-native-workspace-tab {
+  min-width: 100px !important;
+  max-width: 160px !important;
+  height: 38px !important;
+  white-space: nowrap !important;
+  margin: 0 !important;
+  flex: 0 0 auto !important;
+}
