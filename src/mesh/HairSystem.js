@@ -1,439 +1,149 @@
-/**
- * HairSystem.js — SPX Mesh Editor
- * Master orchestrator: ties together HairCards, HairLayers, HairWindCollision,
- * HairLOD, HairGrooming, HairShader, and HairPhysics into a single API.
- */
-import * as THREE from 'three';
+import * as THREE from "three";
 
-const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-const lerp  = (a, b, t)   => a + (b - a) * t;
-
-// ─── Event emitter mixin ──────────────────────────────────────────────────────
-class EventEmitter {
-  constructor() { this._listeners = {}; }
-  on(e, fn)   { (this._listeners[e] = this._listeners[e] || []).push(fn); return this; }
-  off(e, fn)  { this._listeners[e] = (this._listeners[e] || []).filter(f => f !== fn); }
-  emit(e, ...args) { (this._listeners[e] || []).forEach(fn => fn(...args)); }
+export function createHairStrand(root, normal, options = {}) {
+  const { length=0.3, segments=8, width=0.002, stiffness=0.8 } = options;
+  const points = [root.clone()];
+  const dir = normal.clone().normalize();
+  dir.y -= 0.1; dir.normalize();
+  const segLen = length / segments;
+  for (let i = 1; i <= segments; i++) {
+    const prev = points[i-1].clone();
+    const droop = new THREE.Vector3(0, -i*0.005, 0);
+    const noise = new THREE.Vector3((Math.random()-0.5)*0.008,(Math.random()-0.5)*0.003,(Math.random()-0.5)*0.008);
+    points.push(prev.addScaledVector(dir, segLen).add(droop).add(noise));
+  }
+  return {
+    id: crypto.randomUUID(), points,
+    restPoints: points.map(p => p.clone()),
+    root: root.clone(), normal: normal.clone(),
+    length, segments, width, stiffness,
+    velocity: points.map(() => new THREE.Vector3()),
+    selected: false, groupId: null, clump: 0,
+  };
 }
 
-// ─── HairSystemConfig ─────────────────────────────────────────────────────────
-export class HairSystemConfig {
-  constructor(opts = {}) {
-    this.cardCount    = opts.cardCount    ?? 300;
-    this.segments     = opts.segments     ?? 8;
-    this.cardWidth    = opts.cardWidth    ?? 0.012;
-    this.cardLength   = opts.cardLength   ?? 0.25;
-    this.rootColor    = opts.rootColor    ?? '#2a1808';
-    this.tipColor     = opts.tipColor     ?? '#8a5020';
-    this.density      = opts.density      ?? 0.75;
-    this.stiffness    = opts.stiffness    ?? 0.70;
-    this.damping      = opts.damping      ?? 0.85;
-    this.windStr      = opts.windStr      ?? 0.40;
-    this.gravity      = opts.gravity      ?? 0.50;
-    this.shaderType   = opts.shaderType   ?? 'Kajiya-Kay';
-    this.enableLOD    = opts.enableLOD    ?? true;
-    this.enablePhysics= opts.enablePhysics?? true;
-    this.seed         = opts.seed         ?? 42;
-  }
-  toJSON() { return { ...this }; }
-  static fromJSON(data) { return new HairSystemConfig(data); }
-  clone()  { return new HairSystemConfig({ ...this }); }
-}
+export function emitHair(mesh, options = {}) {
+  const { density=200, length=0.3, lengthVar=0.15, segments=8, width=0.002, stiffness=0.8 } = options;
+  const geo = mesh.geometry;
+  const pos = geo.attributes.position;
+  const nor = geo.attributes.normal;
+  const idx = geo.index;
+  const strands = [];
+  if (!pos || !nor || !idx) return strands;
+  const arr = idx.array;
+  const mat = mesh.matrixWorld;
+  const normalMat = new THREE.Matrix3().getNormalMatrix(mat);
 
-// ─── HairSystem ───────────────────────────────────────────────────────────────
-export class HairSystem extends EventEmitter {
-  constructor(opts = {}) {
-    super();
-    this.config     = opts.config ?? new HairSystemConfig(opts);
-    this.scene      = opts.scene  ?? null;
-    this.scalp      = opts.scalp  ?? null;
-    this.group      = new THREE.Group();
-    this.group.name = 'HairSystem';
-    this._cards     = [];
-    this._layers    = [];
-    this._material  = null;
-    this._lod       = null;
-    this._physics   = null;
-    this._wind      = null;
-    this._clock     = new THREE.Clock(false);
-    this._built     = false;
-    this._paused    = false;
-    this._frameIdx  = 0;
-    this._stats     = { fps: 0, cardCount: 0, polyCount: 0, physicsMs: 0 };
-  }
+  for (let i = 0; i < arr.length; i += 3) {
+    const va = new THREE.Vector3(pos.getX(arr[i]),   pos.getY(arr[i]),   pos.getZ(arr[i])).applyMatrix4(mat);
+    const vb = new THREE.Vector3(pos.getX(arr[i+1]), pos.getY(arr[i+1]), pos.getZ(arr[i+1])).applyMatrix4(mat);
+    const vc = new THREE.Vector3(pos.getX(arr[i+2]), pos.getY(arr[i+2]), pos.getZ(arr[i+2])).applyMatrix4(mat);
+    const area = new THREE.Triangle(va,vb,vc).getArea();
+    const count = Math.max(1, Math.round(area * density * 10));
+    const na = new THREE.Vector3(nor.getX(arr[i]),   nor.getY(arr[i]),   nor.getZ(arr[i]));
+    const nb = new THREE.Vector3(nor.getX(arr[i+1]), nor.getY(arr[i+1]), nor.getZ(arr[i+1]));
+    const nc = new THREE.Vector3(nor.getX(arr[i+2]), nor.getY(arr[i+2]), nor.getZ(arr[i+2]));
+    const avgNor = na.add(nb).add(nc).normalize().applyMatrix3(normalMat).normalize();
 
-  // ── Build ─────────────────────────────────────────────────────────────────
-  async build() {
-    this._buildMaterial();
-    this._buildCards();
-    this._buildLayers();
-    if (this.config.enableLOD)     this._buildLOD();
-    if (this.config.enablePhysics) this._buildPhysics();
-    this._buildWind();
-    this.scene?.add(this.group);
-    this._built = true;
-    this._clock.start();
-    this.emit('built', this);
-    return this;
-  }
-
-  _buildMaterial() {
-    this._material = new THREE.MeshStandardMaterial({
-      color:       new THREE.Color(this.config.rootColor),
-      roughness:   0.75,
-      transparent: true,
-      alphaTest:   0.1,
-      side:        THREE.DoubleSide,
-      depthWrite:  false,
-    });
-  }
-
-  _buildCards() {
-    const rng = this._mkRng(this.config.seed);
-    const N   = Math.round(this.config.cardCount * this.config.density);
-    this._cards = [];
-    for (let i = 0; i < N; i++) {
-      const theta = rng() * Math.PI * 2;
-      const phi   = rng() * Math.PI * 0.4;
-      const r     = 0.95 + rng() * 0.05;
-      const rootPos = new THREE.Vector3(
-        r * Math.sin(phi) * Math.cos(theta),
-        r * Math.cos(phi),
-        r * Math.sin(phi) * Math.sin(theta),
+    for (let s = 0; s < count; s++) {
+      let u = Math.random(), v = Math.random();
+      if (u+v > 1) { u=1-u; v=1-v; }
+      const w = 1-u-v;
+      const root = new THREE.Vector3(
+        va.x*u+vb.x*v+vc.x*w, va.y*u+vb.y*v+vc.y*w, va.z*u+vb.z*v+vc.z*w
       );
-      const card = {
-        id:         i,
-        rootPos,
-        rootNormal: rootPos.clone().normalize(),
-        length:     this.config.cardLength * (0.85 + rng() * 0.30),
-        width:      this.config.cardWidth  * (0.80 + rng() * 0.40),
-        stiffness:  this.config.stiffness  * (0.90 + rng() * 0.20),
-        groupId:    Math.floor(i / Math.max(1, N / 8)),
-        curve:      null,
-        geometry:   null,
-        mesh:       null,
-      };
-      card.curve = this._buildCardCurve(card, rng);
-      card.geometry = this._buildCardGeometry(card);
-      card.mesh = new THREE.Mesh(card.geometry, this._material);
-      this.group.add(card.mesh);
-      this._cards.push(card);
+      const strandLen = length * (1+(Math.random()-0.5)*lengthVar);
+      strands.push(createHairStrand(root, avgNor, { length:strandLen, segments, width, stiffness }));
     }
-    this._stats.cardCount = this._cards.length;
-    this._stats.polyCount = this._cards.length * this.config.segments * 2;
   }
+  return strands;
+}
 
-  _buildCardCurve(card, rng) {
-    const pts = [];
-    const normal = card.rootNormal.clone();
-    const curl   = rng() * 0.02;
-    const wave   = rng() * 0.008;
-    const right  = new THREE.Vector3(1, 0, 0)
-      .applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(normal.z, normal.x));
-    for (let s = 0; s <= this.config.segments; s++) {
-      const t = s / this.config.segments;
-      const p = card.rootPos.clone().add(normal.clone().multiplyScalar(t * card.length));
-      if (curl > 0) p.add(right.clone().multiplyScalar(Math.sin(t * Math.PI * 2) * curl * t));
-      if (wave > 0) p.add(right.clone().multiplyScalar(Math.sin(t * Math.PI * 4) * wave));
-      pts.push(p);
+export function buildHairLines(strands, { rootColor="#332211", tipColor="#886644" } = {}) {
+  const positions = [], colors = [];
+  const rc = new THREE.Color(rootColor), tc = new THREE.Color(tipColor);
+  strands.forEach(strand => {
+    for (let i = 0; i < strand.points.length-1; i++) {
+      const t1 = i/(strand.points.length-1), t2 = (i+1)/(strand.points.length-1);
+      positions.push(...strand.points[i].toArray(), ...strand.points[i+1].toArray());
+      const c1 = rc.clone().lerp(tc, t1), c2 = rc.clone().lerp(tc, t2);
+      colors.push(c1.r,c1.g,c1.b, c2.r,c2.g,c2.b);
     }
-    return pts;
-  }
+  });
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(positions), 3));
+  geo.setAttribute("color",    new THREE.BufferAttribute(new Float32Array(colors), 3));
+  const mat = new THREE.LineBasicMaterial({ vertexColors: true });
+  return new THREE.LineSegments(geo, mat);
+}
 
-  _buildCardGeometry(card) {
-    const pts     = card.curve;
-    const N       = pts.length;
-    const positions = [], normals = [], uvs = [], indices = [];
-    const right = card.rootNormal.clone().cross(new THREE.Vector3(0, 1, 0)).normalize();
-    for (let i = 0; i < N; i++) {
-      const t = i / (N - 1);
-      const w = card.width * (1 - t * 0.5) * 0.5;
-      const p = pts[i];
-      positions.push(p.x - right.x*w, p.y - right.y*w, p.z - right.z*w);
-      positions.push(p.x + right.x*w, p.y + right.y*w, p.z + right.z*w);
-      normals.push(card.rootNormal.x, card.rootNormal.y, card.rootNormal.z);
-      normals.push(card.rootNormal.x, card.rootNormal.y, card.rootNormal.z);
-      uvs.push(0, t, 1, t);
-      if (i < N - 1) {
-        const b = i * 2;
-        indices.push(b, b+1, b+2, b+1, b+3, b+2);
+export function buildHairTubes(strands, { radius=0.0015, radialSegs=3, rootColor="#332211", tipColor="#886644" } = {}) {
+  const group = new THREE.Group(); group.name = "Hair";
+  const rc = new THREE.Color(rootColor), tc = new THREE.Color(tipColor);
+  strands.forEach(strand => {
+    if (strand.points.length < 2) return;
+    const curve = new THREE.CatmullRomCurve3(strand.points);
+    const geo   = new THREE.TubeGeometry(curve, strand.segments*2, radius, radialSegs, false);
+    const t     = Math.random();
+    const color = rc.clone().lerp(tc, t);
+    const mat   = new THREE.MeshStandardMaterial({ color, roughness:0.8, metalness:0 });
+    group.add(new THREE.Mesh(geo, mat));
+  });
+  return group;
+}
+
+export function clumpHair(strands, { strength=0.3, radius=0.1 } = {}) {
+  if (!strands.length) return;
+  // Group strands spatially and clump tips
+  const buckets = new Map();
+  strands.forEach(s => {
+    const key = Math.round(s.root.x/radius)+"_"+Math.round(s.root.z/radius);
+    if (!buckets.has(key)) buckets.set(key, []);
+    buckets.get(key).push(s);
+  });
+  buckets.forEach(group => {
+    if (group.length < 2) return;
+    const tipCenter = new THREE.Vector3();
+    group.forEach(s => tipCenter.add(s.points[s.points.length-1]));
+    tipCenter.divideScalar(group.length);
+    group.forEach(s => {
+      for (let i=1; i<s.points.length; i++) {
+        const t = i/s.points.length;
+        s.points[i].lerp(tipCenter, t*strength);
       }
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geo.setAttribute('normal',   new THREE.Float32BufferAttribute(normals,   3));
-    geo.setAttribute('uv',       new THREE.Float32BufferAttribute(uvs,       2));
-    geo.setIndex(indices);
-    return geo;
-  }
-
-  _buildLayers() {
-    const LAYER_TYPES = ['Base','Mid','Top','Flyaway'];
-    this._layers = LAYER_TYPES.map(type => ({
-      type,
-      group:   new THREE.Group(),
-      enabled: true,
-      opacity: 1.0,
-    }));
-  }
-
-  _buildLOD() {
-    this._lod = {
-      currentLevel: 0,
-      distances:    [0, 3, 8, 20, 50],
-      fractions:    [1.0, 0.6, 0.3, 0.1, 0],
-      update: (camera, target) => {
-        const dist = camera.position.distanceTo(target?.position ?? new THREE.Vector3());
-        let level  = this._lod.distances.length - 1;
-        for (let i = 0; i < this._lod.distances.length; i++) {
-          if (dist < this._lod.distances[i+1] ?? Infinity) { level = i; break; }
-        }
-        if (level !== this._lod.currentLevel) {
-          this._lod.currentLevel = level;
-          this.emit('lodChange', level, dist);
-        }
-      },
-    };
-  }
-
-  _buildPhysics() {
-    this._physics = {
-      particles:   new Map(),
-      gravity:     new THREE.Vector3(0, -9.8 * this.config.gravity, 0),
-      damping:     this.config.damping,
-      iterations:  4,
-      init: (card) => {
-        const pts = card.curve.map((p, i) => ({
-          pos: p.clone(), prev: p.clone(),
-          mass: i === 0 ? Infinity : 0.1,
-          pinned: i === 0,
-        }));
-        this._physics.particles.set(card.id, pts);
-      },
-      step: (card, dt, windForce) => {
-        const pts = this._physics.particles.get(card.id);
-        if (!pts) return;
-        const g    = this._physics.gravity.clone().multiplyScalar(dt * dt);
-        const wf   = windForce.clone().multiplyScalar(dt * dt * 0.1);
-        for (let i = 1; i < pts.length; i++) {
-          const p   = pts[i];
-          const vel = p.pos.clone().sub(p.prev).multiplyScalar(this._physics.damping);
-          p.prev.copy(p.pos);
-          p.pos.add(vel).add(g).add(wf);
-        }
-        const restLen = card.length / (pts.length - 1);
-        for (let iter = 0; iter < this._physics.iterations; iter++) {
-          for (let i = 0; i < pts.length - 1; i++) {
-            const a = pts[i], b = pts[i+1];
-            const diff = b.pos.clone().sub(a.pos);
-            const dist = diff.length() || 0.0001;
-            const corr = diff.multiplyScalar((dist - restLen) / dist * 0.5);
-            if (!a.pinned) a.pos.add(corr);
-            if (!b.pinned) b.pos.sub(corr);
-          }
-        }
-        for (let i = 1; i < pts.length; i++) {
-          pts[i].pos.lerp(card.curve[i], card.stiffness * 0.06);
-        }
-      },
-    };
-    this._cards.forEach(c => this._physics.init(c));
-  }
-
-  _buildWind() {
-    this._wind = {
-      direction: new THREE.Vector3(1, 0, 0),
-      strength:  this.config.windStr,
-      time:      0,
-      sample: (dt) => {
-        this._wind.time += dt;
-        const t  = this._wind.time;
-        const nx = Math.sin(t * 0.7) * this._wind.strength;
-        const nz = Math.cos(t * 0.5) * this._wind.strength * 0.5;
-        return new THREE.Vector3(nx, 0, nz);
-      },
-    };
-  }
-
-  // ── Update ─────────────────────────────────────────────────────────────────
-  update(camera) {
-    if (!this._built || this._paused) return;
-    this._frameIdx++;
-    const dt = Math.min(this._clock.getDelta(), 0.05);
-    const t0 = performance.now();
-
-    if (this.config.enablePhysics && this._frameIdx % 2 === 0) {
-      const wind = this._wind?.sample(dt) ?? new THREE.Vector3();
-      this._cards.forEach(card => {
-        this._physics?.step(card, dt, wind);
-        this._applyPhysicsToGeometry(card);
-      });
-    }
-
-    if (this.config.enableLOD && camera && this._frameIdx % 3 === 0) {
-      this._lod?.update(camera, this.group);
-    }
-
-    this._stats.physicsMs = performance.now() - t0;
-    this.emit('update', dt, this._stats);
-  }
-
-  _applyPhysicsToGeometry(card) {
-    const pts = this._physics?.particles.get(card.id);
-    if (!pts || !card.geometry) return;
-    const pos   = card.geometry.attributes.position;
-    const right = card.rootNormal.clone().cross(new THREE.Vector3(0, 1, 0)).normalize();
-    for (let i = 0; i < pts.length; i++) {
-      const p = pts[i].pos;
-      const t = i / (pts.length - 1);
-      const w = card.width * (1 - t * 0.5) * 0.5;
-      const b = i * 2;
-      pos.setXYZ(b,   p.x - right.x*w, p.y - right.y*w, p.z - right.z*w);
-      pos.setXYZ(b+1, p.x + right.x*w, p.y + right.y*w, p.z + right.z*w);
-    }
-    pos.needsUpdate = true;
-  }
-
-  // ── Controls ──────────────────────────────────────────────────────────────
-  pause()   { this._paused = true;  this.emit('pause'); }
-  resume()  { this._paused = false; this.emit('resume'); }
-  setWind(direction, strength) {
-    if (this._wind) { this._wind.direction.copy(direction); this._wind.strength = strength; }
-  }
-  setConfig(partial) {
-    Object.assign(this.config, partial);
-    if (partial.rootColor && this._material) this._material.color.set(partial.rootColor);
-    this.emit('configChange', this.config);
-  }
-
-  // ── Stats & Info ──────────────────────────────────────────────────────────
-  getStats() { return { ...this._stats, built: this._built, paused: this._paused }; }
-  getCardCount()  { return this._cards.length; }
-  getLODLevel()   { return this._lod?.currentLevel ?? 0; }
-
-  // ── Utilities ─────────────────────────────────────────────────────────────
-  _mkRng(seed) {
-    let s = seed;
-    return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
-  }
-
-  // ── Dispose ───────────────────────────────────────────────────────────────
-  dispose() {
-    this._cards.forEach(c => { c.geometry?.dispose(); });
-    this._material?.dispose();
-    this._physics?.particles.clear();
-    this.scene?.remove(this.group);
-    this._built = false;
-    this.emit('dispose');
-  }
-
-  toJSON() { return { config: this.config.toJSON(), cardCount: this._cards.length }; }
-}
-
-export default HairSystem;
-
-export class HairSystemPreset {
-  static apply(hairSystem, name) {
-    const presets = {
-      Realistic: { cardCount:500, density:0.80, stiffness:0.68, damping:0.85, windStr:0.35, gravity:0.50 },
-      Stylized:  { cardCount:200, density:0.90, stiffness:0.90, damping:0.92, windStr:0.10, gravity:0.15 },
-      GameReady: { cardCount:150, density:0.85, stiffness:0.80, damping:0.90, windStr:0.20, gravity:0.30 },
-      Simulation:{ cardCount:600, density:0.70, stiffness:0.50, damping:0.75, windStr:0.60, gravity:0.65 },
-    };
-    const p = presets[name] ?? presets.Realistic;
-    hairSystem.setConfig(p);
-    return p;
-  }
-}
-
-export function buildHairSystemFromConfig(config, scene, scalp) {
-  const hs = new HairSystem({ config: new HairSystemConfig(config), scene, scalp });
-  return hs.build();
-}
-
-export function estimateHairSystemCost(config) {
-  const cards = Math.round((config.cardCount ?? 300) * (config.density ?? 0.75));
-  const tris  = cards * (config.segments ?? 8) * 2;
-  const physMs = config.enablePhysics ? cards * 0.002 : 0;
-  return { cards, tris, estimatedPhysicsMs: physMs.toFixed(2),
-    tier: tris < 50000 ? 'Fast' : tris < 150000 ? 'Medium' : 'Heavy' };
-}
-
-export function serializeHairSystem(hairSystem) {
-  return JSON.stringify({ version: 1, config: hairSystem.config.toJSON(),
-    stats: hairSystem.getStats(), exportedAt: new Date().toISOString() });
-}
-
-export async function deserializeHairSystem(json, scene, scalp) {
-  const data   = JSON.parse(json);
-  const config = HairSystemConfig.fromJSON(data.config ?? data);
-  const hs     = new HairSystem({ config, scene, scalp });
-  await hs.build();
-  return hs;
-}
-
-export function createHairSystemLODChain(baseConfig, levels = 4) {
-  return Array.from({ length: levels }, (_, i) => {
-    const factor = Math.pow(0.5, i);
-    return new HairSystemConfig({
-      ...baseConfig,
-      cardCount: Math.round(baseConfig.cardCount * factor),
-      segments:  Math.max(2, (baseConfig.segments ?? 8) - i * 2),
     });
   });
 }
 
-export function computeHairDensityMap(scalp, targetDensity, seed = 42) {
-  let s = seed;
-  const rng = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
-  const map = new Map();
-  const pos = scalp?.geometry?.attributes?.position;
-  if (!pos) return map;
-  for (let i = 0; i < pos.count; i++) {
-    map.set(i, rng() < targetDensity ? 1.0 : 0.0);
-  }
-  return map;
+export const HAIR_PRESETS = {
+  short:   { length:0.08, density:300, stiffness:0.9, clump:0.2, label:"Short" },
+  medium:  { length:0.2,  density:200, stiffness:0.7, clump:0.3, label:"Medium" },
+  long:    { length:0.5,  density:150, stiffness:0.5, clump:0.4, label:"Long" },
+  curly:   { length:0.25, density:250, stiffness:0.3, clump:0.5, label:"Curly" },
+  wavy:    { length:0.35, density:180, stiffness:0.6, clump:0.35,label:"Wavy" },
+  afro:    { length:0.15, density:400, stiffness:0.2, clump:0.1, label:"Afro" },
+  braids:  { length:0.4,  density:100, stiffness:0.85,clump:0.8, label:"Braids" },
+  buzz:    { length:0.03, density:600, stiffness:0.99,clump:0.05,label:"Buzz Cut" },
+};
+
+export function applyHairPreset(mesh, presetKey) {
+  const preset = HAIR_PRESETS[presetKey];
+  if (!preset) return [];
+  const strands = emitHair(mesh, preset);
+  if (preset.clump > 0) clumpHair(strands, { strength: preset.clump });
+  return strands;
 }
 
-export function createHairSystemFromTemplate(templateName, scene, scalp) {
-  const TEMPLATES = {
-    Realistic: { cardCount:500, density:0.80, stiffness:0.68, damping:0.85, windStr:0.35, gravity:0.50, rootColor:'#2a1808', tipColor:'#8a5020' },
-    Stylized:  { cardCount:200, density:0.90, stiffness:0.90, damping:0.92, windStr:0.10, gravity:0.15, rootColor:'#1a1008', tipColor:'#4a2810' },
-    GameReady: { cardCount:150, density:0.85, stiffness:0.80, damping:0.90, windStr:0.20, gravity:0.30, rootColor:'#2a1808', tipColor:'#6a3818' },
-    Afro:      { cardCount:700, density:0.90, stiffness:0.35, damping:0.65, windStr:0.10, gravity:0.15, rootColor:'#0a0804', tipColor:'#2a1808' },
-    Long:      { cardCount:600, density:0.75, stiffness:0.65, damping:0.85, windStr:0.30, gravity:0.55, rootColor:'#0a0808', tipColor:'#2a1808' },
-  };
-  const cfg = TEMPLATES[templateName] ?? TEMPLATES.Realistic;
-  return new HairSystem({ config: new HairSystemConfig(cfg), scene, scalp });
+export function getHairStats(strands) {
+  const totalPts = strands.reduce((s,st)=>s+st.points.length,0);
+  const avgLen   = strands.length ? strands.reduce((s,st)=>s+st.length,0)/strands.length : 0;
+  return { strands:strands.length, totalPoints:totalPts, avgLength:avgLen.toFixed(3) };
 }
-export function updateHairSystemMaterial(hairSystem, materialOpts) {
-  if (!hairSystem._material) return;
-  if (materialOpts.rootColor) hairSystem._material.color.set(materialOpts.rootColor);
-  if (materialOpts.roughness !== undefined) hairSystem._material.roughness = materialOpts.roughness;
-  if (materialOpts.opacity   !== undefined) hairSystem._material.opacity   = materialOpts.opacity;
-  hairSystem._material.needsUpdate = true;
-}
-export function getHairSystemBounds(hairSystem) {
-  const bbox = new THREE.Box3();
-  hairSystem._cards.forEach(c => c.rootPos && bbox.expandByPoint(c.rootPos));
-  return { box: bbox, center: bbox.getCenter(new THREE.Vector3()), size: bbox.getSize(new THREE.Vector3()) };
-}
-export function pauseAllHairSystems(systems) { systems.forEach(s => s.pause()); }
-export function resumeAllHairSystems(systems) { systems.forEach(s => s.resume()); }
-export function disposeAllHairSystems(systems) { systems.forEach(s => s.dispose()); systems.length = 0; }
 
-export function cloneHairSystem(source, scene) {
-  const cfg = source.config.clone();
-  const hs  = new HairSystem({ config: cfg, scene });
-  return hs;
+export function serializeHair(strands) {
+  return strands.map(s=>({ id:s.id, points:s.points.map(p=>p.toArray()), root:s.root.toArray(), normal:s.normal.toArray(), length:s.length, segments:s.segments }));
 }
-export function setHairSystemVisible(hairSystem, visible) {
-  hairSystem.group.visible = visible;
+
+export function deserializeHair(data) {
+  return data.map(s=>({ ...s, points:s.points.map(p=>new THREE.Vector3(...p)), restPoints:s.points.map(p=>new THREE.Vector3(...p)), root:new THREE.Vector3(...s.root), normal:new THREE.Vector3(...s.normal), velocity:s.points.map(()=>new THREE.Vector3()), selected:false, groupId:null, clump:0 }));
 }
-export function getHairSystemCardAt(hairSystem, idx) {
-  return hairSystem._cards[idx] ?? null;
-}
-export function forEachCard(hairSystem, fn) {
-  hairSystem._cards.forEach((card, i) => fn(card, i));
-}
-export function getHairSystemVersion() { return '1.4.0'; }
