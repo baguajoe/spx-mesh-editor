@@ -61,7 +61,7 @@
 .mw-avatar-wrap { flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--mw-bg); }
 .mw-avatar-label { padding:10px 16px;font-size:12px;color:var(--mw-muted);border-bottom:1px solid var(--mw-border);flex-shrink:0; }
 .mw-avatar-sub { color:var(--mw-teal); }
-.mw-avatar-viewport { flex:1;overflow:hidden; }
+.mw-avatar-viewport { flex:1;overflow:hidden;position:relative;min-height:400px; } .mw-avatar-viewport canvas { display:block;width:100%!important;height:100%!important; }
 .mw-avatar-empty { display:flex;align-items:center;justify-content:center;height:100%;color:var(--mw-muted);font-size:14px; }
 .mw-range { width:100%;accent-color:var(--mw-teal); }
 .mw-frame-label { font-size:11px;color:var(--mw-muted);margin-bottom:4px; }
