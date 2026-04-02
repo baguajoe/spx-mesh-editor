@@ -461,38 +461,37 @@ const AvatarRigPlayer3D = ({ recordedFrames, avatarUrl, liveFrame, smoothingEnab
     const loader = new GLTFLoader();
     loader.load(avatarUrl || '/ybot.glb', (gltf) => {
       const model = gltf.scene;
-      // Scale and center the model
+      // Disable frustum culling FIRST before any bounding box calc
+      model.traverse(child => {
+        if (child.isMesh || child.isSkinnedMesh) {
+          child.frustumCulled = false;
+          child.castShadow = true;
+          child.receiveShadow = true;
+          if (child.material) {
+            const mats = Array.isArray(child.material) ? child.material : [child.material];
+            mats.forEach(m => { m.needsUpdate = true; });
+          }
+        }
+      });
+      // Add to scene first so bones are updated
+      scene.add(model);
+      // Now compute bounding box with skeleton posed
       const box = new THREE.Box3().setFromObject(model);
       const size = box.getSize(new THREE.Vector3());
       const center = box.getCenter(new THREE.Vector3());
       const maxDim = Math.max(size.x, size.y, size.z);
-      const scale = 2.0 / maxDim;
+      const scale = 1.8 / maxDim;
       model.scale.setScalar(scale);
-      model.position.set(-center.x * scale, -box.min.y * scale, -center.z * scale);
-      model.traverse(child => {
-        if (child.isMesh || child.isSkinnedMesh) {
-          child.castShadow = true;
-          child.receiveShadow = true;
-          child.frustumCulled = false;
-          if (child.material) {
-            child.material.needsUpdate = true;
-            if (Array.isArray(child.material)) {
-              child.material.forEach(m => { m.needsUpdate = true; });
-            }
-          }
-        }
-      });
-      scene.add(model);
+      // Place feet on ground
+      const box2 = new THREE.Box3().setFromObject(model);
+      model.position.set(-center.x * scale, -box2.min.y, -center.z * scale);
       avatarRef.current = model;
-      console.log('[AvatarRig] Model loaded, size:', size, 'scale:', scale);
       if (gltf.animations?.length) {
         const mixer = new THREE.AnimationMixer(model);
         mixerRef.current = mixer;
         mixer.clipAction(gltf.animations[0]).play();
       }
-    }, (progress) => {
-      console.log('[AvatarRig] Loading:', Math.round(progress.loaded/progress.total*100)+'%');
-    }, (err) => console.error('[AvatarRigPlayer3D] Load error:', err));
+    }, undefined, (err) => console.error('[AvatarRigPlayer3D] Load error:', err));
 
     // Animate
     function animate() {
