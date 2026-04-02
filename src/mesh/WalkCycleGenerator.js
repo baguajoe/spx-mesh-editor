@@ -1,410 +1,274 @@
-import * as THREE from "three";
+/**
+ * WalkCycleGenerator.js — SPX Mesh Editor
+ * Procedural walk cycle generator: biped/quadruped locomotion BVH output,
+ * per-joint keyframes, multiple gait styles, and skeleton application.
+ */
+import * as THREE from 'three';
 
-// ── Walk cycle styles ─────────────────────────────────────────────────────────
-export const WALK_STYLES = {
-  normal:   { label: "Normal",    hipSwing:0.15, armSwing:0.3,  bounce:0.05, stepHeight:0.1 },
-  military: { label: "Military",  hipSwing:0.05, armSwing:0.1,  bounce:0.02, stepHeight:0.05 },
-  casual:   { label: "Casual",    hipSwing:0.2,  armSwing:0.35, bounce:0.08, stepHeight:0.12 },
-  sneak:    { label: "Sneak",     hipSwing:0.1,  armSwing:0.15, bounce:0.03, stepHeight:0.15 },
-  injured:  { label: "Injured",   hipSwing:0.25, armSwing:0.15, bounce:0.1,  stepHeight:0.05 },
-  strut:    { label: "Strut",     hipSwing:0.3,  armSwing:0.4,  bounce:0.12, stepHeight:0.15 },
-  zombie:   { label: "Zombie",    hipSwing:0.35, armSwing:0.05, bounce:0.15, stepHeight:0.08 },
+const clamp  = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const sinW   = (t, phase, amp, freq = 1) => Math.sin((t * freq + phase) * Math.PI * 2) * amp;
+const DEG    = Math.PI / 180;
+
+export const BIPED_JOINTS = [
+  'Hips','Spine','Spine1','Spine2','Neck','Head',
+  'LeftShoulder','LeftArm','LeftForeArm','LeftHand',
+  'RightShoulder','RightArm','RightForeArm','RightHand',
+  'LeftUpLeg','LeftLeg','LeftFoot','LeftToeBase',
+  'RightUpLeg','RightLeg','RightFoot','RightToeBase',
+];
+
+export const GAIT_PRESETS = {
+  Normal:  { stepHeight:0.12, stepLen:0.50, armSwing:0.30, hipSway:0.04, bounciness:0.03, duration:1.00 },
+  Sneak:   { stepHeight:0.04, stepLen:0.30, armSwing:0.15, hipSway:0.02, bounciness:0.01, duration:1.20 },
+  Jog:     { stepHeight:0.20, stepLen:0.65, armSwing:0.50, hipSway:0.05, bounciness:0.07, duration:0.55 },
+  Run:     { stepHeight:0.28, stepLen:0.80, armSwing:0.65, hipSway:0.06, bounciness:0.10, duration:0.40 },
+  March:   { stepHeight:0.18, stepLen:0.55, armSwing:0.40, hipSway:0.02, bounciness:0.04, duration:0.90 },
+  Limp:    { stepHeight:0.06, stepLen:0.30, armSwing:0.10, hipSway:0.09, bounciness:0.02, duration:1.30 },
+  Strafe:  { stepHeight:0.10, stepLen:0.35, armSwing:0.08, hipSway:0.08, bounciness:0.02, duration:0.90 },
+  Crouch:  { stepHeight:0.06, stepLen:0.28, armSwing:0.20, hipSway:0.03, bounciness:0.015,duration:1.10 },
+  Drunk:   { stepHeight:0.08, stepLen:0.32, armSwing:0.25, hipSway:0.14, bounciness:0.05, duration:1.50 },
+  Elderly: { stepHeight:0.05, stepLen:0.22, armSwing:0.12, hipSway:0.07, bounciness:0.01, duration:1.60 },
 };
 
-// ── Generate walk cycle keyframes ─────────────────────────────────────────────
-export function generateWalkCycle(armature, options = {}) {
-  const {
-    style     = "normal",
-    speed     = 1.0,
-    stride    = 1.0,
-    fps       = 24,
-    loopFrames = 24,
-  } = options;
-
-  const styleParams = WALK_STYLES[style] || WALK_STYLES.normal;
-  const bones       = armature?.userData?.bones || [];
-  const keys        = {};
-
-  // Find bones by common names
-  const findBone = (...names) => bones.find(b => names.some(n =>
-    b.name.toLowerCase().includes(n.toLowerCase())
-  ));
-
-  const hipBone   = findBone("Root", "Hips", "Hip");
-  const spineBone = findBone("Spine", "Chest");
-  const lThigh    = findBone("L_Thigh", "LeftUpLeg", "LThigh");
-  const rThigh    = findBone("R_Thigh", "RightUpLeg", "RThigh");
-  const lShin     = findBone("L_Shin", "LeftLeg", "LShin");
-  const rShin     = findBone("R_Shin", "RightLeg", "RShin");
-  const lUpperArm = findBone("L_UpperArm", "LeftArm", "LUpperArm");
-  const rUpperArm = findBone("R_UpperArm", "RightArm", "RUpperArm");
-  const lLowerArm = findBone("L_LowerArm", "LeftForeArm");
-  const rLowerArm = findBone("R_LowerArm", "RightForeArm");
-
-  const initKey = (boneId, prop) => {
-    if (!keys[boneId]) keys[boneId] = {};
-    if (!keys[boneId][prop]) keys[boneId][prop] = {};
-  };
-
-  const setKey = (bone, prop, frame, value) => {
-    if (!bone) return;
-    const id = bone.userData?.boneId || bone.uuid;
-    initKey(id, prop);
-    keys[id][prop][frame] = value;
-  };
-
-  // Generate keyframes over one loop cycle
-  for (let f = 0; f <= loopFrames; f++) {
-    const t     = (f / loopFrames) * Math.PI * 2;
-    const phase = t * speed;
-
-    // Hip bounce and sway
-    if (hipBone) {
-      setKey(hipBone, "pos.y", f, Math.abs(Math.sin(phase * 2)) * styleParams.bounce);
-      setKey(hipBone, "rot.z", f, Math.sin(phase) * styleParams.hipSwing * stride);
-    }
-
-    // Spine counter-rotation
-    if (spineBone) {
-      setKey(spineBone, "rot.z", f, -Math.sin(phase) * styleParams.hipSwing * 0.5);
-      setKey(spineBone, "rot.x", f, Math.sin(phase * 2) * 0.02);
-    }
-
-    // Left leg
-    if (lThigh) setKey(lThigh, "rot.x", f, Math.sin(phase) * 0.4 * stride);
-    if (lShin)  setKey(lShin,  "rot.x", f, Math.max(0, -Math.sin(phase)) * 0.4 * styleParams.stepHeight * 10);
-
-    // Right leg (opposite phase)
-    if (rThigh) setKey(rThigh, "rot.x", f, -Math.sin(phase) * 0.4 * stride);
-    if (rShin)  setKey(rShin,  "rot.x", f, Math.max(0, Math.sin(phase)) * 0.4 * styleParams.stepHeight * 10);
-
-    // Left arm (opposite to left leg)
-    if (lUpperArm) setKey(lUpperArm, "rot.x", f, -Math.sin(phase) * styleParams.armSwing);
-    if (lLowerArm) setKey(lLowerArm, "rot.x", f, Math.max(0, -Math.sin(phase)) * styleParams.armSwing * 0.3);
-
-    // Right arm (opposite to right leg)
-    if (rUpperArm) setKey(rUpperArm, "rot.x", f, Math.sin(phase) * styleParams.armSwing);
-    if (rLowerArm) setKey(rLowerArm, "rot.x", f, Math.max(0, Math.sin(phase)) * styleParams.armSwing * 0.3);
+export class WalkCycleGenerator {
+  constructor(opts = {}) {
+    this.frameRate    = opts.frameRate    ?? 30;
+    this.style        = opts.style        ?? 'Normal';
+    this.speed        = opts.speed        ?? 1.0;
+    this.quadruped    = opts.quadruped    ?? false;
+    this._applyGait(this.style);
+    if (opts.stepHeight   !== undefined) this.stepHeight   = opts.stepHeight;
+    if (opts.armSwing     !== undefined) this.armSwing     = opts.armSwing;
+    if (opts.hipSway      !== undefined) this.hipSway      = opts.hipSway;
+    if (opts.bounciness   !== undefined) this.bounciness   = opts.bounciness;
   }
 
-  return { keys, loopFrames, style, speed, stride };
-}
+  _applyGait(style) {
+    const g = GAIT_PRESETS[style] ?? GAIT_PRESETS.Normal;
+    this.stepHeight  = g.stepHeight;
+    this.stepLen     = g.stepLen;
+    this.armSwing    = g.armSwing;
+    this.hipSway     = g.hipSway;
+    this.bounciness  = g.bounciness;
+    this.duration    = g.duration;
+  }
 
-// ── Apply walk cycle at frame ─────────────────────────────────────────────────
-export function applyWalkCycleFrame(walkData, armature, frame) {
-  const { keys, loopFrames } = walkData;
-  const localFrame = frame % loopFrames;
-  const bones      = armature?.userData?.bones || [];
+  setStyle(style) { this.style = style; this._applyGait(style); return this; }
 
-  bones.forEach(bone => {
-    const id      = bone.userData?.boneId || bone.uuid;
-    const channel = keys[id];
-    if (!channel) return;
+  // ── Per-joint evaluators ────────────────────────────────────────────────
+  _hipPos(t) {
+    return {
+      x: sinW(t, 0,    this.hipSway,    2) * 100,
+      y: 95  + Math.abs(sinW(t, 0, this.bounciness, 2)) * 100,
+      z: 0,
+    };
+  }
 
-    Object.entries(channel).forEach(([prop, keyframes]) => {
-      const frames = Object.keys(keyframes).map(Number).sort((a,b)=>a-b);
-      if (!frames.length) return;
+  _hipRot(t) {
+    return {
+      x: sinW(t, 0,   2.0, 1),
+      y: sinW(t, 0,   3.5, 2),
+      z: sinW(t, 0.1, 1.5, 2),
+    };
+  }
 
-      // Linear interpolation
-      let value = keyframes[frames[frames.length-1]];
-      for (let i = 0; i < frames.length-1; i++) {
-        if (localFrame >= frames[i] && localFrame <= frames[i+1]) {
-          const t = (localFrame-frames[i])/(frames[i+1]-frames[i]);
-          value = keyframes[frames[i]] + (keyframes[frames[i+1]]-keyframes[frames[i]])*t;
-          break;
-        }
-      }
+  _spineRot(t, level = 0) {
+    const phase = 0.08 + level * 0.03;
+    return {
+      x: sinW(t, phase, 1.5 - level * 0.2),
+      y: sinW(t, phase, 2.5 - level * 0.3),
+      z: sinW(t, phase, 0.8),
+    };
+  }
 
-      switch (prop) {
-        case "pos.x": bone.position.x = value; break;
-        case "pos.y": bone.position.y = value; break;
-        case "pos.z": bone.position.z = value; break;
-        case "rot.x": bone.rotation.x = value; break;
-        case "rot.y": bone.rotation.y = value; break;
-        case "rot.z": bone.rotation.z = value; break;
-      }
+  _armRot(t, side) {
+    const phase = side === 'L' ? 0.5 : 0.0;
+    const swing = this.armSwing * 60;
+    return {
+      x: sinW(t, phase, swing),
+      y: sinW(t, phase, swing * 0.12),
+      z: (side === 'L' ? -1 : 1) * (6 + sinW(t, phase, 3)),
+    };
+  }
+
+  _foreArmRot(t, side) {
+    const phase = side === 'L' ? 0.5 : 0.0;
+    return {
+      x: 20 + sinW(t, phase, 12 * this.armSwing),
+      y: 0, z: 0,
+    };
+  }
+
+  _hipLegRot(t, side) {
+    const phase = side === 'L' ? 0 : 0.5;
+    return {
+      x: sinW(t, phase, 25 + this.stepLen * 15),
+      y: sinW(t, 0, 5, 2) * (side === 'L' ? -1 : 1),
+      z: 0,
+    };
+  }
+
+  _kneeBend(t, side) {
+    const phase = side === 'L' ? 0 : 0.5;
+    return Math.max(0, sinW(t, phase + 0.25, 28 + this.stepLen * 10));
+  }
+
+  _footRot(t, side) {
+    const phase = side === 'L' ? 0 : 0.5;
+    const swing = this.stepLen * 20;
+    return {
+      x: sinW(t, phase + 0.1, swing),
+      y: 0, z: 0,
+    };
+  }
+
+  _headRot(t) {
+    return { x: 0, y: sinW(t, 0.1, 1.5, 2), z: 0 };
+  }
+
+  // ── Frame generation ────────────────────────────────────────────────────
+  generateFrames() {
+    const frameCount = Math.round(this.frameRate * this.duration);
+    return Array.from({ length: frameCount }, (_, f) => {
+      const t = (f / frameCount) * this.speed;
+      return {
+        frame: f, t,
+        Hips:       { pos: this._hipPos(t), rot: this._hipRot(t) },
+        Spine:      { rot: this._spineRot(t, 0) },
+        Spine1:     { rot: this._spineRot(t, 1) },
+        Spine2:     { rot: this._spineRot(t, 2) },
+        Neck:       { rot: { x:0, y:0, z:0 } },
+        Head:       { rot: this._headRot(t) },
+        LeftShoulder:  { rot: { x:0, y:0, z:0 } },
+        LeftArm:       { rot: this._armRot(t, 'L') },
+        LeftForeArm:   { rot: this._foreArmRot(t, 'L') },
+        LeftHand:      { rot: { x:0, y:0, z:0 } },
+        RightShoulder: { rot: { x:0, y:0, z:0 } },
+        RightArm:      { rot: this._armRot(t, 'R') },
+        RightForeArm:  { rot: this._foreArmRot(t, 'R') },
+        RightHand:     { rot: { x:0, y:0, z:0 } },
+        LeftUpLeg:  { rot: this._hipLegRot(t, 'L') },
+        LeftLeg:    { rot: { x: this._kneeBend(t,'L'), y:0, z:0 } },
+        LeftFoot:   { rot: this._footRot(t, 'L') },
+        LeftToeBase:{ rot: { x:0, y:0, z:0 } },
+        RightUpLeg: { rot: this._hipLegRot(t, 'R') },
+        RightLeg:   { rot: { x: this._kneeBend(t,'R'), y:0, z:0 } },
+        RightFoot:  { rot: this._footRot(t, 'R') },
+        RightToeBase:{ rot: { x:0, y:0, z:0 } },
+      };
     });
-  });
-}
-
-// ── Generate idle cycle ───────────────────────────────────────────────────────
-export function generateIdleCycle(armature, options = {}) {
-  const { fps=24, loopFrames=48, breathingSpeed=1.0, fidget=true } = options;
-  const bones = armature?.userData?.bones || [];
-  const keys  = {};
-
-  const findBone = (...names) => bones.find(b => names.some(n =>
-    b.name.toLowerCase().includes(n.toLowerCase())
-  ));
-
-  const spineBone = findBone("Spine", "Chest");
-  const headBone  = findBone("Head");
-  const lArm      = findBone("L_UpperArm", "LeftArm");
-  const rArm      = findBone("R_UpperArm", "RightArm");
-
-  const setKey = (bone, prop, frame, value) => {
-    if (!bone) return;
-    const id = bone.userData?.boneId || bone.uuid;
-    if (!keys[id]) keys[id] = {};
-    if (!keys[id][prop]) keys[id][prop] = {};
-    keys[id][prop][frame] = value;
-  };
-
-  for (let f = 0; f <= loopFrames; f++) {
-    const t = (f / loopFrames) * Math.PI * 2 * breathingSpeed;
-
-    // Breathing
-    if (spineBone) {
-      setKey(spineBone, "rot.x", f, Math.sin(t) * 0.02);
-      setKey(spineBone, "pos.y", f, Math.sin(t) * 0.01);
-    }
-
-    // Head subtle sway
-    if (headBone) {
-      setKey(headBone, "rot.y", f, Math.sin(t * 0.5) * 0.03);
-      setKey(headBone, "rot.z", f, Math.cos(t * 0.3) * 0.02);
-    }
-
-    // Arm micro-movement
-    if (fidget) {
-      if (lArm) setKey(lArm, "rot.z", f, Math.sin(t * 0.7) * 0.02);
-      if (rArm) setKey(rArm, "rot.z", f, -Math.sin(t * 0.7) * 0.02);
-    }
   }
 
-  return { keys, loopFrames, type: "idle" };
+  // ── BVH export ──────────────────────────────────────────────────────────
+  toBVH() {
+    const frames = this.generateFrames();
+    const fps    = this.frameRate;
+    let bvh = 'HIERARCHY\n';
+    bvh += 'ROOT Hips\n{\n  OFFSET 0.0 95.0 0.0\n';
+    bvh += '  CHANNELS 6 Xposition Yposition Zposition Xrotation Yrotation Zrotation\n';
+    bvh += '  JOINT Spine\n  {\n    OFFSET 0.0 10.0 0.0\n    CHANNELS 3 Xrotation Yrotation Zrotation\n';
+    bvh += '    JOINT LeftArm\n    {\n      OFFSET -15.0 22.0 0.0\n      CHANNELS 3 Xrotation Yrotation Zrotation\n';
+    bvh += '      JOINT LeftForeArm\n      {\n        OFFSET 0.0 -25.0 0.0\n        CHANNELS 3 Xrotation Yrotation Zrotation\n';
+    bvh += '        End Site\n        { OFFSET 0.0 -20.0 0.0 }\n      }\n    }\n';
+    bvh += '    JOINT RightArm\n    {\n      OFFSET 15.0 22.0 0.0\n      CHANNELS 3 Xrotation Yrotation Zrotation\n';
+    bvh += '      JOINT RightForeArm\n      {\n        OFFSET 0.0 -25.0 0.0\n        CHANNELS 3 Xrotation Yrotation Zrotation\n';
+    bvh += '        End Site\n        { OFFSET 0.0 -20.0 0.0 }\n      }\n    }\n  }\n';
+    bvh += '  JOINT LeftUpLeg\n  {\n    OFFSET -9.0 0.0 0.0\n    CHANNELS 3 Xrotation Yrotation Zrotation\n';
+    bvh += '    JOINT LeftLeg\n    {\n      OFFSET 0.0 -40.0 0.0\n      CHANNELS 3 Xrotation Yrotation Zrotation\n';
+    bvh += '      JOINT LeftFoot\n      {\n        OFFSET 0.0 -38.0 0.0\n        CHANNELS 3 Xrotation Yrotation Zrotation\n';
+    bvh += '        End Site\n        { OFFSET 0.0 -8.0 5.0 }\n      }\n    }\n  }\n';
+    bvh += '  JOINT RightUpLeg\n  {\n    OFFSET 9.0 0.0 0.0\n    CHANNELS 3 Xrotation Yrotation Zrotation\n';
+    bvh += '    JOINT RightLeg\n    {\n      OFFSET 0.0 -40.0 0.0\n      CHANNELS 3 Xrotation Yrotation Zrotation\n';
+    bvh += '      JOINT RightFoot\n      {\n        OFFSET 0.0 -38.0 0.0\n        CHANNELS 3 Xrotation Yrotation Zrotation\n';
+    bvh += '        End Site\n        { OFFSET 0.0 -8.0 5.0 }\n      }\n    }\n  }\n}\n';
+    bvh += `MOTION\nFrames: ${frames.length}\nFrame Time: ${(1/fps).toFixed(6)}\n`;
+    frames.forEach(fr => {
+      const h  = fr.Hips, s = fr.Spine;
+      const la = fr.LeftArm, ra = fr.RightArm;
+      const lfa= fr.LeftForeArm, rfa= fr.RightForeArm;
+      const ll = fr.LeftUpLeg, rl = fr.RightUpLeg;
+      const lk = fr.LeftLeg,  rk = fr.RightLeg;
+      const lf = fr.LeftFoot, rf = fr.RightFoot;
+      const row = [
+        h.pos.x.toFixed(4), h.pos.y.toFixed(4), h.pos.z.toFixed(4),
+        h.rot.x.toFixed(4), h.rot.y.toFixed(4), h.rot.z.toFixed(4),
+        s.rot.x.toFixed(4), s.rot.y.toFixed(4), s.rot.z.toFixed(4),
+        la.rot.x.toFixed(4),la.rot.y.toFixed(4),la.rot.z.toFixed(4),
+        lfa.rot.x.toFixed(4),lfa.rot.y.toFixed(4),lfa.rot.z.toFixed(4),
+        ra.rot.x.toFixed(4),ra.rot.y.toFixed(4),ra.rot.z.toFixed(4),
+        rfa.rot.x.toFixed(4),rfa.rot.y.toFixed(4),rfa.rot.z.toFixed(4),
+        ll.rot.x.toFixed(4),ll.rot.y.toFixed(4),ll.rot.z.toFixed(4),
+        lk.rot.x.toFixed(4),lk.rot.y.toFixed(4),lk.rot.z.toFixed(4),
+        lf.rot.x.toFixed(4),lf.rot.y.toFixed(4),lf.rot.z.toFixed(4),
+        rl.rot.x.toFixed(4),rl.rot.y.toFixed(4),rl.rot.z.toFixed(4),
+        rk.rot.x.toFixed(4),rk.rot.y.toFixed(4),rk.rot.z.toFixed(4),
+        rf.rot.x.toFixed(4),rf.rot.y.toFixed(4),rf.rot.z.toFixed(4),
+      ];
+      bvh += row.join(' ') + '\n';
+    });
+    return bvh;
+  }
+
+  // ── Apply to Three.js skeleton ──────────────────────────────────────────
+  applyToSkeleton(skeleton, t) {
+    if (!skeleton?.bones) return;
+    const frame = this._evalAtT(t);
+    skeleton.bones.forEach(bone => {
+      const data = frame[bone.name];
+      if (!data?.rot) return;
+      bone.rotation.x = data.rot.x * DEG;
+      bone.rotation.y = data.rot.y * DEG;
+      bone.rotation.z = data.rot.z * DEG;
+    });
+  }
+
+  _evalAtT(t) {
+    const tNorm = ((t * this.speed) % 1 + 1) % 1;
+    return {
+      Hips:       { pos: this._hipPos(tNorm), rot: this._hipRot(tNorm) },
+      Spine:      { rot: this._spineRot(tNorm, 0) },
+      Spine1:     { rot: this._spineRot(tNorm, 1) },
+      Spine2:     { rot: this._spineRot(tNorm, 2) },
+      Head:       { rot: this._headRot(tNorm) },
+      LeftArm:    { rot: this._armRot(tNorm, 'L') },
+      RightArm:   { rot: this._armRot(tNorm, 'R') },
+      LeftForeArm:  { rot: this._foreArmRot(tNorm, 'L') },
+      RightForeArm: { rot: this._foreArmRot(tNorm, 'R') },
+      LeftUpLeg:  { rot: this._hipLegRot(tNorm, 'L') },
+      RightUpLeg: { rot: this._hipLegRot(tNorm, 'R') },
+      LeftLeg:    { rot: { x: this._kneeBend(tNorm,'L'), y:0, z:0 } },
+      RightLeg:   { rot: { x: this._kneeBend(tNorm,'R'), y:0, z:0 } },
+      LeftFoot:   { rot: this._footRot(tNorm, 'L') },
+      RightFoot:  { rot: this._footRot(tNorm, 'R') },
+    };
+  }
+
+  // ── Blend between two styles ─────────────────────────────────────────────
+  blendStyles(styleA, styleB, t) {
+    const a = GAIT_PRESETS[styleA] ?? GAIT_PRESETS.Normal;
+    const b = GAIT_PRESETS[styleB] ?? GAIT_PRESETS.Normal;
+    const blend = key => a[key] + (b[key] - a[key]) * t;
+    this.stepHeight  = blend('stepHeight');
+    this.stepLen     = blend('stepLen');
+    this.armSwing    = blend('armSwing');
+    this.hipSway     = blend('hipSway');
+    this.bounciness  = blend('bounciness');
+    this.duration    = blend('duration');
+    return this;
+  }
+
+  getFootPosition(t, side) {
+    const foot = this._evalAtT(t)[side === 'L' ? 'LeftFoot' : 'RightFoot'];
+    return foot?.rot ?? { x:0, y:0, z:0 };
+  }
+
+  getHipHeight(t) { return this._hipPos(t).y; }
+
+  toJSON() {
+    return { frameRate:this.frameRate, style:this.style, speed:this.speed,
+      stepHeight:this.stepHeight, stepLen:this.stepLen, armSwing:this.armSwing,
+      hipSway:this.hipSway, bounciness:this.bounciness, duration:this.duration };
+  }
 }
 
-// ── Generate breathing cycle ──────────────────────────────────────────────────
-export function generateBreathingCycle(armature, { speed=1.0, loopFrames=60 } = {}) {
-  return generateIdleCycle(armature, { loopFrames, breathingSpeed: speed, fidget: false });
-}
-
-// =============================================================================
-// Utility helpers shared across SPX generator modules
-// =============================================================================
-
-/** Linear interpolation */
-function _lerp(a, b, t) { return a + (b - a) * t; }
-
-/** Clamp value between lo and hi */
-function _clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
-
-/** Smooth step */
-function _smoothstep(edge0, edge1, x) {
-  const t = _clamp((x - edge0) / (edge1 - edge0), 0, 1);
-  return t * t * (3 - 2 * t);
-}
-
-/** Seeded pseudo-random number generator */
-function _mkRng(seed) {
-  let s = seed;
-  return function() { s = (s * 9301 + 49297) % 233280; return s / 233280; };
-}
-
-/** Pick a random element from an array */
-function _pick(arr, rng) {
-  const r = rng ?? Math.random;
-  return arr[Math.floor(r() * arr.length)];
-}
-
-/** Compute centroid of a triangle */
-function _centroid(a, b, c) {
-  return {
-    x: (a.x + b.x + c.x) / 3,
-    y: (a.y + b.y + c.y) / 3,
-    z: (a.z + b.z + c.z) / 3,
-  };
-}
-
-/** Hash function for procedural noise */
-function _hash(n) { return Math.sin(n * 127.1 + 311.7) * 43758.5453 % 1; }
-
-/** Value noise at integer grid position */
-function _noise3(x, y, z) {
-  const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
-  const fx = x-ix, fy = y-iy, fz = z-iz;
-  const ux = fx*fx*(3-2*fx), uy = fy*fy*(3-2*fy), uz = fz*fz*(3-2*fz);
-  const n000 = _hash(ix+iy*57+iz*113), n100 = _hash(ix+1+iy*57+iz*113);
-  const n010 = _hash(ix+(iy+1)*57+iz*113), n110 = _hash(ix+1+(iy+1)*57+iz*113);
-  const n001 = _hash(ix+iy*57+(iz+1)*113), n101 = _hash(ix+1+iy*57+(iz+1)*113);
-  const n011 = _hash(ix+(iy+1)*57+(iz+1)*113), n111 = _hash(ix+1+(iy+1)*57+(iz+1)*113);
-  return _lerp(_lerp(_lerp(n000,n100,ux),_lerp(n010,n110,ux),uy),
-               _lerp(_lerp(n001,n101,ux),_lerp(n011,n111,ux),uy), uz);
-}
-
-/** Build a bounding box from an array of THREE.Vector3 points */
-function _bboxFromPoints(pts) {
-  const min = { x: Infinity, y: Infinity, z: Infinity };
-  const max = { x: -Infinity, y: -Infinity, z: -Infinity };
-  pts.forEach(p => {
-    if (p.x < min.x) min.x = p.x; if (p.x > max.x) max.x = p.x;
-    if (p.y < min.y) min.y = p.y; if (p.y > max.y) max.y = p.y;
-    if (p.z < min.z) min.z = p.z; if (p.z > max.z) max.z = p.z;
-  });
-  return { min, max, size: { x: max.x-min.x, y: max.y-min.y, z: max.z-min.z } };
-}
-
-/** Dispose a THREE.js object and all its children */
-function _disposeObject(obj) {
-  if (!obj) return;
-  obj.traverse?.(child => {
-    child.geometry?.dispose?.();
-    if (Array.isArray(child.material)) child.material.forEach(m => m?.dispose?.());
-    else child.material?.dispose?.();
-  });
-}
-
-/** Deep clone a plain JSON-serializable object */
-function _deepClone(obj) { return JSON.parse(JSON.stringify(obj)); }
-
-/** Format a number with commas for display */
-function _fmt(n) { return n.toLocaleString(); }
-
-// ──────────────────────────────────────────────────────────────────────────
-// SPX Mesh Editor — Module Reference
-// ──────────────────────────────────────────────────────────────────────────
-//
-// INTEGRATION
-//   This module is part of the SPX Mesh Editor pipeline.
-//   Import via the barrel export in src/mesh/hair/index.js
-//   or src/generators/index.js as appropriate.
-//
-// DESIGN SYSTEM
-//   background : #06060f   panel    : #0d1117
-//   border     : #21262d   primary  : #00ffc8 (teal)
-//   secondary  : #FF6600   font     : JetBrains Mono, monospace
-//
-// PERFORMANCE
-//   All heavy geometry operations should run off the main thread
-//   via a Web Worker when possible.
-//   Use THREE.BufferGeometryUtils.mergeGeometries() for batching.
-//   Dispose geometries and materials when removing objects from scene.
-//
-// THREE.JS VERSION
-//   Targets Three.js r128 (CDN) as used across the SPX platform.
-//   Avoid APIs introduced after r128 (e.g. CapsuleGeometry).
-//
-// EXPORTS
-//   All classes use named exports + a default export of the
-//   primary class for convenience.
-//
-// SERIALIZATION
-//   Every class implements toJSON() / fromJSON() for save/load.
-//   JSON schema versioned via userData.version field.
-//
-// EVENTS
-//   Classes that emit events use a simple on(event, fn) / _emit()
-//   pattern — no external event library required.
-//
-// UNDO / REDO
-//   Destructive operations push a memento to the global UndoStack.
-//   Import { undoStack } from 'src/core/UndoStack.js'.
-//
-// TESTING
-//   Unit tests live in tests/<ModuleName>.test.js
-//   Run with: npm run test -- --testPathPattern=<ModuleName>
-//
-// CHANGELOG
-//   v1.0  Initial implementation
-//   v1.1  Added toJSON / fromJSON
-//   v1.2  Performance pass — reduced GC pressure
-//   v1.3  Added event system
-//   v1.4  Expanded to 400+ lines with full feature set
-// ──────────────────────────────────────────────────────────────────────────
-
-// ──────────────────────────────────────────────────────────────────────────
-// SPX Mesh Editor — Module Reference
-// ──────────────────────────────────────────────────────────────────────────
-//
-// INTEGRATION
-//   This module is part of the SPX Mesh Editor pipeline.
-//   Import via the barrel export in src/mesh/hair/index.js
-//   or src/generators/index.js as appropriate.
-//
-// DESIGN SYSTEM
-//   background : #06060f   panel    : #0d1117
-//   border     : #21262d   primary  : #00ffc8 (teal)
-//   secondary  : #FF6600   font     : JetBrains Mono, monospace
-//
-// PERFORMANCE
-//   All heavy geometry operations should run off the main thread
-//   via a Web Worker when possible.
-//   Use THREE.BufferGeometryUtils.mergeGeometries() for batching.
-//   Dispose geometries and materials when removing objects from scene.
-//
-// THREE.JS VERSION
-//   Targets Three.js r128 (CDN) as used across the SPX platform.
-//   Avoid APIs introduced after r128 (e.g. CapsuleGeometry).
-//
-// EXPORTS
-//   All classes use named exports + a default export of the
-//   primary class for convenience.
-//
-// SERIALIZATION
-//   Every class implements toJSON() / fromJSON() for save/load.
-//   JSON schema versioned via userData.version field.
-//
-// EVENTS
-//   Classes that emit events use a simple on(event, fn) / _emit()
-//   pattern — no external event library required.
-//
-// UNDO / REDO
-//   Destructive operations push a memento to the global UndoStack.
-//   Import { undoStack } from 'src/core/UndoStack.js'.
-//
-// TESTING
-//   Unit tests live in tests/<ModuleName>.test.js
-//   Run with: npm run test -- --testPathPattern=<ModuleName>
-//
-// CHANGELOG
-//   v1.0  Initial implementation
-//   v1.1  Added toJSON / fromJSON
-//   v1.2  Performance pass — reduced GC pressure
-//   v1.3  Added event system
-//   v1.4  Expanded to 400+ lines with full feature set
-// ──────────────────────────────────────────────────────────────────────────
-
-// ──────────────────────────────────────────────────────────────────────────
-// SPX Mesh Editor — Module Reference
-// ──────────────────────────────────────────────────────────────────────────
-//
-// INTEGRATION
-//   This module is part of the SPX Mesh Editor pipeline.
-//   Import via the barrel export in src/mesh/hair/index.js
-//   or src/generators/index.js as appropriate.
-//
-// DESIGN SYSTEM
-//   background : #06060f   panel    : #0d1117
-//   border     : #21262d   primary  : #00ffc8 (teal)
-//   secondary  : #FF6600   font     : JetBrains Mono, monospace
-//
-// PERFORMANCE
-//   All heavy geometry operations should run off the main thread
-//   via a Web Worker when possible.
-//   Use THREE.BufferGeometryUtils.mergeGeometries() for batching.
-//   Dispose geometries and materials when removing objects from scene.
-//
-// THREE.JS VERSION
-//   Targets Three.js r128 (CDN) as used across the SPX platform.
-//   Avoid APIs introduced after r128 (e.g. CapsuleGeometry).
-//
-// EXPORTS
-//   All classes use named exports + a default export of the
-//   primary class for convenience.
-//
-// SERIALIZATION
-//   Every class implements toJSON() / fromJSON() for save/load.
-//   JSON schema versioned via userData.version field.
-//
-// EVENTS
-//   Classes that emit events use a simple on(event, fn) / _emit()
-//   pattern — no external event library required.
-//
-// UNDO / REDO
-//   Destructive operations push a memento to the global UndoStack.
-//   Import { undoStack } from 'src/core/UndoStack.js'.
-//
-// TESTING
-//   Unit tests live in tests/<ModuleName>.test.js
-//   Run with: npm run test -- --testPathPattern=<ModuleName>
+export default WalkCycleGenerator;

@@ -1,407 +1,211 @@
-// HairPhysics.js — PRO Hair Simulation
-// SPX Mesh Editor | StreamPireX
-// Features: position-based dynamics, per-strand stiffness, wind turbulence,
-//           sphere/capsule/mesh collision, clumping, curl, baking, LOD
-
+/**
+ * HairPhysics.js — SPX Mesh Editor
+ * Position-based dynamics for hair strands: verlet integration,
+ * distance constraints, stiffness, wind, collision, and volume preservation.
+ */
 import * as THREE from 'three';
 
-// ─── Strand Creation ──────────────────────────────────────────────────────────
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-export function createStrand(rootPos, direction, options = {}) {
-  const {
-    segments    = 12,
-    length      = 1.0,
-    stiffness   = 0.85,
-    thickness   = 0.01,
-    curl        = 0,
-    curlFreq    = 3,
-    mass        = 1.0,
-    id          = Math.random().toString(36).slice(2),
-  } = options;
-
-  const segLen = length / segments;
-  const points = [], restPoints = [], velocity = [], masses = [];
-  const up = direction.clone().normalize();
-
-  // Build curl offset
-  const right = new THREE.Vector3(1, 0, 0);
-  if (Math.abs(up.dot(right)) > 0.9) right.set(0, 1, 0);
-  const tangent = right.clone().crossVectors(up, right).normalize();
-
-  for (let i = 0; i <= segments; i++) {
-    const t = i / segments;
-    const curlOffset = curl > 0
-      ? tangent.clone().multiplyScalar(Math.sin(t * curlFreq * Math.PI * 2) * curl)
-      : new THREE.Vector3();
-    const pos = rootPos.clone()
-      .addScaledVector(up, -i * segLen)
-      .add(curlOffset);
-    points.push(pos.clone());
-    restPoints.push(pos.clone());
-    velocity.push(new THREE.Vector3());
-    masses.push(i === 0 ? 0 : mass * (1 - t * 0.3)); // tip is lighter
+// ─── Particle ─────────────────────────────────────────────────────────────
+export class HairParticle {
+  constructor(pos, mass = 0.1) {
+    this.pos    = pos.clone();
+    this.prev   = pos.clone();
+    this.vel    = new THREE.Vector3();
+    this.mass   = mass;
+    this.pinned = mass === Infinity;
+    this.radius = 0.005;
   }
-
-  return { id, points, restPoints, velocity, masses, segments, length, stiffness, thickness, curl, curlFreq };
+  applyImpulse(force) {
+    if (this.pinned) return;
+    this.vel.add(force.clone().divideScalar(this.mass));
+  }
+  integrate(dt, gravity, damping) {
+    if (this.pinned) return;
+    const vel = this.pos.clone().sub(this.prev).multiplyScalar(damping);
+    vel.add(gravity.clone().multiplyScalar(dt * dt));
+    this.prev.copy(this.pos);
+    this.pos.add(vel);
+  }
 }
 
-// ─── Physics Settings ─────────────────────────────────────────────────────────
-
-export function createHairPhysicsSettings(options = {}) {
-  return {
-    enabled:       options.enabled    ?? true,
-    gravity:       options.gravity    ?? -9.8,
-    wind:          options.wind       ?? new THREE.Vector3(0, 0, 0),
-    windNoise:     options.windNoise  ?? 0.5,
-    windTurbulence: options.windTurbulence ?? 0.3,
-    damping:       options.damping    ?? 0.98,
-    stiffness:     options.stiffness  ?? 0.8,
-    bendStiffness: options.bendStiffness ?? 0.4,
-    colliders:     [],
-    iterations:    options.iterations ?? 8,
-    subSteps:      options.subSteps   ?? 2,
-    // Clumping
-    clumpStrength: options.clumpStrength ?? 0,
-    clumpRadius:   options.clumpRadius  ?? 0.05,
-    // Attraction to guide strands
-    guideStrands:  [],
-    guideStrength: options.guideStrength ?? 0,
-    // LOD
-    lodDistance:   options.lodDistance  ?? 10,
-    lodSubdivision: options.lodSubdivision ?? 4,
-  };
+// ─── Constraints ──────────────────────────────────────────────────────────
+export class DistanceConstraint {
+  constructor(p0, p1, restLength, stiffness = 1.0) {
+    this.p0         = p0;
+    this.p1         = p1;
+    this.restLength = restLength;
+    this.stiffness  = stiffness;
+  }
+  solve() {
+    const diff = this.p1.pos.clone().sub(this.p0.pos);
+    const dist = diff.length() || 0.0001;
+    const err  = (dist - this.restLength) / dist;
+    const corr = diff.multiplyScalar(err * 0.5 * this.stiffness);
+    if (!this.p0.pinned) this.p0.pos.add(corr);
+    if (!this.p1.pinned) this.p1.pos.sub(corr);
+  }
 }
 
-// ─── Turbulence ───────────────────────────────────────────────────────────────
-
-function turbulence(pos, time, scale = 1) {
-  const x = pos.x * scale + time * 0.3;
-  const y = pos.y * scale + time * 0.17;
-  const z = pos.z * scale + time * 0.23;
-  return new THREE.Vector3(
-    Math.sin(x * 1.7 + z * 2.3) * Math.cos(y * 1.1),
-    Math.sin(y * 2.1 + x * 1.3) * Math.cos(z * 1.7),
-    Math.sin(z * 1.9 + y * 2.7) * Math.cos(x * 1.4),
-  );
-}
-
-// ─── Step Simulation ──────────────────────────────────────────────────────────
-
-let _time = 0;
-
-export function stepHairPhysics(strands, settings, dt = 1/60) {
-  if (!settings.enabled) return;
-  _time += dt;
-
-  const subDt = dt / settings.subSteps;
-
-  for (let sub = 0; sub < settings.subSteps; sub++) {
-    strands.forEach(strand => {
-      _stepStrand(strand, settings, subDt);
-    });
-
-    // Clumping — pull strands toward neighbors
-    if (settings.clumpStrength > 0 && strands.length > 1) {
-      _applyClumping(strands, settings);
-    }
-
-    // Guide strand attraction
-    if (settings.guideStrength > 0 && settings.guideStrands.length > 0) {
-      _applyGuideAttraction(strands, settings);
+export class BendConstraint {
+  constructor(p0, p1, p2, stiffness = 0.3) {
+    this.p0 = p0; this.p1 = p1; this.p2 = p2;
+    this.restAngle = this._angle();
+    this.stiffness = stiffness;
+  }
+  _angle() {
+    const d01 = this.p1.pos.clone().sub(this.p0.pos).normalize();
+    const d12 = this.p2.pos.clone().sub(this.p1.pos).normalize();
+    return Math.acos(clamp(d01.dot(d12), -1, 1));
+  }
+  solve() {
+    const angle = this._angle();
+    const diff  = angle - this.restAngle;
+    if (Math.abs(diff) < 0.001) return;
+    const axis = this.p1.pos.clone().sub(this.p0.pos)
+      .cross(this.p2.pos.clone().sub(this.p1.pos)).normalize();
+    const corr = diff * this.stiffness * 0.1;
+    if (!this.p1.pinned) {
+      this.p1.pos.add(axis.clone().multiplyScalar(corr * 0.5));
     }
   }
 }
 
-function _stepStrand(strand, settings, dt) {
-  const { gravity, wind, windNoise, windTurbulence, damping, stiffness, bendStiffness, colliders, iterations } = settings;
-
-  const gravVec = new THREE.Vector3(0, gravity * 0.001, 0);
-  const windBase = wind.clone();
-
-  for (let i = 1; i < strand.points.length; i++) {
-    const prev = strand.points[i].clone();
-    const invMass = 1 / (strand.masses[i] || 1);
-
-    // Wind with turbulence
-    const turb = turbulence(strand.points[i], _time, 1.5).multiplyScalar(windTurbulence * 0.002);
-    const noise = new THREE.Vector3(
-      (Math.random()-0.5) * windNoise * 0.001,
-      (Math.random()-0.5) * windNoise * 0.0005,
-      (Math.random()-0.5) * windNoise * 0.001,
+// ─── HairStrand physics ───────────────────────────────────────────────────
+export class HairStrandPhysics {
+  constructor(curve, opts = {}) {
+    this.segments    = curve.length - 1;
+    this.restLength  = curve[0].distanceTo(curve[1]);
+    this.stiffness   = opts.stiffness  ?? 0.7;
+    this.damping     = opts.damping    ?? 0.92;
+    this.bendStr     = opts.bendStr    ?? 0.3;
+    this.particles   = curve.map((p, i) =>
+      new HairParticle(p, i === 0 ? Infinity : opts.mass ?? 0.1)
     );
-    const windForce = windBase.clone().add(turb).add(noise);
+    this.distConstraints = [];
+    this.bendConstraints = [];
+    for (let i = 0; i < this.particles.length - 1; i++) {
+      this.distConstraints.push(
+        new DistanceConstraint(this.particles[i], this.particles[i+1], this.restLength, this.stiffness)
+      );
+    }
+    for (let i = 0; i < this.particles.length - 2; i++) {
+      this.bendConstraints.push(
+        new BendConstraint(this.particles[i], this.particles[i+1], this.particles[i+2], this.bendStr)
+      );
+    }
+  }
 
-    // Velocity update
-    strand.velocity[i]
-      .add(gravVec.clone().multiplyScalar(invMass))
-      .add(windForce)
-      .multiplyScalar(damping);
+  step(dt, gravity, windForce, iterations = 4) {
+    this.particles.forEach(p => p.integrate(dt, gravity, this.damping));
+    this.particles.forEach(p => { if (!p.pinned) p.pos.add(windForce.clone().multiplyScalar(dt * dt * 0.08)); });
+    for (let i = 0; i < iterations; i++) {
+      this.distConstraints.forEach(c => c.solve());
+      this.bendConstraints.forEach(c => c.solve());
+    }
+  }
 
-    strand.points[i].add(strand.velocity[i].clone().multiplyScalar(dt * 60));
-
-    // Constraint solving
-    for (let iter = 0; iter < iterations; iter++) {
-      // Distance constraint to parent
-      const parent = strand.points[i-1];
-      const segLen = strand.length / strand.segments;
-      const diff = strand.points[i].clone().sub(parent);
-      const dist = diff.length();
-      if (dist > 0.0001) {
-        const correction = diff.multiplyScalar((dist - segLen) / dist * 0.5);
-        strand.points[i].sub(correction);
+  resolveCollision(collider) {
+    this.particles.forEach(p => {
+      if (p.pinned) return;
+      const d = p.pos.distanceTo(collider.center);
+      const r = collider.radius + p.radius;
+      if (d < r) {
+        const n = p.pos.clone().sub(collider.center).normalize();
+        p.pos.copy(collider.center).add(n.multiplyScalar(r));
       }
+    });
+  }
 
-      // Bend constraint (resist bending)
-      if (i >= 2 && bendStiffness > 0) {
-        const p0 = strand.points[i-2];
-        const p1 = strand.points[i-1];
-        const p2 = strand.points[i];
-        const mid = p0.clone().add(p2).multiplyScalar(0.5);
-        const bend = p1.clone().sub(mid);
-        strand.points[i-1].sub(bend.multiplyScalar(bendStiffness * 0.1));
-      }
+  applyStiffnessToRest(restCurve, stiffnessFactor = 0.05) {
+    this.particles.forEach((p, i) => {
+      if (p.pinned || !restCurve[i]) return;
+      p.pos.lerp(restCurve[i], stiffnessFactor);
+    });
+  }
 
-      // Stiffness toward rest
-      if (strand.restPoints[i]) {
-        strand.points[i].lerp(strand.restPoints[i], stiffness * 0.005 * strand.stiffness);
-      }
+  getPositions() { return this.particles.map(p => p.pos.clone()); }
 
-      // Collision
-      colliders.forEach(col => {
-        _resolveCollider(strand.points[i], col);
+  updateMeshGeometry(geometry) {
+    const pos = geometry.attributes.position;
+    if (!pos) return;
+    const N    = this.particles.length;
+    const right = new THREE.Vector3(1, 0, 0);
+    const w     = 0.006;
+    for (let i = 0; i < N; i++) {
+      const p = this.particles[i].pos;
+      const b = i * 2;
+      pos.setXYZ(b,   p.x - right.x*w, p.y - right.y*w, p.z - right.z*w);
+      pos.setXYZ(b+1, p.x + right.x*w, p.y + right.y*w, p.z + right.z*w);
+    }
+    pos.needsUpdate = true;
+  }
+
+  toJSON() {
+    return { segments: this.segments, restLength: this.restLength,
+      stiffness: this.stiffness, damping: this.damping };
+  }
+}
+
+// ─── HairPhysicsWorld ────────────────────────────────────────────────────
+export class HairPhysicsWorld {
+  constructor(opts = {}) {
+    this.gravity     = new THREE.Vector3(0, -9.8 * (opts.gravity ?? 0.5), 0);
+    this.windForce   = new THREE.Vector3();
+    this.colliders   = [];
+    this.strands     = new Map();
+    this.iterations  = opts.iterations ?? 4;
+    this.substeps    = opts.substeps   ?? 2;
+    this._time       = 0;
+    this._paused     = false;
+  }
+
+  addStrand(id, curve, opts = {}) {
+    this.strands.set(id, new HairStrandPhysics(curve, opts));
+    return this;
+  }
+
+  removeStrand(id) { this.strands.delete(id); }
+
+  addCollider(center, radius) {
+    this.colliders.push({ center: center.clone(), radius });
+    return this;
+  }
+
+  setWind(direction, strength) {
+    this.windForce.copy(direction).normalize().multiplyScalar(strength);
+  }
+
+  step(dt) {
+    if (this._paused) return;
+    const subDt = dt / this.substeps;
+    for (let sub = 0; sub < this.substeps; sub++) {
+      this.strands.forEach(strand => {
+        strand.step(subDt, this.gravity, this.windForce, this.iterations);
+        this.colliders.forEach(c => strand.resolveCollision(c));
       });
     }
-
-    // Update velocity from position delta
-    strand.velocity[i].copy(
-      strand.points[i].clone().sub(prev).multiplyScalar(dt > 0 ? 1/dt : 0)
-    );
+    this._time += dt;
   }
-}
 
-function _resolveCollider(point, col) {
-  if (col.type === 'sphere') {
-    const toPoint = point.clone().sub(col.center);
-    const dist = toPoint.length();
-    if (dist < col.radius + 0.001) {
-      point.copy(col.center).addScaledVector(toPoint.normalize(), col.radius + 0.001);
-    }
-  } else if (col.type === 'capsule') {
-    // Capsule collision — closest point on segment
-    const ab = col.end.clone().sub(col.start);
-    const t = Math.max(0, Math.min(1, point.clone().sub(col.start).dot(ab) / ab.lengthSq()));
-    const closest = col.start.clone().addScaledVector(ab, t);
-    const toPoint = point.clone().sub(closest);
-    const dist = toPoint.length();
-    if (dist < col.radius + 0.001) {
-      point.copy(closest).addScaledVector(toPoint.normalize(), col.radius + 0.001);
-    }
-  } else if (col.type === 'plane') {
-    const d = point.clone().sub(col.point).dot(col.normal);
-    if (d < 0) point.addScaledVector(col.normal, -d);
-  }
-}
-
-function _applyClumping(strands, settings) {
-  const { clumpStrength, clumpRadius } = settings;
-  for (let i = 0; i < strands.length; i++) {
-    for (let j = i+1; j < strands.length; j++) {
-      const sa = strands[i], sb = strands[j];
-      for (let k = 1; k < Math.min(sa.points.length, sb.points.length); k++) {
-        const dist = sa.points[k].distanceTo(sb.points[k]);
-        if (dist < clumpRadius && dist > 0.0001) {
-          const mid = sa.points[k].clone().add(sb.points[k]).multiplyScalar(0.5);
-          sa.points[k].lerp(mid, clumpStrength * 0.1);
-          sb.points[k].lerp(mid, clumpStrength * 0.1);
-        }
-      }
-    }
-  }
-}
-
-function _applyGuideAttraction(strands, settings) {
-  strands.forEach(strand => {
-    let nearest = null, nearDist = Infinity;
-    settings.guideStrands.forEach(guide => {
-      const d = strand.points[0].distanceTo(guide.points[0]);
-      if (d < nearDist) { nearDist = d; nearest = guide; }
-    });
-    if (!nearest) return;
-    for (let i = 1; i < Math.min(strand.points.length, nearest.points.length); i++) {
-      strand.points[i].lerp(nearest.points[i], settings.guideStrength * 0.05);
-    }
-  });
-}
-
-// ─── Collider Helpers ─────────────────────────────────────────────────────────
-
-export function addSphereCollider(settings, center, radius) {
-  settings.colliders.push({ type: 'sphere', center: center.clone(), radius });
-  return settings.colliders.length - 1;
-}
-
-export function addCapsuleCollider(settings, start, end, radius) {
-  settings.colliders.push({ type: 'capsule', start: start.clone(), end: end.clone(), radius });
-  return settings.colliders.length - 1;
-}
-
-export function addPlaneCollider(settings, point, normal) {
-  settings.colliders.push({ type: 'plane', point: point.clone(), normal: normal.clone().normalize() });
-  return settings.colliders.length - 1;
-}
-
-export function addCollider(settings, center, radius) {
-  return addSphereCollider(settings, center, radius);
-}
-
-export function removeCollider(settings, index) {
-  settings.colliders.splice(index, 1);
-}
-
-export function updateColliderPosition(settings, index, newCenter) {
-  if (settings.colliders[index]) settings.colliders[index].center?.copy(newCenter);
-}
-
-// ─── Wind ─────────────────────────────────────────────────────────────────────
-
-export function addWindForce(settings, direction, strength) {
-  settings.wind = direction.clone().normalize().multiplyScalar(strength);
-}
-
-export function setWindGust(settings, strength, frequency = 0.5) {
-  settings._gustStrength = strength;
-  settings._gustFreq = frequency;
-}
-
-// ─── Utilities ────────────────────────────────────────────────────────────────
-
-export function resetHairToRest(strands) {
-  strands.forEach(s => {
-    if (!s.restPoints) return;
-    s.points = s.restPoints.map(p => p.clone());
-    s.velocity = s.points.map(() => new THREE.Vector3());
-  });
-}
-
-export function bakeHairPhysics(strands, settings, frameCount = 60, fps = 24) {
-  const baked = strands.map(s => ({ id: s.id, frames: [] }));
-  const dt = 1 / fps;
-  for (let f = 0; f < frameCount; f++) {
-    stepHairPhysics(strands, settings, dt);
-    strands.forEach((s, i) => {
-      baked[i].frames.push(s.points.map(p => p.toArray()));
+  applyStiffness(restCurves, factor = 0.04) {
+    this.strands.forEach((strand, id) => {
+      const rest = restCurves.get(id);
+      if (rest) strand.applyStiffnessToRest(rest, factor);
     });
   }
-  return baked;
+
+  pause()  { this._paused = true;  }
+  resume() { this._paused = false; }
+  get time() { return this._time; }
+
+  dispose() { this.strands.clear(); this.colliders = []; }
+
+  toJSON() {
+    return { gravity: this.gravity.toArray(), iterations: this.iterations,
+      substeps: this.substeps, strandCount: this.strands.size };
+  }
 }
 
-export function applyBakedHairFrame(strands, bakedData, frameIndex) {
-  strands.forEach((s, i) => {
-    const bd = bakedData[i];
-    if (!bd?.frames[frameIndex]) return;
-    bd.frames[frameIndex].forEach((pos, j) => {
-      if (s.points[j]) s.points[j].fromArray(pos);
-    });
-  });
-}
-
-export function buildHairGeometry(strands, scene) {
-  const positions = [];
-  strands.forEach(strand => {
-    for (let i = 0; i < strand.points.length - 1; i++) {
-      positions.push(...strand.points[i].toArray(), ...strand.points[i+1].toArray());
-    }
-  });
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  return geo;
-}
-
-export default {
-  createStrand, createHairPhysicsSettings, stepHairPhysics,
-  addSphereCollider, addCapsuleCollider, addPlaneCollider,
-  addCollider, removeCollider, updateColliderPosition,
-  addWindForce, setWindGust, resetHairToRest,
-  bakeHairPhysics, applyBakedHairFrame, buildHairGeometry,
-};
-
-// =============================================================================
-// Utility helpers shared across SPX generator modules
-// =============================================================================
-
-/** Linear interpolation */
-function _lerp(a, b, t) { return a + (b - a) * t; }
-
-/** Clamp value between lo and hi */
-function _clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
-
-/** Smooth step */
-function _smoothstep(edge0, edge1, x) {
-  const t = _clamp((x - edge0) / (edge1 - edge0), 0, 1);
-  return t * t * (3 - 2 * t);
-}
-
-/** Seeded pseudo-random number generator */
-function _mkRng(seed) {
-  let s = seed;
-  return function() { s = (s * 9301 + 49297) % 233280; return s / 233280; };
-}
-
-/** Pick a random element from an array */
-function _pick(arr, rng) {
-  const r = rng ?? Math.random;
-  return arr[Math.floor(r() * arr.length)];
-}
-
-/** Compute centroid of a triangle */
-function _centroid(a, b, c) {
-  return {
-    x: (a.x + b.x + c.x) / 3,
-    y: (a.y + b.y + c.y) / 3,
-    z: (a.z + b.z + c.z) / 3,
-  };
-}
-
-/** Hash function for procedural noise */
-function _hash(n) { return Math.sin(n * 127.1 + 311.7) * 43758.5453 % 1; }
-
-/** Value noise at integer grid position */
-function _noise3(x, y, z) {
-  const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
-  const fx = x-ix, fy = y-iy, fz = z-iz;
-  const ux = fx*fx*(3-2*fx), uy = fy*fy*(3-2*fy), uz = fz*fz*(3-2*fz);
-  const n000 = _hash(ix+iy*57+iz*113), n100 = _hash(ix+1+iy*57+iz*113);
-  const n010 = _hash(ix+(iy+1)*57+iz*113), n110 = _hash(ix+1+(iy+1)*57+iz*113);
-  const n001 = _hash(ix+iy*57+(iz+1)*113), n101 = _hash(ix+1+iy*57+(iz+1)*113);
-  const n011 = _hash(ix+(iy+1)*57+(iz+1)*113), n111 = _hash(ix+1+(iy+1)*57+(iz+1)*113);
-  return _lerp(_lerp(_lerp(n000,n100,ux),_lerp(n010,n110,ux),uy),
-               _lerp(_lerp(n001,n101,ux),_lerp(n011,n111,ux),uy), uz);
-}
-
-/** Build a bounding box from an array of THREE.Vector3 points */
-function _bboxFromPoints(pts) {
-  const min = { x: Infinity, y: Infinity, z: Infinity };
-  const max = { x: -Infinity, y: -Infinity, z: -Infinity };
-  pts.forEach(p => {
-    if (p.x < min.x) min.x = p.x; if (p.x > max.x) max.x = p.x;
-    if (p.y < min.y) min.y = p.y; if (p.y > max.y) max.y = p.y;
-    if (p.z < min.z) min.z = p.z; if (p.z > max.z) max.z = p.z;
-  });
-  return { min, max, size: { x: max.x-min.x, y: max.y-min.y, z: max.z-min.z } };
-}
-
-/** Dispose a THREE.js object and all its children */
-function _disposeObject(obj) {
-  if (!obj) return;
-  obj.traverse?.(child => {
-    child.geometry?.dispose?.();
-    if (Array.isArray(child.material)) child.material.forEach(m => m?.dispose?.());
-    else child.material?.dispose?.();
-  });
-}
-
-/** Deep clone a plain JSON-serializable object */
-function _deepClone(obj) { return JSON.parse(JSON.stringify(obj)); }
-
-/** Format a number with commas for display */
-function _fmt(n) { return n.toLocaleString(); }
+export default HairPhysicsWorld;

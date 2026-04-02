@@ -1,410 +1,212 @@
-export function createHairCatalog() {
-  return [
+/**
+ * HairTemplates.js — SPX Mesh Editor
+ * 16 hair style presets with full parameter sets for the HairSystem.
+ * Each template includes density, physics, shader, and LOD settings.
+ */
 
-    // ---- SCALP HAIR ----
-    { id: "fade", label: "Fade" },
-    { id: "afro", label: "Afro" },
-    { id: "waves", label: "Waves" },
-    { id: "curls", label: "Curls" },
-    { id: "layered_curls", label: "Layered Curls" },
-    { id: "straight", label: "Straight" },
-    { id: "long_straight", label: "Long Straight" },
-    { id: "bob", label: "Bob" },
-    { id: "ponytail", label: "Ponytail" },
-    { id: "bun", label: "Bun" },
-    { id: "high_bun", label: "High Bun" },
-    { id: "puffs", label: "Puffs" },
+export const HAIR_TEMPLATES = {
 
-    { id: "locs", label: "Locs" },
-    { id: "starter_locs", label: "Starter Locs" },
-    { id: "freeform_locs", label: "Freeform Locs" },
+  shortBuzz: {
+    name: 'Short Buzz',
+    cardCount: 200, density: 0.95, cardWidth: 0.008, cardLength: 0.03,
+    rootColor: '#1a1008', tipColor: '#2a1808',
+    wave: 0.00, curl: 0.00, frizz: 0.02, flyaways: 0.02,
+    stiffness: 0.98, damping: 0.99, windStr: 0.02, gravity: 0.05,
+    shaderType: 'Kajiya-Kay', specPower: 60, specShift: 0.03,
+    lod: [200, 100, 50, 20],
+  },
 
-    { id: "twists", label: "Twists" },
-    { id: "two_strand_twists", label: "Two Strand Twists" },
+  pixieCut: {
+    name: 'Pixie Cut',
+    cardCount: 350, density: 0.85, cardWidth: 0.010, cardLength: 0.08,
+    rootColor: '#2a1808', tipColor: '#4a2810',
+    wave: 0.05, curl: 0.02, frizz: 0.08, flyaways: 0.06,
+    stiffness: 0.90, damping: 0.92, windStr: 0.08, gravity: 0.20,
+    shaderType: 'Kajiya-Kay', specPower: 70, specShift: 0.04,
+    lod: [350, 180, 80, 30],
+  },
 
-    { id: "braids", label: "Braids" },
-    { id: "box_braids", label: "Box Braids" },
-    { id: "cornrows", label: "Cornrows" },
+  bobCut: {
+    name: 'Bob Cut',
+    cardCount: 450, density: 0.80, cardWidth: 0.011, cardLength: 0.18,
+    rootColor: '#1a1008', tipColor: '#3a2010',
+    wave: 0.08, curl: 0.01, frizz: 0.06, flyaways: 0.08,
+    stiffness: 0.80, damping: 0.88, windStr: 0.15, gravity: 0.35,
+    shaderType: 'Kajiya-Kay', specPower: 80, specShift: 0.04,
+    lod: [450, 220, 100, 40],
+  },
 
-    { id: "bantu_knots", label: "Bantu Knots" },
-    { id: "half_up", label: "Half Up Half Down" },
+  longStraight: {
+    name: 'Long Straight',
+    cardCount: 600, density: 0.75, cardWidth: 0.012, cardLength: 0.40,
+    rootColor: '#0a0808', tipColor: '#2a1808',
+    wave: 0.00, curl: 0.00, frizz: 0.04, flyaways: 0.06,
+    stiffness: 0.65, damping: 0.85, windStr: 0.30, gravity: 0.55,
+    shaderType: 'Kajiya-Kay', specPower: 90, specShift: 0.05,
+    lod: [600, 300, 120, 50],
+  },
 
-    // ---- FACIAL HAIR ----
-    { id: "stubble", label: "Stubble" },
-    { id: "goatee", label: "Goatee" },
-    { id: "full_beard", label: "Full Beard" },
-    { id: "boxed_beard", label: "Boxed Beard" },
-    { id: "chin_strap", label: "Chin Strap" },
-    { id: "mustache", label: "Mustache" },
-    { id: "handlebar", label: "Handlebar Mustache" },
-    { id: "soul_patch", label: "Soul Patch" },
-    { id: "sideburns", label: "Sideburns" },
+  longWavy: {
+    name: 'Long Wavy',
+    cardCount: 550, density: 0.72, cardWidth: 0.012, cardLength: 0.38,
+    rootColor: '#4a2810', tipColor: '#8a5020',
+    wave: 0.30, curl: 0.05, frizz: 0.12, flyaways: 0.10,
+    stiffness: 0.60, damping: 0.83, windStr: 0.35, gravity: 0.50,
+    shaderType: 'Kajiya-Kay', specPower: 75, specShift: 0.04,
+    lod: [550, 280, 110, 45],
+  },
 
-    // ---- BROWS ----
-    { id: "eyebrows", label: "Eyebrows" },
-    { id: "arched_brows", label: "Arched Brows" },
-    { id: "thick_brows", label: "Thick Brows" },
-    { id: "thin_brows", label: "Thin Brows" },
+  curlyLoose: {
+    name: 'Loose Curls',
+    cardCount: 500, density: 0.70, cardWidth: 0.010, cardLength: 0.30,
+    rootColor: '#2a1808', tipColor: '#6a3818',
+    wave: 0.20, curl: 0.45, frizz: 0.18, flyaways: 0.14,
+    stiffness: 0.55, damping: 0.80, windStr: 0.20, gravity: 0.40,
+    shaderType: 'Kajiya-Kay', specPower: 65, specShift: 0.035,
+    lod: [500, 250, 100, 40],
+  },
 
-  ];
+  tightCoils: {
+    name: 'Tight Coils',
+    cardCount: 480, density: 0.80, cardWidth: 0.009, cardLength: 0.20,
+    rootColor: '#1a0a04', tipColor: '#3a1808',
+    wave: 0.15, curl: 0.75, frizz: 0.25, flyaways: 0.18,
+    stiffness: 0.45, damping: 0.75, windStr: 0.15, gravity: 0.30,
+    shaderType: 'Kajiya-Kay', specPower: 55, specShift: 0.03,
+    lod: [480, 240, 100, 40],
+  },
+
+  afro: {
+    name: 'Afro',
+    cardCount: 700, density: 0.90, cardWidth: 0.008, cardLength: 0.18,
+    rootColor: '#0a0804', tipColor: '#2a1808',
+    wave: 0.10, curl: 0.90, frizz: 0.45, flyaways: 0.28,
+    stiffness: 0.35, damping: 0.65, windStr: 0.10, gravity: 0.15,
+    shaderType: 'Kajiya-Kay', specPower: 45, specShift: 0.025,
+    lod: [700, 350, 140, 60],
+  },
+
+  ponytail: {
+    name: 'Ponytail',
+    cardCount: 500, density: 0.80, cardWidth: 0.011, cardLength: 0.35,
+    rootColor: '#2a1808', tipColor: '#6a3818',
+    wave: 0.12, curl: 0.03, frizz: 0.08, flyaways: 0.10,
+    stiffness: 0.58, damping: 0.82, windStr: 0.40, gravity: 0.60,
+    shaderType: 'Kajiya-Kay', specPower: 80, specShift: 0.04,
+    lod: [500, 250, 100, 40],
+  },
+
+  bun: {
+    name: 'Bun',
+    cardCount: 300, density: 0.85, cardWidth: 0.010, cardLength: 0.12,
+    rootColor: '#2a1808', tipColor: '#4a2810',
+    wave: 0.05, curl: 0.10, frizz: 0.06, flyaways: 0.12,
+    stiffness: 0.88, damping: 0.92, windStr: 0.05, gravity: 0.10,
+    shaderType: 'Kajiya-Kay', specPower: 70, specShift: 0.04,
+    lod: [300, 150, 60, 25],
+  },
+
+  mohawk: {
+    name: 'Mohawk',
+    cardCount: 250, density: 0.90, cardWidth: 0.012, cardLength: 0.14,
+    rootColor: '#0a0808', tipColor: '#1a1208',
+    wave: 0.00, curl: 0.00, frizz: 0.05, flyaways: 0.04,
+    stiffness: 0.95, damping: 0.97, windStr: 0.08, gravity: 0.10,
+    shaderType: 'Kajiya-Kay', specPower: 90, specShift: 0.05,
+    lod: [250, 120, 50, 20],
+  },
+
+  dreadlocks: {
+    name: 'Dreadlocks',
+    cardCount: 180, density: 0.75, cardWidth: 0.018, cardLength: 0.45,
+    rootColor: '#1a0a04', tipColor: '#3a1808',
+    wave: 0.05, curl: 0.10, frizz: 0.30, flyaways: 0.20,
+    stiffness: 0.72, damping: 0.88, windStr: 0.25, gravity: 0.50,
+    shaderType: 'PBR', specPower: 40, specShift: 0.02,
+    lod: [180, 90, 40, 15],
+  },
+
+  highlight: {
+    name: 'Highlighted',
+    cardCount: 550, density: 0.75, cardWidth: 0.011, cardLength: 0.35,
+    rootColor: '#1a1008', tipColor: '#d0b060',
+    wave: 0.10, curl: 0.02, frizz: 0.08, flyaways: 0.08,
+    stiffness: 0.65, damping: 0.85, windStr: 0.28, gravity: 0.50,
+    shaderType: 'Kajiya-Kay', specPower: 95, specShift: 0.05,
+    lod: [550, 275, 110, 45],
+  },
+
+  platinum: {
+    name: 'Platinum Blonde',
+    cardCount: 580, density: 0.78, cardWidth: 0.011, cardLength: 0.32,
+    rootColor: '#c8c0a0', tipColor: '#f0e8d0',
+    wave: 0.08, curl: 0.01, frizz: 0.06, flyaways: 0.07,
+    stiffness: 0.68, damping: 0.86, windStr: 0.28, gravity: 0.48,
+    shaderType: 'Kajiya-Kay', specPower: 110, specShift: 0.06,
+    lod: [580, 290, 116, 46],
+  },
+
+  red: {
+    name: 'Vibrant Red',
+    cardCount: 520, density: 0.74, cardWidth: 0.011, cardLength: 0.30,
+    rootColor: '#6a1008', tipColor: '#cc2808',
+    wave: 0.12, curl: 0.04, frizz: 0.10, flyaways: 0.09,
+    stiffness: 0.62, damping: 0.84, windStr: 0.30, gravity: 0.48,
+    shaderType: 'Kajiya-Kay', specPower: 85, specShift: 0.045,
+    lod: [520, 260, 104, 42],
+  },
+
+  anime: {
+    name: 'Anime Style',
+    cardCount: 120, density: 0.90, cardWidth: 0.025, cardLength: 0.35,
+    rootColor: '#1a1a3a', tipColor: '#6060c0',
+    wave: 0.00, curl: 0.00, frizz: 0.00, flyaways: 0.02,
+    stiffness: 0.95, damping: 0.98, windStr: 0.05, gravity: 0.08,
+    shaderType: 'PBR', specPower: 120, specShift: 0.06,
+    lod: [120, 60, 30, 12],
+  },
+};
+
+export function getTemplate(name) {
+  return HAIR_TEMPLATES[name] ?? HAIR_TEMPLATES.longStraight;
 }
 
-function ringPoints(count = 8, radius = 0.5, y = 0) {
-  const pts = [];
-  for (let i = 0; i < count; i++) {
-    const t = (i / count) * Math.PI * 2;
-    pts.push({
-      x: Math.cos(t) * radius,
-      y,
-      z: Math.sin(t) * radius,
-    });
-  }
-  return pts;
+export function listTemplates() {
+  return Object.entries(HAIR_TEMPLATES).map(([key, t]) => ({
+    key, name: t.name, length: t.cardLength, curl: t.curl,
+  }));
 }
 
-export function createHairGuides(type = "fade", {
-  density = 24,
-  length = 0.7,
-  width = 0.12,
-  clump = 0.2,
-  curl = 0.15,
-} = {}) {
-  const guides = [];
-
-  if (type === "fade") {
-    const pts = ringPoints(Math.max(10, density), 0.42, 0.82);
-    for (let i = 0; i < pts.length; i++) {
-      const p = pts[i];
-      guides.push({
-        root: { x: p.x, y: p.y, z: p.z },
-        dir: { x: 0, y: 0.35, z: 0 },
-        length: length * 0.45,
-        width: width * 0.75,
-        bend: 0.02,
-      });
-    }
-  } else if (type === "afro") {
-    const pts = ringPoints(Math.max(14, density), 0.48, 0.9);
-    for (let i = 0; i < pts.length; i++) {
-      const p = pts[i];
-      guides.push({
-        root: { x: p.x, y: p.y, z: p.z },
-        dir: { x: p.x * 0.15, y: 0.7, z: p.z * 0.15 },
-        length: length * 1.15,
-        width: width * 1.15,
-        bend: curl * 1.2,
-      });
-    }
-    guides.push({
-      root: { x: 0, y: 1.02, z: 0 },
-      dir: { x: 0, y: 0.9, z: 0 },
-      length: length * 1.25,
-      width: width * 1.2,
-      bend: curl,
-    });
-  } else if (type === "twists" || type === "locs" || type === "braids") {
-    const pts = ringPoints(Math.max(12, density), 0.44, 0.9);
-    for (let i = 0; i < pts.length; i++) {
-      const p = pts[i];
-      const side = i % 2 === 0 ? 1 : -1;
-      guides.push({
-        root: { x: p.x, y: p.y, z: p.z },
-        dir: { x: p.x * 0.05 + side * clump * 0.08, y: 0.9, z: p.z * 0.05 },
-        length: length * (type === "braids" ? 1.45 : 1.2),
-        width: width * (type === "locs" ? 0.7 : 0.52),
-        bend: type === "braids" ? 0.03 : 0.07,
-      });
-    }
-  } else if (type === "straight" || type === "curls") {
-    const pts = ringPoints(Math.max(14, density), 0.47, 0.9);
-    for (let i = 0; i < pts.length; i++) {
-      const p = pts[i];
-      guides.push({
-        root: { x: p.x, y: p.y, z: p.z },
-        dir: { x: 0, y: 0.8, z: 0 },
-        length: length * 1.35,
-        width: width * 0.9,
-        bend: type === "curls" ? curl * 1.6 : 0.02,
-      });
-    }
-  } else if (type === "beard") {
-    for (let i = 0; i < density; i++) {
-      const t = i / Math.max(1, density - 1);
-      guides.push({
-        root: { x: (t - 0.5) * 0.55, y: 0.2 + Math.sin(t * Math.PI) * 0.05, z: 0.42 },
-        dir: { x: 0, y: -0.45, z: 0.08 },
-        length: length * 0.85,
-        width: width * 0.7,
-        bend: 0.04,
-      });
-    }
-  } else if (type === "eyebrows") {
-    for (let i = 0; i < Math.max(8, Math.floor(density / 2)); i++) {
-      const t = i / Math.max(1, Math.floor(density / 2) - 1);
-      guides.push({
-        root: { x: -0.22 + t * 0.18, y: 0.58 + Math.sin(t * Math.PI) * 0.02, z: 0.46 },
-        dir: { x: 0.08, y: 0.02, z: 0.01 },
-        length: length * 0.18,
-        width: width * 0.22,
-        bend: 0.01,
-      });
-      guides.push({
-        root: { x: 0.04 + t * 0.18, y: 0.58 + Math.sin((1 - t) * Math.PI) * 0.02, z: 0.46 },
-        dir: { x: -0.08, y: 0.02, z: 0.01 },
-        length: length * 0.18,
-        width: width * 0.22,
-        bend: 0.01,
-      });
-    }
-  }
-
-  return guides;
-}
-
-// =============================================================================
-// Utility helpers shared across SPX generator modules
-// =============================================================================
-
-/** Linear interpolation */
-function _lerp(a, b, t) { return a + (b - a) * t; }
-
-/** Clamp value between lo and hi */
-function _clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
-
-/** Smooth step */
-function _smoothstep(edge0, edge1, x) {
-  const t = _clamp((x - edge0) / (edge1 - edge0), 0, 1);
-  return t * t * (3 - 2 * t);
-}
-
-/** Seeded pseudo-random number generator */
-function _mkRng(seed) {
-  let s = seed;
-  return function() { s = (s * 9301 + 49297) % 233280; return s / 233280; };
-}
-
-/** Pick a random element from an array */
-function _pick(arr, rng) {
-  const r = rng ?? Math.random;
-  return arr[Math.floor(r() * arr.length)];
-}
-
-/** Compute centroid of a triangle */
-function _centroid(a, b, c) {
-  return {
-    x: (a.x + b.x + c.x) / 3,
-    y: (a.y + b.y + c.y) / 3,
-    z: (a.z + b.z + c.z) / 3,
-  };
-}
-
-/** Hash function for procedural noise */
-function _hash(n) { return Math.sin(n * 127.1 + 311.7) * 43758.5453 % 1; }
-
-/** Value noise at integer grid position */
-function _noise3(x, y, z) {
-  const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
-  const fx = x-ix, fy = y-iy, fz = z-iz;
-  const ux = fx*fx*(3-2*fx), uy = fy*fy*(3-2*fy), uz = fz*fz*(3-2*fz);
-  const n000 = _hash(ix+iy*57+iz*113), n100 = _hash(ix+1+iy*57+iz*113);
-  const n010 = _hash(ix+(iy+1)*57+iz*113), n110 = _hash(ix+1+(iy+1)*57+iz*113);
-  const n001 = _hash(ix+iy*57+(iz+1)*113), n101 = _hash(ix+1+iy*57+(iz+1)*113);
-  const n011 = _hash(ix+(iy+1)*57+(iz+1)*113), n111 = _hash(ix+1+(iy+1)*57+(iz+1)*113);
-  return _lerp(_lerp(_lerp(n000,n100,ux),_lerp(n010,n110,ux),uy),
-               _lerp(_lerp(n001,n101,ux),_lerp(n011,n111,ux),uy), uz);
-}
-
-/** Build a bounding box from an array of THREE.Vector3 points */
-function _bboxFromPoints(pts) {
-  const min = { x: Infinity, y: Infinity, z: Infinity };
-  const max = { x: -Infinity, y: -Infinity, z: -Infinity };
-  pts.forEach(p => {
-    if (p.x < min.x) min.x = p.x; if (p.x > max.x) max.x = p.x;
-    if (p.y < min.y) min.y = p.y; if (p.y > max.y) max.y = p.y;
-    if (p.z < min.z) min.z = p.z; if (p.z > max.z) max.z = p.z;
+export function applyTemplate(hairSystem, templateName) {
+  const t = getTemplate(templateName);
+  if (!hairSystem) return t;
+  hairSystem.setConfig({
+    cardCount: t.cardCount, density: t.density,
+    cardWidth: t.cardWidth, cardLength: t.cardLength,
+    rootColor: t.rootColor, tipColor: t.tipColor,
+    stiffness: t.stiffness, damping: t.damping,
+    windStr:   t.windStr,   gravity: t.gravity,
   });
-  return { min, max, size: { x: max.x-min.x, y: max.y-min.y, z: max.z-min.z } };
+  return t;
 }
 
-/** Dispose a THREE.js object and all its children */
-function _disposeObject(obj) {
-  if (!obj) return;
-  obj.traverse?.(child => {
-    child.geometry?.dispose?.();
-    if (Array.isArray(child.material)) child.material.forEach(m => m?.dispose?.());
-    else child.material?.dispose?.();
+export function blendTemplates(nameA, nameB, t) {
+  const a = getTemplate(nameA), b = getTemplate(nameB);
+  const lerp = (x, y) => typeof x === 'number' && typeof y === 'number' ? x + (y - x) * t : x;
+  return Object.fromEntries(
+    Object.keys(a).map(k => [k, lerp(a[k], b[k])])
+  );
+}
+
+export function findClosestTemplate(params) {
+  let best = null, bestScore = Infinity;
+  Object.entries(HAIR_TEMPLATES).forEach(([key, t]) => {
+    const score = Math.abs(t.cardLength - (params.length ?? 0.25)) * 2 +
+                  Math.abs(t.curl - (params.curl ?? 0)) +
+                  Math.abs(t.density - (params.density ?? 0.75));
+    if (score < bestScore) { bestScore = score; best = key; }
   });
+  return best;
 }
 
-/** Deep clone a plain JSON-serializable object */
-function _deepClone(obj) { return JSON.parse(JSON.stringify(obj)); }
-
-/** Format a number with commas for display */
-function _fmt(n) { return n.toLocaleString(); }
-
-// ──────────────────────────────────────────────────────────────────────────
-// SPX Mesh Editor — Module Reference
-// ──────────────────────────────────────────────────────────────────────────
-//
-// INTEGRATION
-//   This module is part of the SPX Mesh Editor pipeline.
-//   Import via the barrel export in src/mesh/hair/index.js
-//   or src/generators/index.js as appropriate.
-//
-// DESIGN SYSTEM
-//   background : #06060f   panel    : #0d1117
-//   border     : #21262d   primary  : #00ffc8 (teal)
-//   secondary  : #FF6600   font     : JetBrains Mono, monospace
-//
-// PERFORMANCE
-//   All heavy geometry operations should run off the main thread
-//   via a Web Worker when possible.
-//   Use THREE.BufferGeometryUtils.mergeGeometries() for batching.
-//   Dispose geometries and materials when removing objects from scene.
-//
-// THREE.JS VERSION
-//   Targets Three.js r128 (CDN) as used across the SPX platform.
-//   Avoid APIs introduced after r128 (e.g. CapsuleGeometry).
-//
-// EXPORTS
-//   All classes use named exports + a default export of the
-//   primary class for convenience.
-//
-// SERIALIZATION
-//   Every class implements toJSON() / fromJSON() for save/load.
-//   JSON schema versioned via userData.version field.
-//
-// EVENTS
-//   Classes that emit events use a simple on(event, fn) / _emit()
-//   pattern — no external event library required.
-//
-// UNDO / REDO
-//   Destructive operations push a memento to the global UndoStack.
-//   Import { undoStack } from 'src/core/UndoStack.js'.
-//
-// TESTING
-//   Unit tests live in tests/<ModuleName>.test.js
-//   Run with: npm run test -- --testPathPattern=<ModuleName>
-//
-// CHANGELOG
-//   v1.0  Initial implementation
-//   v1.1  Added toJSON / fromJSON
-//   v1.2  Performance pass — reduced GC pressure
-//   v1.3  Added event system
-//   v1.4  Expanded to 400+ lines with full feature set
-// ──────────────────────────────────────────────────────────────────────────
-
-// ──────────────────────────────────────────────────────────────────────────
-// SPX Mesh Editor — Module Reference
-// ──────────────────────────────────────────────────────────────────────────
-//
-// INTEGRATION
-//   This module is part of the SPX Mesh Editor pipeline.
-//   Import via the barrel export in src/mesh/hair/index.js
-//   or src/generators/index.js as appropriate.
-//
-// DESIGN SYSTEM
-//   background : #06060f   panel    : #0d1117
-//   border     : #21262d   primary  : #00ffc8 (teal)
-//   secondary  : #FF6600   font     : JetBrains Mono, monospace
-//
-// PERFORMANCE
-//   All heavy geometry operations should run off the main thread
-//   via a Web Worker when possible.
-//   Use THREE.BufferGeometryUtils.mergeGeometries() for batching.
-//   Dispose geometries and materials when removing objects from scene.
-//
-// THREE.JS VERSION
-//   Targets Three.js r128 (CDN) as used across the SPX platform.
-//   Avoid APIs introduced after r128 (e.g. CapsuleGeometry).
-//
-// EXPORTS
-//   All classes use named exports + a default export of the
-//   primary class for convenience.
-//
-// SERIALIZATION
-//   Every class implements toJSON() / fromJSON() for save/load.
-//   JSON schema versioned via userData.version field.
-//
-// EVENTS
-//   Classes that emit events use a simple on(event, fn) / _emit()
-//   pattern — no external event library required.
-//
-// UNDO / REDO
-//   Destructive operations push a memento to the global UndoStack.
-//   Import { undoStack } from 'src/core/UndoStack.js'.
-//
-// TESTING
-//   Unit tests live in tests/<ModuleName>.test.js
-//   Run with: npm run test -- --testPathPattern=<ModuleName>
-//
-// CHANGELOG
-//   v1.0  Initial implementation
-//   v1.1  Added toJSON / fromJSON
-//   v1.2  Performance pass — reduced GC pressure
-//   v1.3  Added event system
-//   v1.4  Expanded to 400+ lines with full feature set
-// ──────────────────────────────────────────────────────────────────────────
-
-// ──────────────────────────────────────────────────────────────────────────
-// SPX Mesh Editor — Module Reference
-// ──────────────────────────────────────────────────────────────────────────
-//
-// INTEGRATION
-//   This module is part of the SPX Mesh Editor pipeline.
-//   Import via the barrel export in src/mesh/hair/index.js
-//   or src/generators/index.js as appropriate.
-//
-// DESIGN SYSTEM
-//   background : #06060f   panel    : #0d1117
-//   border     : #21262d   primary  : #00ffc8 (teal)
-//   secondary  : #FF6600   font     : JetBrains Mono, monospace
-//
-// PERFORMANCE
-//   All heavy geometry operations should run off the main thread
-//   via a Web Worker when possible.
-//   Use THREE.BufferGeometryUtils.mergeGeometries() for batching.
-//   Dispose geometries and materials when removing objects from scene.
-//
-// THREE.JS VERSION
-//   Targets Three.js r128 (CDN) as used across the SPX platform.
-//   Avoid APIs introduced after r128 (e.g. CapsuleGeometry).
-//
-// EXPORTS
-//   All classes use named exports + a default export of the
-//   primary class for convenience.
-//
-// SERIALIZATION
-//   Every class implements toJSON() / fromJSON() for save/load.
-//   JSON schema versioned via userData.version field.
-//
-// EVENTS
-//   Classes that emit events use a simple on(event, fn) / _emit()
-//   pattern — no external event library required.
-//
-// UNDO / REDO
-//   Destructive operations push a memento to the global UndoStack.
-//   Import { undoStack } from 'src/core/UndoStack.js'.
-//
-// TESTING
-//   Unit tests live in tests/<ModuleName>.test.js
-//   Run with: npm run test -- --testPathPattern=<ModuleName>
-//
-// CHANGELOG
-//   v1.0  Initial implementation
-//   v1.1  Added toJSON / fromJSON
-//   v1.2  Performance pass — reduced GC pressure
-//   v1.3  Added event system
-//   v1.4  Expanded to 400+ lines with full feature set
-// ──────────────────────────────────────────────────────────────────────────
-
-// ──────────────────────────────────────────────────────────────────────────
-// SPX Mesh Editor — Module Reference
-// ──────────────────────────────────────────────────────────────────────────
-//
-// INTEGRATION
-//   This module is part of the SPX Mesh Editor pipeline.
-//   Import via the barrel export in src/mesh/hair/index.js
-//   or src/generators/index.js as appropriate.
-//
-// DESIGN SYSTEM
+export default HAIR_TEMPLATES;
