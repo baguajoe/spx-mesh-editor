@@ -414,16 +414,85 @@ const AvatarRig = ({ recordedFrames, avatarUrl, liveFrame, smoothingEnabled = tr
 // EXPORTED COMPONENT
 // ─────────────────────────────────────────────────────────────
 const AvatarRigPlayer3D = ({ recordedFrames, avatarUrl, liveFrame, smoothingEnabled, visemes = [], audioRef = null }) => {
-  return (
-    <Canvas camera={{ position: [0, 1.5, 3], fov: 50 }} style={{ background: '#0d1117' }} gl={{ alpha: false }}>
-      <color attach="background" args={['#0d1117']} />
-      <ambientLight intensity={0.8} />
-      <directionalLight position={[3, 5, 5]} intensity={1} />
-      <Suspense fallback={null}>
-        <AvatarRig recordedFrames={recordedFrames} avatarUrl={avatarUrl} liveFrame={liveFrame} smoothingEnabled={smoothingEnabled} visemes={visemes} audioRef={audioRef} />
-      </Suspense>
-    </Canvas>
-  );
+  const mountRef = useRef(null);
+  const rendererRef = useRef(null);
+  const sceneRef = useRef(null);
+  const cameraRef = useRef(null);
+  const frameRef = useRef(null);
+  const mixerRef = useRef(null);
+  const avatarRef = useRef(null);
+  const clockRef = useRef(new THREE.Clock());
+
+  useEffect(() => {
+    const mount = mountRef.current;
+    if (!mount) return;
+    const W = mount.clientWidth || 800;
+    const H = mount.clientHeight || 500;
+
+    // Scene
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0d1117);
+    sceneRef.current = scene;
+
+    // Camera
+    const camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 100);
+    camera.position.set(0, 1.5, 3);
+    camera.lookAt(0, 1, 0);
+    cameraRef.current = camera;
+
+    // Renderer — create new one just for this canvas
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setSize(W, H);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    mount.appendChild(renderer.domElement);
+    rendererRef.current = renderer;
+
+    // Lights
+    scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+    const dir = new THREE.DirectionalLight(0xffeedd, 1.2);
+    dir.position.set(3, 5, 5); dir.castShadow = true; scene.add(dir);
+
+    // Ground grid
+    scene.add(new THREE.GridHelper(10, 10, 0x1a2a1a, 0x1a2a1a));
+
+    // Load avatar
+    const { GLTFLoader } = require('three/examples/jsm/loaders/GLTFLoader');
+    const loader = new GLTFLoader();
+    loader.load(avatarUrl || '/ybot.glb', (gltf) => {
+      const model = gltf.scene;
+      model.traverse(child => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
+      scene.add(model);
+      avatarRef.current = model;
+      if (gltf.animations?.length) {
+        const mixer = new THREE.AnimationMixer(model);
+        mixerRef.current = mixer;
+        mixer.clipAction(gltf.animations[0]).play();
+      }
+    }, undefined, (err) => console.warn('[AvatarRigPlayer3D] Load error:', err));
+
+    // Animate
+    let angle = 0;
+    function animate() {
+      frameRef.current = requestAnimationFrame(animate);
+      const delta = clockRef.current.getDelta();
+      mixerRef.current?.update(delta);
+      angle += 0.005;
+      camera.position.set(Math.sin(angle) * 3, 1.5, Math.cos(angle) * 3);
+      camera.lookAt(0, 1, 0);
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    return () => {
+      cancelAnimationFrame(frameRef.current);
+      renderer.dispose();
+      if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement);
+    };
+  }, [avatarUrl]);
+
+  return <div ref={mountRef} style={{ width: '100%', height: '100%', minHeight: 400 }} />;
 };
 
 export default AvatarRigPlayer3D;
