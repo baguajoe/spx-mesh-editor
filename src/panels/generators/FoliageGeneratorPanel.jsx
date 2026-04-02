@@ -1,190 +1,415 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback } from 'react';
 
-const S = {
-  panel: { background:"#0d1117", color:"#e6edf3", fontFamily:"JetBrains Mono,monospace", fontSize:12, padding:12, overflowY:"auto", maxHeight:"100%", boxSizing:"border-box" },
-  h3:    { color:"#00ffc8", fontSize:13, fontWeight:700, marginBottom:10, borderBottom:"1px solid #21262d", paddingBottom:6 },
-  section:{ marginBottom:10 },
-  label: { display:"flex", justifyContent:"space-between", color:"#8b949e", marginBottom:2 },
-  row:   { display:"grid", gridTemplateColumns:"1fr 1fr", gap:6, marginBottom:8 },
-  slider:{ width:"100%", accentColor:"#00ffc8" },
-  btn:   { width:"100%", padding:"8px 0", background:"#00ffc8", color:"#06060f", border:"none", borderRadius:4, fontFamily:"JetBrains Mono,monospace", fontSize:12, fontWeight:700, cursor:"pointer", marginTop:4 },
-  btnSec:{ width:"100%", padding:"6px 0", background:"#21262d", color:"#e6edf3", border:"1px solid #30363d", borderRadius:4, fontFamily:"JetBrains Mono,monospace", fontSize:11, cursor:"pointer", marginTop:4 },
-  select:{ width:"100%", background:"#21262d", color:"#e6edf3", border:"1px solid #30363d", borderRadius:4, padding:"4px 6px", fontFamily:"JetBrains Mono,monospace", fontSize:11 },
-  tag:   { display:"inline-block", background:"#21262d", color:"#8b949e", borderRadius:3, padding:"2px 6px", fontSize:10, marginRight:4, marginBottom:4, cursor:"pointer" },
-  tagOn: { display:"inline-block", background:"#00ffc8", color:"#06060f", borderRadius:3, padding:"2px 6px", fontSize:10, marginRight:4, marginBottom:4, cursor:"pointer", fontWeight:700 },
-  swatch:{ width:24, height:24, borderRadius:4, border:"1px solid #30363d", cursor:"pointer", display:"inline-block" },
-};
-
-const TREE_TYPES = ["Oak","Pine","Palm","Willow","Cherry Blossom","Maple","Birch","Baobab","Cypress","Mangrove","Dead Tree","Cartoon Tree"];
-const BUSH_TYPES = ["Roundy","Elongated","Flowering","Thorny","Topiary","Wild","Hedge"];
-const GRASS_TYPES = ["Short","Long","Savanna","Tropical","Wheat","Bamboo","Reed"];
-const SEASONS   = ["Spring","Summer","Autumn","Winter"];
-const CLIMATES  = ["Temperate","Tropical","Desert","Arctic","Mediterranean","Rainforest"];
-
-const TREE_PRESETS = {
-  oak:    { trunkHeight:2.0, trunkRadius:0.18, branchCount:8, branchLength:1.2, branchAngle:45, canopyRadius:1.8, canopyDensity:0.85, leafSize:0.18, leafCount:200, rootFlare:0.25 },
-  pine:   { trunkHeight:4.0, trunkRadius:0.14, branchCount:12, branchLength:0.8, branchAngle:30, canopyRadius:0.8, canopyDensity:0.95, leafSize:0.06, leafCount:400, rootFlare:0.10 },
-  palm:   { trunkHeight:5.0, trunkRadius:0.12, branchCount:8, branchLength:2.0, branchAngle:70, canopyRadius:2.2, canopyDensity:0.60, leafSize:0.40, leafCount:40,  rootFlare:0.08 },
-  willow: { trunkHeight:3.0, trunkRadius:0.20, branchCount:10, branchLength:2.5, branchAngle:60, canopyRadius:2.5, canopyDensity:0.70, leafSize:0.12, leafCount:300, rootFlare:0.20 },
-  dead:   { trunkHeight:3.5, trunkRadius:0.22, branchCount:6,  branchLength:1.0, branchAngle:50, canopyRadius:1.0, canopyDensity:0.00, leafSize:0.00, leafCount:0,   rootFlare:0.15 },
-};
-
-function Slider({ label, value, min, max, step=0.01, onChange }) {
+function Slider({ label, value, min = 0, max = 1, step = 0.01, onChange, unit = '' }) {
   return (
-    <div style={S.section}>
-      <div style={S.label}><span>{label}</span><span style={{color:"#00ffc8"}}>{typeof value === "number" ? value.toFixed(2) : value}</span></div>
-      <input type="range" style={S.slider} min={min} max={max} step={step} value={value} onChange={e => onChange(Number(e.target.value))} />
+    <div style={{ marginBottom: 5 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#888' }}>
+        <span>{label}</span>
+        <span style={{ color: '#00ffc8', fontWeight: 600 }}>
+          {typeof value === 'number' ? (step < 0.1 ? value.toFixed(2) : Math.round(value)) : value}{unit}
+        </span>
+      </div>
+      <input type="range" min={min} max={max} step={step} value={value}
+        onChange={e => onChange(parseFloat(e.target.value))}
+        style={{ width: '100%', accentColor: '#00ffc8', cursor: 'pointer', height: 16 }} />
     </div>
   );
 }
+function Select({ label, value, options, onChange }) {
+  return (
+    <div style={{ marginBottom: 6 }}>
+      {label && <div style={{ fontSize: 10, color: '#888', marginBottom: 2 }}>{label}</div>}
+      <select value={value} onChange={e => onChange(e.target.value)} style={{
+        width: '100%', background: '#0d1117', color: '#e0e0e0',
+        border: '1px solid #21262d', padding: '3px 6px', borderRadius: 4, fontSize: 11, cursor: 'pointer',
+      }}>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+function Check({ label, value, onChange }) {
+  return (
+    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11,
+      color: '#ccc', cursor: 'pointer', marginBottom: 4 }}>
+      <input type="checkbox" checked={value} onChange={e => onChange(e.target.checked)}
+        style={{ accentColor: '#00ffc8', width: 12, height: 12 }} />
+      {label}
+    </label>
+  );
+}
+function ColorRow({ label, value, onChange }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+      <span style={{ fontSize: 10, color: '#888', flex: 1 }}>{label}</span>
+      <input type="color" value={value} onChange={e => onChange(e.target.value)}
+        style={{ width: 32, height: 22, border: 'none', cursor: 'pointer', borderRadius: 3 }} />
+      <span style={{ fontSize: 9, color: '#555', fontFamily: 'monospace' }}>{value}</span>
+    </div>
+  );
+}
+function Section({ title, children, defaultOpen = true }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ marginBottom: 6, border: '1px solid #21262d', borderRadius: 5, overflow: 'hidden' }}>
+      <div onClick={() => setOpen(o => !o)} style={{
+        padding: '5px 8px', cursor: 'pointer', background: '#0d1117',
+        display: 'flex', justifyContent: 'space-between',
+        fontSize: 11, fontWeight: 600, color: '#00ffc8', userSelect: 'none',
+      }}>
+        <span>{title}</span>
+        <span style={{ fontSize: 9, opacity: 0.7 }}>{open ? '\u25b2' : '\u25bc'}</span>
+      </div>
+      {open && <div style={{ padding: '6px 8px', background: '#06060f' }}>{children}</div>}
+    </div>
+  );
+}
+function Badges({ items, active, onSelect }) {
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>
+      {items.map(item => (
+        <button key={item} onClick={() => onSelect(item)} style={{
+          padding: '2px 7px', fontSize: 9, borderRadius: 4, cursor: 'pointer',
+          background: active === item ? '#00ffc8' : '#1a1f2c',
+          color: active === item ? '#06060f' : '#ccc',
+          border: `1px solid ${active === item ? '#00ffc8' : '#21262d'}`,
+        }}>{item}</button>
+      ))}
+    </div>
+  );
+}
+function NumInput({ label, value, min, max, step = 1, onChange, unit = '' }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+      <span style={{ fontSize: 10, color: '#888', flex: 1 }}>{label}</span>
+      <input type="number" value={value} min={min} max={max} step={step}
+        onChange={e => onChange(parseFloat(e.target.value))}
+        style={{ width: 60, background: '#0d1117', color: '#e0e0e0',
+          border: '1px solid #21262d', padding: '2px 4px', borderRadius: 3, fontSize: 11, textAlign: 'right' }} />
+      {unit && <span style={{ fontSize: 9, color: '#555' }}>{unit}</span>}
+    </div>
+  );
+}
+function GenBtn({ label, onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      width: '100%', background: '#00ffc8', color: '#06060f', border: 'none',
+      borderRadius: 4, padding: '7px 0', cursor: 'pointer', fontWeight: 700,
+      fontSize: 12, marginTop: 6, letterSpacing: 0.5, fontFamily: 'JetBrains Mono, monospace',
+    }}>{label}</button>
+  );
+}
+function RandBtn({ onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      background: '#1a1f2c', color: '#888', border: '1px solid #21262d',
+      borderRadius: 4, padding: '6px 10px', cursor: 'pointer', fontSize: 11,
+    }}>\u{1F3B2}</button>
+  );
+}
+const P = { fontFamily: 'JetBrains Mono, monospace', color: '#e0e0e0', fontSize: 12, userSelect: 'none', width: '100%' };
 
-export default function FoliageGeneratorPanel({ addObject }) {
-  const [mode, setMode] = useState("tree");
-  const [treeType, setTreeType] = useState("Oak");
-  const [bushType, setBushType] = useState("Roundy");
-  const [grassType, setGrassType] = useState("Short");
-  const [season, setSeason] = useState("Summer");
-  const [climate, setClimate] = useState("Temperate");
-  const [params, setParams] = useState(TREE_PRESETS.oak);
-  const [leafColor, setLeafColor] = useState("#3a7d44");
-  const [trunkColor, setTrunkColor] = useState("#5c3d1e");
-  const [windEffect, setWindEffect] = useState(false);
-  const [showRoots, setShowRoots] = useState(false);
-  const [count, setCount] = useState(1);
-  const [scatter, setScatter] = useState(0);
-  const [seed, setSeed] = useState(42);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+const FOLIAGE_TYPES = ['Deciduous Tree','Conifer','Palm Tree','Oak','Willow','Birch','Dead Tree',
+  'Bamboo','Cactus','Fern','Tropical Shrub','Flower Bush','Grass Tuft','Mushroom','Vine',
+  'Seaweed','Coral','Bonsai','Mangrove','Cypress','Baobab','Cherry Blossom'];
+const LEAF_SHAPES   = ['Oval','Maple','Fan','Pine Needle','Tropical','Compound','Fern Frond','Heart','Lance','Lobed'];
+const BARK_TYPES    = ['Smooth','Rough','Peeling','Cracked','Mossy','Scaly','Fibrous','Cork','Birch White'];
+const SEASONS       = ['Spring','Summer','Autumn','Winter','Tropical','Desert','Arctic','Eternal'];
+const POLY_OPTIONS  = ['Low','Mid','High','Ultra'];
 
-  const set = useCallback((key, val) => setParams(p => ({ ...p, [key]: val })), []);
+export default function FoliageGeneratorPanel({ onGenerate }) {
+  const [foliageType,  setFoliageType]  = useState('Deciduous Tree');
+  const [season,       setSeason]       = useState('Summer');
+  const [seed,         setSeed]         = useState(42);
+  // Trunk
+  const [trunkH,       setTrunkH]       = useState(0.50);
+  const [trunkGirth,   setTrunkGirth]   = useState(0.50);
+  const [trunkTaper,   setTrunkTaper]   = useState(0.40);
+  const [trunkCurve,   setTrunkCurve]   = useState(0.20);
+  const [barkType,     setBarkType]     = useState('Rough');
+  const [barkColor,    setBarkColor]    = useState('#5a3820');
+  const [barkColor2,   setBarkColor2]   = useState('#3a2010');
+  const [barkRough,    setBarkRough]    = useState(0.90);
+  const [showRoots,    setShowRoots]    = useState(false);
+  const [rootSpread,   setRootSpread]   = useState(0.30);
+  const [rootDepth,    setRootDepth]    = useState(0.20);
+  // Branches
+  const [branchCount,    setBranchCount]    = useState(0.60);
+  const [branchLen,      setBranchLen]      = useState(0.50);
+  const [branchAngle,    setBranchAngle]    = useState(0.50);
+  const [branchDroop,    setBranchDroop]    = useState(0.20);
+  const [branchRecurse,  setBranchRecurse]  = useState(3);
+  const [branchTaper,    setBranchTaper]    = useState(0.70);
+  const [branchRandness, setBranchRandness] = useState(0.30);
+  // Leaves
+  const [leafShape,      setLeafShape]      = useState('Oval');
+  const [leafDensity,    setLeafDensity]    = useState(0.70);
+  const [leafSize,       setLeafSize]       = useState(0.50);
+  const [leafColor,      setLeafColor]      = useState('#3a7a20');
+  const [leafColor2,     setLeafColor2]     = useState('#5a9a30');
+  const [leafColor3,     setLeafColor3]     = useState('#8ab040');
+  const [leafGloss,      setLeafGloss]      = useState(0.30);
+  const [leafTranslucency, setLeafTranslucency] = useState(0.40);
+  const [leafTwist,      setLeafTwist]      = useState(0.10);
+  // Wind
+  const [windResp,       setWindResp]       = useState(0.50);
+  const [windFreq,       setWindFreq]       = useState(0.50);
+  const [windTurbulence, setWindTurbulence] = useState(0.30);
+  // Extras
+  const [flowerDensity,  setFlowerDensity]  = useState(0.00);
+  const [flowerColor,    setFlowerColor]    = useState('#ff88cc');
+  const [fruitDensity,   setFruitDensity]   = useState(0.00);
+  const [fruitColor,     setFruitColor]     = useState('#dd3322');
+  const [mossCoverage,   setMossCoverage]   = useState(0.00);
+  const [snowCoverage,   setSnowCoverage]   = useState(0.00);
+  // Output
+  const [polyLevel,      setPolyLevel]      = useState('Mid');
+  const [addLOD,         setAddLOD]         = useState(true);
+  const [addCollider,    setAddCollider]    = useState(true);
+  const [billboard,      setBillboard]      = useState(true);
+  const [separateMeshes, setSeparateMeshes] = useState(false);
+  const [windReadyRig,   setWindReadyRig]   = useState(true);
 
-  const generate = () => {
-    if (!addObject) return;
-    for (let i = 0; i < count; i++) {
-      addObject({
-        type: "foliage",
-        subType: mode,
-        params: { ...params, leafColor, trunkColor, windEffect, showRoots, season, climate, treeType, bushType, grassType },
-        name: `${mode}_${treeType}_${Date.now()}_${i}`,
-        scatter: scatter > 0 ? { radius: scatter, seed: seed + i } : null,
-      });
-    }
-  };
-
-  const randomize = () => {
+  const randomize = useCallback(() => {
+    const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+    const rn = (a, b) => parseFloat((a + Math.random() * (b - a)).toFixed(2));
+    setFoliageType(pick(FOLIAGE_TYPES)); setSeason(pick(SEASONS));
+    setTrunkH(rn(0.2, 0.9)); setTrunkGirth(rn(0.2, 0.8));
+    setBranchCount(rn(0.3, 0.9)); setLeafDensity(rn(0.4, 1.0));
     setSeed(Math.floor(Math.random() * 9999));
-    setParams({
-      trunkHeight: 1 + Math.random() * 5,
-      trunkRadius: 0.08 + Math.random() * 0.25,
-      branchCount: Math.floor(4 + Math.random() * 12),
-      branchLength: 0.5 + Math.random() * 2,
-      branchAngle:  20 + Math.random() * 60,
-      canopyRadius: 0.5 + Math.random() * 3,
-      canopyDensity:0.3 + Math.random() * 0.7,
-      leafSize:     0.05 + Math.random() * 0.35,
-      leafCount:    Math.floor(50 + Math.random() * 400),
-      rootFlare:    0.05 + Math.random() * 0.3,
-    });
-  };
+  }, []);
 
   return (
-    <div style={S.panel}>
-      <div style={S.h3}>🌿 Foliage Generator</div>
-
-      {/* Mode tabs */}
-      <div style={{display:"flex", gap:4, marginBottom:10}}>
-        {["tree","bush","grass","scatter"].map(m => (
-          <span key={m} style={mode===m ? S.tagOn : S.tag} onClick={() => setMode(m)}>{m}</span>
-        ))}
+    <div style={P}>
+      <Section title="\u{1F333} Foliage Type">
+        <Badges items={FOLIAGE_TYPES} active={foliageType} onSelect={setFoliageType} />
+        <Select label="Season"      value={season} options={SEASONS} onChange={setSeason} />
+        <Slider label="Random Seed" value={seed} min={0} max={9999} step={1} onChange={setSeed} />
+      </Section>
+      <Section title="\u{1FAB5} Trunk">
+        <Slider label="Height"          value={trunkH}     onChange={setTrunkH}     />
+        <Slider label="Girth"           value={trunkGirth}  onChange={setTrunkGirth}  />
+        <Slider label="Taper"           value={trunkTaper}  onChange={setTrunkTaper}  />
+        <Slider label="Curve"           value={trunkCurve}  onChange={setTrunkCurve}  />
+        <Badges items={BARK_TYPES} active={barkType} onSelect={setBarkType} />
+        <ColorRow label="Bark Color 1"  value={barkColor}   onChange={setBarkColor}   />
+        <ColorRow label="Bark Color 2"  value={barkColor2}  onChange={setBarkColor2}  />
+        <Slider label="Bark Roughness"  value={barkRough}   onChange={setBarkRough}   />
+        <Check  label="Surface Roots"   value={showRoots}   onChange={setShowRoots}   />
+        {showRoots && <>
+          <Slider label="Root Spread" value={rootSpread} onChange={setRootSpread} />
+          <Slider label="Root Depth"  value={rootDepth}  onChange={setRootDepth}  />
+        </>}
+      </Section>
+      <Section title="Branches">
+        <Slider label="Count"       value={branchCount}    onChange={setBranchCount}    />
+        <Slider label="Length"      value={branchLen}      onChange={setBranchLen}      />
+        <Slider label="Spread Angle" value={branchAngle}   onChange={setBranchAngle}    />
+        <Slider label="Droop"       value={branchDroop}    onChange={setBranchDroop}    />
+        <Slider label="Recursion"   value={branchRecurse} min={0} max={6} step={1} onChange={setBranchRecurse} />
+        <Slider label="Taper"       value={branchTaper}    onChange={setBranchTaper}    />
+        <Slider label="Randomness"  value={branchRandness} onChange={setBranchRandness} />
+      </Section>
+      <Section title="\u{1F343} Leaves">
+        <Badges items={LEAF_SHAPES} active={leafShape} onSelect={setLeafShape} />
+        <Slider label="Density"      value={leafDensity}       onChange={setLeafDensity}       />
+        <Slider label="Size"         value={leafSize}          onChange={setLeafSize}          />
+        <Slider label="Gloss"        value={leafGloss}         onChange={setLeafGloss}         />
+        <Slider label="Translucency" value={leafTranslucency}  onChange={setLeafTranslucency}  />
+        <Slider label="Twist"        value={leafTwist}         onChange={setLeafTwist}         />
+        <ColorRow label="Leaf Color 1" value={leafColor}  onChange={setLeafColor}  />
+        <ColorRow label="Leaf Color 2" value={leafColor2} onChange={setLeafColor2} />
+        <ColorRow label="Leaf Color 3" value={leafColor3} onChange={setLeafColor3} />
+      </Section>
+      <Section title="\u{1F4A8} Wind" defaultOpen={false}>
+        <Slider label="Response"   value={windResp}       onChange={setWindResp}       />
+        <Slider label="Frequency"  value={windFreq}       onChange={setWindFreq}       />
+        <Slider label="Turbulence" value={windTurbulence} onChange={setWindTurbulence} />
+      </Section>
+      <Section title="\u2728 Extras" defaultOpen={false}>
+        <Slider   label="Flowers"      value={flowerDensity} onChange={setFlowerDensity} />
+        {flowerDensity > 0 && <ColorRow label="Flower Color" value={flowerColor} onChange={setFlowerColor} />}
+        <Slider   label="Fruit"        value={fruitDensity}  onChange={setFruitDensity}  />
+        {fruitDensity  > 0 && <ColorRow label="Fruit Color"  value={fruitColor}  onChange={setFruitColor}  />}
+        <Slider   label="Moss"         value={mossCoverage}  onChange={setMossCoverage}  />
+        <Slider   label="Snow"         value={snowCoverage}  onChange={setSnowCoverage}  />
+      </Section>
+      <Section title="\u2699 Output" defaultOpen={false}>
+        <Select label="Poly Budget"      value={polyLevel}      options={POLY_OPTIONS} onChange={setPolyLevel}      />
+        <Check  label="Auto LOD"         value={addLOD}         onChange={setAddLOD}         />
+        <Check  label="Collider"         value={addCollider}    onChange={setAddCollider}    />
+        <Check  label="Billboard LOD"    value={billboard}      onChange={setBillboard}      />
+        <Check  label="Separate Meshes"  value={separateMeshes} onChange={setSeparateMeshes} />
+        <Check  label="Wind-Ready Rig"   value={windReadyRig}   onChange={setWindReadyRig}   />
+      </Section>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <RandBtn onClick={randomize} />
+        <GenBtn label="\u26a1 Generate Foliage" onClick={() => onGenerate?.({
+          foliageType, season, seed,
+          trunk: { trunkH, trunkGirth, trunkTaper, trunkCurve, barkType, barkColor, barkColor2, barkRough, showRoots, rootSpread, rootDepth },
+          branches: { branchCount, branchLen, branchAngle, branchDroop, branchRecurse, branchTaper, branchRandness },
+          leaves: { leafShape, leafDensity, leafSize, leafColor, leafColor2, leafColor3, leafGloss, leafTranslucency, leafTwist },
+          wind: { windResp, windFreq, windTurbulence },
+          extras: { flowerDensity, flowerColor, fruitDensity, fruitColor, mossCoverage, snowCoverage },
+          output: { polyLevel, addLOD, addCollider, billboard, separateMeshes, windReadyRig },
+        })} />
       </div>
-
-      {/* Type selector */}
-      <div style={S.row}>
-        <div>
-          <div style={{...S.label, marginBottom:4}}><span>{mode === "tree" ? "Tree Type" : mode === "bush" ? "Bush Type" : "Grass Type"}</span></div>
-          <select style={S.select} value={mode==="tree" ? treeType : mode==="bush" ? bushType : grassType}
-            onChange={e => { if(mode==="tree") setTreeType(e.target.value); else if(mode==="bush") setBushType(e.target.value); else setGrassType(e.target.value); }}>
-            {(mode==="tree" ? TREE_TYPES : mode==="bush" ? BUSH_TYPES : GRASS_TYPES).map(t => <option key={t}>{t}</option>)}
-          </select>
-        </div>
-        <div>
-          <div style={{...S.label, marginBottom:4}}><span>Season</span></div>
-          <select style={S.select} value={season} onChange={e => setSeason(e.target.value)}>
-            {SEASONS.map(s => <option key={s}>{s}</option>)}
-          </select>
-        </div>
-      </div>
-
-      <div style={S.row}>
-        <div>
-          <div style={{...S.label, marginBottom:4}}><span>Climate</span></div>
-          <select style={S.select} value={climate} onChange={e => setClimate(e.target.value)}>
-            {CLIMATES.map(c => <option key={c}>{c}</option>)}
-          </select>
-        </div>
-        <div>
-          <div style={{...S.label, marginBottom:4}}><span>Count</span></div>
-          <input type="number" min={1} max={50} value={count} onChange={e => setCount(Number(e.target.value))}
-            style={{...S.select, width:"100%"}} />
-        </div>
-      </div>
-
-      {/* Quick presets */}
-      <div style={S.section}>
-        <div style={{...S.label, marginBottom:4}}><span>Quick Presets</span></div>
-        <div style={{display:"flex", flexWrap:"wrap", gap:4}}>
-          {Object.keys(TREE_PRESETS).map(p => (
-            <span key={p} style={S.tag} onClick={() => setParams(TREE_PRESETS[p])}>{p}</span>
-          ))}
-        </div>
-      </div>
-
-      {/* Trunk */}
-      <div style={{...S.label, marginBottom:6, marginTop:4}}><span style={{color:"#00ffc8"}}>Trunk</span></div>
-      <Slider label="Height"      value={params.trunkHeight} min={0.5} max={10}  onChange={v => set("trunkHeight", v)} />
-      <Slider label="Radius"      value={params.trunkRadius} min={0.04} max={0.5} onChange={v => set("trunkRadius", v)} />
-      <Slider label="Root Flare"  value={params.rootFlare}   min={0} max={0.5}   onChange={v => set("rootFlare", v)} />
-
-      {/* Branches */}
-      <div style={{...S.label, marginBottom:6, marginTop:4}}><span style={{color:"#00ffc8"}}>Branches</span></div>
-      <Slider label="Count"       value={params.branchCount}  min={2}  max={24} step={1} onChange={v => set("branchCount", v)} />
-      <Slider label="Length"      value={params.branchLength} min={0.2} max={4}  onChange={v => set("branchLength", v)} />
-      <Slider label="Angle"       value={params.branchAngle}  min={10}  max={80} step={1} onChange={v => set("branchAngle", v)} />
-
-      {/* Canopy */}
-      <div style={{...S.label, marginBottom:6, marginTop:4}}><span style={{color:"#00ffc8"}}>Canopy / Leaves</span></div>
-      <Slider label="Canopy Radius"  value={params.canopyRadius}  min={0.2} max={5}   onChange={v => set("canopyRadius", v)} />
-      <Slider label="Density"        value={params.canopyDensity} min={0}   max={1}   onChange={v => set("canopyDensity", v)} />
-      <Slider label="Leaf Size"      value={params.leafSize}      min={0.02} max={0.6} onChange={v => set("leafSize", v)} />
-      <Slider label="Leaf Count"     value={params.leafCount}     min={0}   max={600} step={10} onChange={v => set("leafCount", v)} />
-
-      {/* Colors */}
-      <div style={{...S.label, marginBottom:6, marginTop:4}}><span style={{color:"#00ffc8"}}>Colors</span></div>
-      <div style={{...S.row, alignItems:"center"}}>
-        <div><div style={{...S.label, marginBottom:4}}><span>Leaves</span></div>
-          <input type="color" value={leafColor} onChange={e => setLeafColor(e.target.value)} style={{width:"100%", height:28, borderRadius:4, border:"none", cursor:"pointer"}} /></div>
-        <div><div style={{...S.label, marginBottom:4}}><span>Trunk</span></div>
-          <input type="color" value={trunkColor} onChange={e => setTrunkColor(e.target.value)} style={{width:"100%", height:28, borderRadius:4, border:"none", cursor:"pointer"}} /></div>
-      </div>
-
-      {/* Options */}
-      <div style={{display:"flex", flexWrap:"wrap", gap:4, marginBottom:8}}>
-        <span style={windEffect ? S.tagOn : S.tag} onClick={() => setWindEffect(!windEffect)}>💨 Wind</span>
-        <span style={showRoots ? S.tagOn : S.tag} onClick={() => setShowRoots(!showRoots)}>🌱 Roots</span>
-      </div>
-
-      {/* Advanced */}
-      <div style={{...S.label, cursor:"pointer", marginBottom:6}} onClick={() => setShowAdvanced(!showAdvanced)}>
-        <span style={{color:"#00ffc8"}}>Advanced {showAdvanced ? "▲" : "▼"}</span>
-      </div>
-      {showAdvanced && (
-        <>
-          <Slider label="Scatter Radius" value={scatter} min={0} max={20} onChange={setScatter} />
-          <Slider label="Random Seed"    value={seed}    min={0} max={9999} step={1} onChange={setSeed} />
-        </>
-      )}
-
-      <button style={S.btn} onClick={generate}>Generate {count > 1 ? `${count} Plants` : "Plant"}</button>
-      <button style={S.btnSec} onClick={randomize}>🎲 Randomize</button>
     </div>
   );
 }
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//

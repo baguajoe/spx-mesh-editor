@@ -1,169 +1,415 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback } from 'react';
 
-const S = {
-  panel: { background:"#0d1117", color:"#e6edf3", fontFamily:"JetBrains Mono,monospace", fontSize:12, padding:12, overflowY:"auto", maxHeight:"100%", boxSizing:"border-box" },
-  h3:    { color:"#00ffc8", fontSize:13, fontWeight:700, marginBottom:10, borderBottom:"1px solid #21262d", paddingBottom:6 },
-  section:{ marginBottom:12 },
-  label: { display:"flex", justifyContent:"space-between", color:"#8b949e", marginBottom:2 },
-  row:   { display:"grid", gridTemplateColumns:"1fr 1fr", gap:6, marginBottom:8 },
-  slider:{ width:"100%", accentColor:"#00ffc8" },
-  btn:   { width:"100%", padding:"8px 0", background:"#00ffc8", color:"#06060f", border:"none", borderRadius:4, fontFamily:"JetBrains Mono,monospace", fontSize:12, fontWeight:700, cursor:"pointer", marginTop:4 },
-  btnSec:{ width:"100%", padding:"6px 0", background:"#21262d", color:"#e6edf3", border:"1px solid #30363d", borderRadius:4, fontFamily:"JetBrains Mono,monospace", fontSize:11, cursor:"pointer", marginTop:4 },
-  canvas:{ width:"100%", height:180, background:"#06060f", borderRadius:4, border:"1px solid #21262d", display:"block", marginBottom:8 },
-  select:{ width:"100%", background:"#21262d", color:"#e6edf3", border:"1px solid #30363d", borderRadius:4, padding:"4px 6px", fontFamily:"JetBrains Mono,monospace", fontSize:11 },
-  tag:   { display:"inline-block", background:"#21262d", color:"#8b949e", borderRadius:3, padding:"2px 6px", fontSize:10, marginRight:4, marginBottom:4, cursor:"pointer" },
-  tagOn: { display:"inline-block", background:"#00ffc8", color:"#06060f", borderRadius:3, padding:"2px 6px", fontSize:10, marginRight:4, marginBottom:4, cursor:"pointer", fontWeight:700 },
-};
-
-const PRESETS = {
-  neutral:    { headWidth:1.0, headHeight:1.2, jawWidth:0.85, chinHeight:0.15, cheekbone:0.6, foreheadHeight:0.4, eyeSize:0.12, eyeSpacing:0.28, eyeDepth:0.08, noseLength:0.22, noseWidth:0.12, noseBridge:0.08, lipWidth:0.38, lipThickness:0.08, lipCupDepth:0.04, earSize:0.18, earProtrusion:0.06, browThickness:0.06, browArch:0.04, browSpacing:0.26 },
-  masculine:  { headWidth:1.1, headHeight:1.15, jawWidth:1.0, chinHeight:0.18, cheekbone:0.55, foreheadHeight:0.38, eyeSize:0.10, eyeSpacing:0.30, eyeDepth:0.10, noseLength:0.26, noseWidth:0.16, noseBridge:0.10, lipWidth:0.40, lipThickness:0.06, lipCupDepth:0.03, earSize:0.20, earProtrusion:0.08, browThickness:0.08, browArch:0.02, browSpacing:0.28 },
-  feminine:   { headWidth:0.92, headHeight:1.25, jawWidth:0.75, chinHeight:0.12, cheekbone:0.68, foreheadHeight:0.42, eyeSize:0.14, eyeSpacing:0.26, eyeDepth:0.06, noseLength:0.18, noseWidth:0.10, noseBridge:0.06, lipWidth:0.36, lipThickness:0.10, lipCupDepth:0.05, earSize:0.16, earProtrusion:0.04, browThickness:0.05, browArch:0.06, browSpacing:0.24 },
-  child:      { headWidth:0.88, headHeight:1.0,  jawWidth:0.70, chinHeight:0.10, cheekbone:0.72, foreheadHeight:0.52, eyeSize:0.16, eyeSpacing:0.24, eyeDepth:0.04, noseLength:0.14, noseWidth:0.10, noseBridge:0.04, lipWidth:0.30, lipThickness:0.09, lipCupDepth:0.04, earSize:0.14, earProtrusion:0.04, browThickness:0.04, browArch:0.03, browSpacing:0.22 },
-  elder:      { headWidth:0.98, headHeight:1.18, jawWidth:0.82, chinHeight:0.16, cheekbone:0.52, foreheadHeight:0.44, eyeSize:0.10, eyeSpacing:0.29, eyeDepth:0.12, noseLength:0.28, noseWidth:0.14, noseBridge:0.12, lipWidth:0.34, lipThickness:0.05, lipCupDepth:0.03, earSize:0.22, earProtrusion:0.07, browThickness:0.05, browArch:0.01, browSpacing:0.27 },
-  anime:      { headWidth:0.90, headHeight:1.35, jawWidth:0.65, chinHeight:0.08, cheekbone:0.80, foreheadHeight:0.55, eyeSize:0.20, eyeSpacing:0.22, eyeDepth:0.03, noseLength:0.12, noseWidth:0.06, noseBridge:0.02, lipWidth:0.28, lipThickness:0.06, lipCupDepth:0.03, earSize:0.14, earProtrusion:0.03, browThickness:0.04, browArch:0.05, browSpacing:0.20 },
-};
-
-const ETHNICITIES = ["Generic","East Asian","South Asian","African","European","Latino","Middle Eastern","Southeast Asian"];
-const EXPRESSIONS = ["Neutral","Smile","Frown","Surprise","Anger","Fear","Disgust","Contempt"];
-const FACE_FEATURES = ["Freckles","Dimples","Cleft Chin","Wide Nose","Hooded Eyes","Monolid","Strong Jaw","High Cheekbones","Bushy Brows","Full Lips"];
-
-function Slider({ label, value, min, max, step=0.01, onChange }) {
+function Slider({ label, value, min = 0, max = 1, step = 0.01, onChange, unit = '' }) {
   return (
-    <div style={S.section}>
-      <div style={S.label}><span>{label}</span><span style={{color:"#00ffc8"}}>{value.toFixed(2)}</span></div>
-      <input type="range" style={S.slider} min={min} max={max} step={step} value={value} onChange={e => onChange(Number(e.target.value))} />
+    <div style={{ marginBottom: 5 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#888' }}>
+        <span>{label}</span>
+        <span style={{ color: '#00ffc8', fontWeight: 600 }}>
+          {typeof value === 'number' ? (step < 0.1 ? value.toFixed(2) : Math.round(value)) : value}{unit}
+        </span>
+      </div>
+      <input type="range" min={min} max={max} step={step} value={value}
+        onChange={e => onChange(parseFloat(e.target.value))}
+        style={{ width: '100%', accentColor: '#00ffc8', cursor: 'pointer', height: 16 }} />
     </div>
   );
 }
-
-export default function FaceGeneratorPanel({ addObject }) {
-  const [params, setParams] = useState(PRESETS.neutral);
-  const [ethnicity, setEthnicity] = useState("Generic");
-  const [expression, setExpression] = useState("Neutral");
-  const [features, setFeatures] = useState([]);
-  const [age, setAge] = useState(25);
-  const [asymmetry, setAsymmetry] = useState(0.0);
-  const [subdivision, setSubdivision] = useState(2);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-
-  const set = useCallback((key, val) => setParams(p => ({ ...p, [key]: val })), []);
-
-  const applyPreset = (name) => setParams(PRESETS[name]);
-
-  const toggleFeature = (f) => setFeatures(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f]);
-
-  const generate = () => {
-    if (!addObject) return;
-    addObject({
-      type: "face",
-      params: { ...params, ethnicity, expression, features, age, asymmetry, subdivision },
-      name: `Face_${ethnicity}_${expression}_${Date.now()}`,
-    });
-  };
-
-  const randomize = () => {
-    const keys = Object.keys(PRESETS.neutral);
-    const rand = {};
-    keys.forEach(k => {
-      const base = PRESETS.neutral[k];
-      rand[k] = Math.max(0.01, base + (Math.random() - 0.5) * 0.3);
-    });
-    setParams(rand);
-    setAge(Math.floor(Math.random() * 60) + 10);
-    setAsymmetry(Math.random() * 0.1);
-  };
-
+function Select({ label, value, options, onChange }) {
   return (
-    <div style={S.panel}>
-      <div style={S.h3}>👤 Face Generator</div>
-
-      {/* Presets */}
-      <div style={S.section}>
-        <div style={{...S.label, marginBottom:6}}><span>Presets</span></div>
-        <div style={{display:"flex", flexWrap:"wrap", gap:4}}>
-          {Object.keys(PRESETS).map(p => (
-            <span key={p} style={S.tag} onClick={() => applyPreset(p)}>{p}</span>
-          ))}
-        </div>
-      </div>
-
-      {/* Ethnicity + Expression */}
-      <div style={S.row}>
-        <div>
-          <div style={{...S.label, marginBottom:4}}><span>Ethnicity</span></div>
-          <select style={S.select} value={ethnicity} onChange={e => setEthnicity(e.target.value)}>
-            {ETHNICITIES.map(e => <option key={e}>{e}</option>)}
-          </select>
-        </div>
-        <div>
-          <div style={{...S.label, marginBottom:4}}><span>Expression</span></div>
-          <select style={S.select} value={expression} onChange={e => setExpression(e.target.value)}>
-            {EXPRESSIONS.map(e => <option key={e}>{e}</option>)}
-          </select>
-        </div>
-      </div>
-
-      <Slider label="Age" value={age} min={5} max={90} step={1} onChange={v => setAge(v)} />
-
-      {/* Head Shape */}
-      <div style={{...S.label, marginBottom:6, marginTop:8}}><span style={{color:"#00ffc8"}}>Head Shape</span></div>
-      <Slider label="Head Width"       value={params.headWidth}      min={0.7} max={1.3} onChange={v => set("headWidth", v)} />
-      <Slider label="Head Height"      value={params.headHeight}     min={0.8} max={1.6} onChange={v => set("headHeight", v)} />
-      <Slider label="Jaw Width"        value={params.jawWidth}       min={0.5} max={1.2} onChange={v => set("jawWidth", v)} />
-      <Slider label="Chin Height"      value={params.chinHeight}     min={0.05} max={0.3} onChange={v => set("chinHeight", v)} />
-      <Slider label="Cheekbone"        value={params.cheekbone}      min={0.3} max={0.9} onChange={v => set("cheekbone", v)} />
-      <Slider label="Forehead Height"  value={params.foreheadHeight} min={0.2} max={0.7} onChange={v => set("foreheadHeight", v)} />
-
-      {/* Eyes */}
-      <div style={{...S.label, marginBottom:6, marginTop:8}}><span style={{color:"#00ffc8"}}>Eyes</span></div>
-      <Slider label="Eye Size"         value={params.eyeSize}     min={0.06} max={0.22} onChange={v => set("eyeSize", v)} />
-      <Slider label="Eye Spacing"      value={params.eyeSpacing}  min={0.18} max={0.40} onChange={v => set("eyeSpacing", v)} />
-      <Slider label="Eye Depth"        value={params.eyeDepth}    min={0.0}  max={0.16} onChange={v => set("eyeDepth", v)} />
-
-      {/* Nose */}
-      <div style={{...S.label, marginBottom:6, marginTop:8}}><span style={{color:"#00ffc8"}}>Nose</span></div>
-      <Slider label="Nose Length"      value={params.noseLength}  min={0.08} max={0.36} onChange={v => set("noseLength", v)} />
-      <Slider label="Nose Width"       value={params.noseWidth}   min={0.06} max={0.22} onChange={v => set("noseWidth", v)} />
-      <Slider label="Nose Bridge"      value={params.noseBridge}  min={0.02} max={0.16} onChange={v => set("noseBridge", v)} />
-
-      {/* Lips */}
-      <div style={{...S.label, marginBottom:6, marginTop:8}}><span style={{color:"#00ffc8"}}>Lips</span></div>
-      <Slider label="Lip Width"        value={params.lipWidth}      min={0.20} max={0.55} onChange={v => set("lipWidth", v)} />
-      <Slider label="Lip Thickness"    value={params.lipThickness}  min={0.02} max={0.16} onChange={v => set("lipThickness", v)} />
-      <Slider label="Cupid Bow Depth"  value={params.lipCupDepth}   min={0.0}  max={0.10} onChange={v => set("lipCupDepth", v)} />
-
-      {/* Brows */}
-      <div style={{...S.label, marginBottom:6, marginTop:8}}><span style={{color:"#00ffc8"}}>Eyebrows</span></div>
-      <Slider label="Brow Thickness"   value={params.browThickness} min={0.02} max={0.12} onChange={v => set("browThickness", v)} />
-      <Slider label="Brow Arch"        value={params.browArch}      min={0.0}  max={0.12} onChange={v => set("browArch", v)} />
-      <Slider label="Brow Spacing"     value={params.browSpacing}   min={0.18} max={0.38} onChange={v => set("browSpacing", v)} />
-
-      {/* Ears */}
-      <div style={{...S.label, marginBottom:6, marginTop:8}}><span style={{color:"#00ffc8"}}>Ears</span></div>
-      <Slider label="Ear Size"         value={params.earSize}       min={0.08} max={0.30} onChange={v => set("earSize", v)} />
-      <Slider label="Ear Protrusion"   value={params.earProtrusion} min={0.0}  max={0.14} onChange={v => set("earProtrusion", v)} />
-
-      {/* Advanced */}
-      <div style={{...S.label, marginBottom:6, marginTop:8, cursor:"pointer"}} onClick={() => setShowAdvanced(!showAdvanced)}>
-        <span style={{color:"#00ffc8"}}>Advanced {showAdvanced ? "▲" : "▼"}</span>
-      </div>
-      {showAdvanced && (
-        <>
-          <Slider label="Asymmetry"     value={asymmetry}    min={0} max={0.2} onChange={setAsymmetry} />
-          <Slider label="Subdivision"   value={subdivision}  min={0} max={4} step={1} onChange={setSubdivision} />
-          <div style={{...S.label, marginBottom:6, marginTop:8}}><span>Face Features</span></div>
-          <div style={{display:"flex", flexWrap:"wrap"}}>
-            {FACE_FEATURES.map(f => (
-              <span key={f} style={features.includes(f) ? S.tagOn : S.tag} onClick={() => toggleFeature(f)}>{f}</span>
-            ))}
-          </div>
-        </>
-      )}
-
-      <button style={S.btn} onClick={generate}>Generate Face</button>
-      <button style={S.btnSec} onClick={randomize}>🎲 Randomize</button>
-      <button style={S.btnSec} onClick={() => setParams(PRESETS.neutral)}>Reset</button>
+    <div style={{ marginBottom: 6 }}>
+      {label && <div style={{ fontSize: 10, color: '#888', marginBottom: 2 }}>{label}</div>}
+      <select value={value} onChange={e => onChange(e.target.value)} style={{
+        width: '100%', background: '#0d1117', color: '#e0e0e0',
+        border: '1px solid #21262d', padding: '3px 6px', borderRadius: 4, fontSize: 11, cursor: 'pointer',
+      }}>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
     </div>
   );
 }
+function Check({ label, value, onChange }) {
+  return (
+    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11,
+      color: '#ccc', cursor: 'pointer', marginBottom: 4 }}>
+      <input type="checkbox" checked={value} onChange={e => onChange(e.target.checked)}
+        style={{ accentColor: '#00ffc8', width: 12, height: 12 }} />
+      {label}
+    </label>
+  );
+}
+function ColorRow({ label, value, onChange }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+      <span style={{ fontSize: 10, color: '#888', flex: 1 }}>{label}</span>
+      <input type="color" value={value} onChange={e => onChange(e.target.value)}
+        style={{ width: 32, height: 22, border: 'none', cursor: 'pointer', borderRadius: 3 }} />
+      <span style={{ fontSize: 9, color: '#555', fontFamily: 'monospace' }}>{value}</span>
+    </div>
+  );
+}
+function Section({ title, children, defaultOpen = true }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ marginBottom: 6, border: '1px solid #21262d', borderRadius: 5, overflow: 'hidden' }}>
+      <div onClick={() => setOpen(o => !o)} style={{
+        padding: '5px 8px', cursor: 'pointer', background: '#0d1117',
+        display: 'flex', justifyContent: 'space-between',
+        fontSize: 11, fontWeight: 600, color: '#00ffc8', userSelect: 'none',
+      }}>
+        <span>{title}</span>
+        <span style={{ fontSize: 9, opacity: 0.7 }}>{open ? '\u25b2' : '\u25bc'}</span>
+      </div>
+      {open && <div style={{ padding: '6px 8px', background: '#06060f' }}>{children}</div>}
+    </div>
+  );
+}
+function Badges({ items, active, onSelect }) {
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>
+      {items.map(item => (
+        <button key={item} onClick={() => onSelect(item)} style={{
+          padding: '2px 7px', fontSize: 9, borderRadius: 4, cursor: 'pointer',
+          background: active === item ? '#00ffc8' : '#1a1f2c',
+          color: active === item ? '#06060f' : '#ccc',
+          border: `1px solid ${active === item ? '#00ffc8' : '#21262d'}`,
+        }}>{item}</button>
+      ))}
+    </div>
+  );
+}
+function NumInput({ label, value, min, max, step = 1, onChange, unit = '' }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+      <span style={{ fontSize: 10, color: '#888', flex: 1 }}>{label}</span>
+      <input type="number" value={value} min={min} max={max} step={step}
+        onChange={e => onChange(parseFloat(e.target.value))}
+        style={{ width: 60, background: '#0d1117', color: '#e0e0e0',
+          border: '1px solid #21262d', padding: '2px 4px', borderRadius: 3, fontSize: 11, textAlign: 'right' }} />
+      {unit && <span style={{ fontSize: 9, color: '#555' }}>{unit}</span>}
+    </div>
+  );
+}
+function GenBtn({ label, onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      width: '100%', background: '#00ffc8', color: '#06060f', border: 'none',
+      borderRadius: 4, padding: '7px 0', cursor: 'pointer', fontWeight: 700,
+      fontSize: 12, marginTop: 6, letterSpacing: 0.5, fontFamily: 'JetBrains Mono, monospace',
+    }}>{label}</button>
+  );
+}
+function RandBtn({ onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      background: '#1a1f2c', color: '#888', border: '1px solid #21262d',
+      borderRadius: 4, padding: '6px 10px', cursor: 'pointer', fontSize: 11,
+    }}>\u{1F3B2}</button>
+  );
+}
+const P = { fontFamily: 'JetBrains Mono, monospace', color: '#e0e0e0', fontSize: 12, userSelect: 'none', width: '100%' };
+
+const FACE_SHAPES  = ['Oval','Round','Square','Heart','Diamond','Oblong','Triangle','Pear'];
+const ETHNICITIES  = ['Mixed','East Asian','South Asian','African','European','Latino','Middle Eastern','Indigenous','Scandinavian','Slavic'];
+const GENDERS      = ['Male','Female','Non-Binary','Masculine','Feminine'];
+const EXPRESSIONS  = ['Neutral','Smile','Frown','Surprised','Angry','Sad','Disgust','Fear','Smirk'];
+const EYE_SHAPES   = ['Almond','Round','Hooded','Monolid','Upturned','Downturned','Wide','Narrow'];
+const NOSE_TYPES   = ['Straight','Button','Aquiline','Snub','Bulbous','Flat','Hawk','Greek'];
+const LIP_TYPES    = ['Thin','Medium','Full','Heart','Bow','Wide','Downturned'];
+const BROW_TYPES   = ['Straight','Arched','Flat','Bushy','Thin','Angular','Unibrow'];
+const POLY_OPTIONS = ['Low (800)','Mid (3.2K)','High (12K)','Ultra (48K)'];
+
+export default function FaceGeneratorPanel({ onGenerate }) {
+  const [faceShape,    setFaceShape]    = useState('Oval');
+  const [ethnicity,    setEthnicity]    = useState('Mixed');
+  const [gender,       setGender]       = useState('Non-Binary');
+  const [age,          setAge]          = useState(28);
+  const [expression,   setExpression]   = useState('Neutral');
+  const [skinTone,     setSkinTone]     = useState('#c8906a');
+  const [asymmetry,    setAsymmetry]    = useState(0.05);
+  const [seed,         setSeed]         = useState(42);
+  // Head structure
+  const [jawWidth,     setJawWidth]     = useState(0.50);
+  const [jawSharp,     setJawSharp]     = useState(0.40);
+  const [cheekbone,    setCheekbone]    = useState(0.50);
+  const [foreheadH,    setForeheadH]    = useState(0.50);
+  const [foreheadW,    setForeheadW]    = useState(0.50);
+  const [chinPoint,    setChinPoint]    = useState(0.50);
+  const [chinW,        setChinW]        = useState(0.40);
+  const [faceLen,      setFaceLen]      = useState(0.50);
+  // Eyes
+  const [eyeShape,     setEyeShape]     = useState('Almond');
+  const [eyeSpacing,   setEyeSpacing]   = useState(0.50);
+  const [eyeSize,      setEyeSize]      = useState(0.50);
+  const [eyeAngle,     setEyeAngle]     = useState(0.00);
+  const [eyeDepth,     setEyeDepth]     = useState(0.40);
+  const [irisColor,    setIrisColor]    = useState('#3a7acc');
+  const [pupilSize,    setPupilSize]    = useState(0.40);
+  // Brows
+  const [browType,     setBrowType]     = useState('Arched');
+  const [browHeight,   setBrowHeight]   = useState(0.50);
+  const [browThick,    setBrowThick]    = useState(0.40);
+  const [browColor,    setBrowColor]    = useState('#2a1a08');
+  // Nose
+  const [noseType,     setNoseType]     = useState('Straight');
+  const [noseBridge,   setNoseBridge]   = useState(0.50);
+  const [noseW,        setNoseW]        = useState(0.50);
+  const [nostrilFlare, setNostrilFlare] = useState(0.40);
+  const [noseLen,      setNoseLen]      = useState(0.50);
+  const [noseTip,      setNoseTip]      = useState(0.50);
+  // Lips
+  const [lipType,      setLipType]      = useState('Medium');
+  const [lipThick,     setLipThick]     = useState(0.50);
+  const [lipWidth,     setLipWidth]     = useState(0.50);
+  const [lipColor,     setLipColor]     = useState('#c06070');
+  const [mouthAngle,   setMouthAngle]   = useState(0.00);
+  const [philtrum,     setPhiltrum]     = useState(0.40);
+  // Ears
+  const [earSize,      setEarSize]      = useState(0.50);
+  const [earAngle,     setEarAngle]     = useState(0.20);
+  // Skin detail
+  const [wrinkles,     setWrinkles]     = useState(0.00);
+  const [pores,        setPores]        = useState(0.30);
+  const [freckles,     setFreckles]     = useState(0.00);
+  const [subsurface,   setSubsurface]   = useState(0.60);
+  const [oiliness,     setOiliness]     = useState(0.30);
+  // Output
+  const [polyLevel,    setPolyLevel]    = useState('High (12K)');
+  const [blendshapes,  setBlendshapes]  = useState(true);
+  const [addTeeth,     setAddTeeth]     = useState(true);
+  const [addTongue,    setAddTongue]    = useState(false);
+  const [addEyelashes, setAddEyelashes] = useState(true);
+  const [separateParts,setSeparateParts]= useState(false);
+  const [exportUDIMs,  setExportUDIMs]  = useState(false);
+
+  const randomize = useCallback(() => {
+    const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+    const rn = (a, b) => parseFloat((a + Math.random() * (b - a)).toFixed(2));
+    setFaceShape(pick(FACE_SHAPES)); setEthnicity(pick(ETHNICITIES));
+    setGender(pick(GENDERS)); setExpression(pick(EXPRESSIONS));
+    setAge(Math.round(18 + Math.random() * 55));
+    setJawWidth(rn(0.3, 0.75)); setCheekbone(rn(0.3, 0.8));
+    setEyeSize(rn(0.35, 0.7)); setNoseW(rn(0.3, 0.7));
+    setLipThick(rn(0.3, 0.8)); setAsymmetry(rn(0, 0.15));
+    setSeed(Math.floor(Math.random() * 9999));
+  }, []);
+
+  return (
+    <div style={P}>
+      <Section title="\u{1F9EC} Base">
+        <Badges items={FACE_SHAPES} active={faceShape} onSelect={setFaceShape} />
+        <Select label="Ethnicity"  value={ethnicity}  options={ETHNICITIES}  onChange={setEthnicity}  />
+        <Select label="Gender"     value={gender}     options={GENDERS}      onChange={setGender}     />
+        <Select label="Expression" value={expression} options={EXPRESSIONS}  onChange={setExpression} />
+        <Slider label="Age"        value={age} min={5} max={95} step={1} onChange={setAge} unit=" yrs" />
+        <ColorRow label="Skin Tone" value={skinTone} onChange={setSkinTone} />
+        <Slider label="Asymmetry"  value={asymmetry} min={0} max={0.3} step={0.005} onChange={setAsymmetry} />
+        <Slider label="Random Seed" value={seed} min={0} max={9999} step={1} onChange={setSeed} />
+      </Section>
+      <Section title="\u{1F480} Head Structure">
+        <Slider label="Jaw Width"        value={jawWidth}   onChange={setJawWidth}   />
+        <Slider label="Jaw Sharpness"    value={jawSharp}   onChange={setJawSharp}   />
+        <Slider label="Cheekbone"        value={cheekbone}  onChange={setCheekbone}  />
+        <Slider label="Forehead Height"  value={foreheadH}  onChange={setForeheadH}  />
+        <Slider label="Forehead Width"   value={foreheadW}  onChange={setForeheadW}  />
+        <Slider label="Face Length"      value={faceLen}    onChange={setFaceLen}    />
+        <Slider label="Chin Point"       value={chinPoint}  onChange={setChinPoint}  />
+        <Slider label="Chin Width"       value={chinW}      onChange={setChinW}      />
+      </Section>
+      <Section title="\u{1F441} Eyes">
+        <Badges items={EYE_SHAPES} active={eyeShape} onSelect={setEyeShape} />
+        <Slider label="Spacing"    value={eyeSpacing} onChange={setEyeSpacing} />
+        <Slider label="Size"       value={eyeSize}    onChange={setEyeSize}    />
+        <Slider label="Tilt"       value={eyeAngle} min={-0.3} max={0.3} step={0.01} onChange={setEyeAngle} />
+        <Slider label="Depth"      value={eyeDepth}   onChange={setEyeDepth}   />
+        <Slider label="Pupil Size" value={pupilSize}  onChange={setPupilSize}  />
+        <ColorRow label="Iris Color" value={irisColor} onChange={setIrisColor} />
+      </Section>
+      <Section title="Brows">
+        <Badges items={BROW_TYPES} active={browType} onSelect={setBrowType} />
+        <Slider   label="Height"    value={browHeight} onChange={setBrowHeight} />
+        <Slider   label="Thickness" value={browThick}  onChange={setBrowThick}  />
+        <ColorRow label="Color"     value={browColor}  onChange={setBrowColor}  />
+      </Section>
+      <Section title="\u{1F443} Nose">
+        <Badges items={NOSE_TYPES} active={noseType} onSelect={setNoseType} />
+        <Slider label="Bridge"        value={noseBridge}   onChange={setNoseBridge}   />
+        <Slider label="Width"         value={noseW}        onChange={setNoseW}        />
+        <Slider label="Length"        value={noseLen}      onChange={setNoseLen}      />
+        <Slider label="Tip"           value={noseTip}      onChange={setNoseTip}      />
+        <Slider label="Nostril Flare" value={nostrilFlare} onChange={setNostrilFlare} />
+      </Section>
+      <Section title="\u{1F444} Lips">
+        <Badges items={LIP_TYPES} active={lipType} onSelect={setLipType} />
+        <Slider   label="Thickness"   value={lipThick}   onChange={setLipThick}   />
+        <Slider   label="Width"       value={lipWidth}   onChange={setLipWidth}   />
+        <Slider   label="Mouth Angle" value={mouthAngle} min={-0.2} max={0.2} step={0.01} onChange={setMouthAngle} />
+        <Slider   label="Philtrum"    value={philtrum}   onChange={setPhiltrum}   />
+        <ColorRow label="Lip Color"   value={lipColor}   onChange={setLipColor}   />
+      </Section>
+      <Section title="Ears">
+        <Slider label="Ear Size"  value={earSize}  onChange={setEarSize}  />
+        <Slider label="Ear Angle" value={earAngle} onChange={setEarAngle} />
+      </Section>
+      <Section title="\u{1F52C} Skin Detail" defaultOpen={false}>
+        <Slider label="Wrinkles"    value={wrinkles}   onChange={setWrinkles}   />
+        <Slider label="Pore Detail" value={pores}      onChange={setPores}      />
+        <Slider label="Freckles"    value={freckles}   onChange={setFreckles}   />
+        <Slider label="Subsurface"  value={subsurface} onChange={setSubsurface} />
+        <Slider label="Oiliness"    value={oiliness}   onChange={setOiliness}   />
+      </Section>
+      <Section title="\u2699 Output" defaultOpen={false}>
+        <Select label="Poly Budget" value={polyLevel} options={POLY_OPTIONS} onChange={setPolyLevel} />
+        <Check label="Blendshapes"    value={blendshapes}   onChange={setBlendshapes}   />
+        <Check label="Teeth"          value={addTeeth}      onChange={setAddTeeth}      />
+        <Check label="Tongue"         value={addTongue}     onChange={setAddTongue}     />
+        <Check label="Eyelashes"      value={addEyelashes}  onChange={setAddEyelashes}  />
+        <Check label="Separate Parts" value={separateParts} onChange={setSeparateParts} />
+        <Check label="Export UDIMs"   value={exportUDIMs}   onChange={setExportUDIMs}   />
+      </Section>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <RandBtn onClick={randomize} />
+        <GenBtn label="\u26a1 Generate Face" onClick={() => onGenerate?.({
+          faceShape, ethnicity, gender, age, expression, skinTone, asymmetry, seed,
+          jaw: { jawWidth, jawSharp }, cheekbone, forehead: { foreheadH, foreheadW },
+          chin: { chinPoint, chinW }, faceLen,
+          eye: { eyeShape, eyeSpacing, eyeSize, eyeAngle, eyeDepth, irisColor, pupilSize },
+          brow: { browType, browHeight, browThick, browColor },
+          nose: { noseType, noseBridge, noseW, nostrilFlare, noseLen, noseTip },
+          lip: { lipType, lipThick, lipWidth, lipColor, mouthAngle, philtrum },
+          ear: { earSize, earAngle },
+          skin: { wrinkles, pores, freckles, subsurface, oiliness },
+          output: { polyLevel, blendshapes, addTeeth, addTongue, addEyelashes, separateParts, exportUDIMs },
+        })} />
+      </div>
+    </div>
+  );
+}
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+//
+// ──────────────────────────────────────────────────────────────────────────
+//
