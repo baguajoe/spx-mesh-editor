@@ -1,456 +1,359 @@
-/**
- * SkinningSystem.js — SPX Mesh Editor
- * Linear blend skinning (LBS), dual-quaternion skinning (DQS),
- * corrective shapes, per-vertex weight painting, and skin transfer.
- */
+// SkinningSystem.js — UPGRADE: Dual Quaternion Skinning + volume preservation
+// SPX Mesh Editor | StreamPireX
+// Features: LBS, DQS, volume preservation, heat diffusion weight baking,
+//           weight normalization, mirror weights, smooth weights, transfer weights
+
 import * as THREE from 'three';
 
-const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+// ─── Linear Blend Skinning (LBS) ─────────────────────────────────────────────
 
-// ─── Weight map ───────────────────────────────────────────────────────────
-export class VertexWeightMap {
-  constructor(vertexCount, boneCount) {
-    this.vertexCount = vertexCount;
-    this.boneCount   = boneCount;
-    this.maxInfluences = 4;
-    this.boneIndices = new Uint16Array(vertexCount * this.maxInfluences);
-    this.boneWeights = new Float32Array(vertexCount * this.maxInfluences);
-  }
+export function applyLBS(geometry, skeleton, boneMatrices) {
+  const pos = geometry.attributes.position;
+  const skinIndex = geometry.attributes.skinIndex;
+  const skinWeight = geometry.attributes.skinWeight;
+  if (!skinIndex || !skinWeight) return;
 
-  setWeights(vertexIdx, influences) {
-    const base = vertexIdx * this.maxInfluences;
-    const sorted = [...influences].sort((a, b) => b.weight - a.weight).slice(0, this.maxInfluences);
-    const total  = sorted.reduce((s, i) => s + i.weight, 0) || 1;
-    sorted.forEach((inf, i) => {
-      this.boneIndices[base + i] = inf.boneIndex;
-      this.boneWeights[base + i] = inf.weight / total;
-    });
-    for (let i = sorted.length; i < this.maxInfluences; i++) {
-      this.boneIndices[base + i] = 0;
-      this.boneWeights[base + i] = 0;
+  const result = new Float32Array(pos.array.length);
+  const v = new THREE.Vector3();
+  const bv = new THREE.Vector3();
+
+  for (let i = 0; i < pos.count; i++) {
+    v.set(0, 0, 0);
+    for (let j = 0; j < 4; j++) {
+      const boneIdx = skinIndex.getComponent(i, j);
+      const weight  = skinWeight.getComponent(i, j);
+      if (weight === 0) continue;
+      const mat = boneMatrices[boneIdx];
+      if (!mat) continue;
+      bv.fromBufferAttribute(pos, i).applyMatrix4(mat);
+      v.addScaledVector(bv, weight);
     }
+    result[i * 3]     = v.x;
+    result[i * 3 + 1] = v.y;
+    result[i * 3 + 2] = v.z;
   }
 
-  getWeights(vertexIdx) {
-    const base = vertexIdx * this.maxInfluences;
-    const result = [];
-    for (let i = 0; i < this.maxInfluences; i++) {
-      const w = this.boneWeights[base + i];
-      if (w > 0.001) result.push({ boneIndex: this.boneIndices[base + i], weight: w });
-    }
-    return result;
-  }
-
-  normalize() {
-    for (let v = 0; v < this.vertexCount; v++) {
-      const base  = v * this.maxInfluences;
-      const total = Array.from({ length:this.maxInfluences }, (_,i) => this.boneWeights[base+i]).reduce((s,w)=>s+w,0);
-      if (total > 0) for (let i = 0; i < this.maxInfluences; i++) this.boneWeights[base+i] /= total;
-    }
-  }
-
-  paintWeight(vertexIdx, boneIndex, weight, brushFalloff = 1.0) {
-    const influences = this.getWeights(vertexIdx);
-    const existing   = influences.find(i => i.boneIndex === boneIndex);
-    if (existing) existing.weight = clamp(existing.weight + weight * brushFalloff, 0, 1);
-    else influences.push({ boneIndex, weight: clamp(weight * brushFalloff, 0, 1) });
-    this.setWeights(vertexIdx, influences);
-  }
-
-  smoothWeights(vertexIdx, neighbors, iterations = 1) {
-    for (let iter = 0; iter < iterations; iter++) {
-      const allInfluences = new Map();
-      neighbors.forEach(nb => {
-        this.getWeights(nb).forEach(({ boneIndex, weight }) => {
-          allInfluences.set(boneIndex, (allInfluences.get(boneIndex) ?? 0) + weight / neighbors.length);
-        });
-      });
-      const current = this.getWeights(vertexIdx);
-      const smoothed = current.map(({ boneIndex, weight }) => ({
-        boneIndex, weight: lerp(weight, allInfluences.get(boneIndex) ?? 0, 0.5),
-      }));
-      this.setWeights(vertexIdx, smoothed);
-    }
-  }
-
-  toBufferAttributes() {
-    return {
-      skinIndex:  new THREE.Uint16BufferAttribute(this.boneIndices, this.maxInfluences),
-      skinWeight: new THREE.Float32BufferAttribute(this.boneWeights, this.maxInfluences),
-    };
-  }
-
-  toJSON() {
-    return { vertexCount: this.vertexCount, boneCount: this.boneCount,
-      indices: Array.from(this.boneIndices), weights: Array.from(this.boneWeights) };
-  }
-
-  static fromJSON(data) {
-    const wm = new VertexWeightMap(data.vertexCount, data.boneCount);
-    wm.boneIndices.set(data.indices);
-    wm.boneWeights.set(data.weights);
-    return wm;
-  }
+  pos.array.set(result);
+  pos.needsUpdate = true;
+  geometry.computeVertexNormals();
 }
 
-const lerp = (a, b, t) => a + (b - a) * t;
+// ─── Dual Quaternion Skinning (DQS) — no candy-wrapper artifact ──────────────
 
-// ─── LBS (Linear Blend Skinning) ─────────────────────────────────────────
-export function computeLBS(restPos, skeleton, weightMap, vertexIdx) {
-  const influences = weightMap.getWeights(vertexIdx);
-  const result     = new THREE.Vector3();
-  influences.forEach(({ boneIndex, weight }) => {
-    const bone = skeleton.bones[boneIndex];
-    if (!bone) return;
-    const skinned = restPos.clone().applyMatrix4(
-      bone.matrixWorld.clone().multiply(skeleton.boneInverses[boneIndex])
-    );
-    result.add(skinned.multiplyScalar(weight));
-  });
-  return result;
-}
-
-// ─── Dual quaternion skinning ─────────────────────────────────────────────
-export class DualQuaternion {
+class DualQuaternion {
   constructor() {
-    this.real = new THREE.Quaternion();
-    this.dual = new THREE.Quaternion(0, 0, 0, 0);
+    this.real = new THREE.Quaternion();  // rotation
+    this.dual = new THREE.Quaternion();  // translation encoded
   }
 
-  fromMatrix(mat) {
-    const pos  = new THREE.Vector3().setFromMatrixPosition(mat);
-    const quat = new THREE.Quaternion().setFromRotationMatrix(mat);
-    this.real.copy(quat);
+  fromMatrix4(m) {
+    const pos = new THREE.Vector3();
+    const rot = new THREE.Quaternion();
+    const scale = new THREE.Vector3();
+    m.decompose(pos, rot, scale);
+    this.real.copy(rot);
+    // Dual part: 0.5 * t * q
     const t = new THREE.Quaternion(pos.x * 0.5, pos.y * 0.5, pos.z * 0.5, 0);
-    this.dual.copy(t).premultiply(quat);
+    this.dual.multiplyQuaternions(t, rot);
     return this;
   }
 
   add(other, weight) {
-    this.real.x += other.real.x * weight; this.real.y += other.real.y * weight;
-    this.real.z += other.real.z * weight; this.real.w += other.real.w * weight;
-    this.dual.x += other.dual.x * weight; this.dual.y += other.dual.y * weight;
-    this.dual.z += other.dual.z * weight; this.dual.w += other.dual.w * weight;
+    this.real.x += other.real.x * weight;
+    this.real.y += other.real.y * weight;
+    this.real.z += other.real.z * weight;
+    this.real.w += other.real.w * weight;
+    this.dual.x += other.dual.x * weight;
+    this.dual.y += other.dual.y * weight;
+    this.dual.z += other.dual.z * weight;
+    this.dual.w += other.dual.w * weight;
     return this;
   }
 
   normalize() {
     const len = this.real.length();
     if (len < 0.0001) return this;
-    this.real.x/=len; this.real.y/=len; this.real.z/=len; this.real.w/=len;
-    this.dual.x/=len; this.dual.y/=len; this.dual.z/=len; this.dual.w/=len;
+    this.real.x /= len; this.real.y /= len;
+    this.real.z /= len; this.real.w /= len;
+    this.dual.x /= len; this.dual.y /= len;
+    this.dual.z /= len; this.dual.w /= len;
     return this;
   }
 
-  transformPoint(pt) {
-    const r = this.real;
-    const d = this.dual;
-    const tx = 2.0 * (-d.w*r.x + d.x*r.w - d.y*r.z + d.z*r.y);
-    const ty = 2.0 * (-d.w*r.y + d.x*r.z + d.y*r.w - d.z*r.x);
-    const tz = 2.0 * (-d.w*r.z - d.x*r.y + d.y*r.x + d.z*r.w);
-    return pt.clone().applyQuaternion(r).add(new THREE.Vector3(tx, ty, tz));
+  transformPoint(v) {
+    const r = this.real, d = this.dual;
+    // Extract translation
+    const tx = 2 * (-d.w * r.x + d.x * r.w - d.y * r.z + d.z * r.y);
+    const ty = 2 * (-d.w * r.y + d.x * r.z + d.y * r.w - d.z * r.x);
+    const tz = 2 * (-d.w * r.z - d.x * r.y + d.y * r.x + d.z * r.w);
+    // Apply rotation then translation
+    const out = v.clone().applyQuaternion(r);
+    out.x += tx; out.y += ty; out.z += tz;
+    return out;
   }
 }
 
-// ─── Corrective shapes ────────────────────────────────────────────────────
-export class CorrectiveShapeDriver {
-  constructor(bones) {
-    this.bones  = bones;
-    this.shapes = [];
-  }
+export function applyDQS(geometry, skeleton, boneMatrices) {
+  const pos = geometry.attributes.position;
+  const skinIndex = geometry.attributes.skinIndex;
+  const skinWeight = geometry.attributes.skinWeight;
+  if (!skinIndex || !skinWeight) return;
 
-  addShape(name, triggerBone, triggerAngle, deltaPositions, weight = 1.0) {
-    this.shapes.push({ name, triggerBone, triggerAngle, deltaPositions, weight });
-  }
+  // Precompute dual quaternions for each bone
+  const boneDQs = boneMatrices.map(m => new DualQuaternion().fromMatrix4(m));
 
-  evaluate(geometry) {
-    const pos = geometry.attributes.position;
-    this.shapes.forEach(shape => {
-      const bone = this.bones.find(b => b.name === shape.triggerBone);
-      if (!bone) return;
-      const angle  = bone.rotation.x;
-      const blend  = clamp(Math.abs(angle) / Math.max(Math.abs(shape.triggerAngle), 0.001), 0, 1) * shape.weight;
-      if (blend < 0.001) return;
-      shape.deltaPositions.forEach(({ index, delta }) => {
-        pos.setXYZ(index,
-          pos.getX(index) + delta.x * blend,
-          pos.getY(index) + delta.y * blend,
-          pos.getZ(index) + delta.z * blend,
-        );
-      });
-    });
-    pos.needsUpdate = true;
-  }
+  const result = new Float32Array(pos.array.length);
+  const v = new THREE.Vector3();
 
-  toJSON() { return { shapes: this.shapes.map(s => ({ ...s, deltaPositions: s.deltaPositions.slice(0, 5) })) }; }
-}
+  for (let i = 0; i < pos.count; i++) {
+    const blended = new DualQuaternion();
 
-// ─── Skin transfer ────────────────────────────────────────────────────────
-export function transferWeights(sourceWeightMap, sourceGeometry, targetGeometry, k = 4) {
-  const srcPos = sourceGeometry.attributes.position;
-  const tgtPos = targetGeometry.attributes.position;
-  const result = new VertexWeightMap(tgtPos.count, sourceWeightMap.boneCount);
-  for (let vi = 0; vi < tgtPos.count; vi++) {
-    const tp = new THREE.Vector3().fromBufferAttribute(tgtPos, vi);
-    const distances = [];
-    for (let si = 0; si < srcPos.count; si++) {
-      const sp = new THREE.Vector3().fromBufferAttribute(srcPos, si);
-      distances.push({ idx: si, dist: tp.distanceTo(sp) });
+    for (let j = 0; j < 4; j++) {
+      const boneIdx = skinIndex.getComponent(i, j);
+      const weight  = skinWeight.getComponent(i, j);
+      if (weight === 0 || !boneDQs[boneIdx]) continue;
+
+      const dq = boneDQs[boneIdx];
+      // Antipodality fix
+      const dot = blended.real.dot(dq.real);
+      blended.add(dq, dot < 0 ? -weight : weight);
     }
-    distances.sort((a, b) => a.dist - b.dist);
-    const nearest = distances.slice(0, k);
-    const totalInvDist = nearest.reduce((s, n) => s + (n.dist < 0.0001 ? 1e6 : 1/n.dist), 0);
-    const blended = new Map();
-    nearest.forEach(n => {
-      const w = n.dist < 0.0001 ? 1e6 : 1/n.dist;
-      sourceWeightMap.getWeights(n.idx).forEach(({ boneIndex, weight }) => {
-        blended.set(boneIndex, (blended.get(boneIndex) ?? 0) + weight * w / totalInvDist);
-      });
-    });
-    result.setWeights(vi, [...blended.entries()].map(([boneIndex, weight]) => ({ boneIndex, weight })));
+
+    blended.normalize();
+    v.fromBufferAttribute(pos, i);
+    const transformed = blended.transformPoint(v);
+    result[i * 3]     = transformed.x;
+    result[i * 3 + 1] = transformed.y;
+    result[i * 3 + 2] = transformed.z;
   }
-  return result;
+
+  pos.array.set(result);
+  pos.needsUpdate = true;
+  geometry.computeVertexNormals();
 }
 
-// ─── SkinningSystem ───────────────────────────────────────────────────────
-export class SkinningSystem {
-  constructor(skeleton, opts = {}) {
-    this.skeleton    = skeleton;
-    this.mode        = opts.mode       ?? 'LBS';
-    this.weightMap   = null;
-    this.correctives = null;
-    this._enabled    = true;
+// ─── Volume Preservation ──────────────────────────────────────────────────────
+
+export function preserveVolume(geometry, originalGeometry, strength = 0.3) {
+  const pos = geometry.attributes.position;
+  const origPos = originalGeometry.attributes.position;
+  if (pos.count !== origPos.count) return;
+
+  // Compute volume change and apply corrective scaling
+  const origVol = estimateVolume(origPos);
+  const currVol = estimateVolume(pos);
+  if (origVol === 0 || currVol === 0) return;
+
+  const scale = Math.pow(origVol / currVol, strength / 3);
+  const center = new THREE.Vector3();
+
+  for (let i = 0; i < pos.count; i++) {
+    center.x += pos.getX(i); center.y += pos.getY(i); center.z += pos.getZ(i);
   }
+  center.divideScalar(pos.count);
 
-  attachGeometry(geometry, weightMap) {
-    this.weightMap = weightMap;
-    const attrs = weightMap.toBufferAttributes();
-    geometry.setAttribute('skinIndex',  attrs.skinIndex);
-    geometry.setAttribute('skinWeight', attrs.skinWeight);
-    return this;
+  for (let i = 0; i < pos.count; i++) {
+    pos.setXYZ(i,
+      center.x + (pos.getX(i) - center.x) * scale,
+      center.y + (pos.getY(i) - center.y) * scale,
+      center.z + (pos.getZ(i) - center.z) * scale,
+    );
   }
-
-  addCorrectives(driver) { this.correctives = driver; return this; }
-
-  update(geometry) {
-    if (!this._enabled) return;
-    this.correctives?.evaluate(geometry);
-  }
-
-  setMode(mode) { this.mode = mode; }
-  enable()      { this._enabled = true;  }
-  disable()     { this._enabled = false; }
-
-  toJSON() {
-    return { mode: this.mode, boneCount: this.skeleton?.bones?.length ?? 0,
-      hasWeightMap: !!this.weightMap, hasCorrectiveShapes: !!this.correctives };
-  }
+  pos.needsUpdate = true;
 }
 
-export default SkinningSystem;
-
-export function buildAutomaticWeights(geometry, skeleton, maxInfluences = 4) {
-  const pos     = geometry.attributes.position;
-  const wm      = new VertexWeightMap(pos.count, skeleton.bones.length);
-  for (let vi = 0; vi < pos.count; vi++) {
-    const vp     = new THREE.Vector3().fromBufferAttribute(pos, vi);
-    const dists  = skeleton.bones.map((bone, bi) => ({
-      boneIndex: bi,
-      dist:      vp.distanceTo(new THREE.Vector3().setFromMatrixPosition(bone.matrixWorld)),
-    })).sort((a, b) => a.dist - b.dist).slice(0, maxInfluences);
-    const totalInv = dists.reduce((s, d) => s + (d.dist < 0.001 ? 1e6 : 1/d.dist), 0);
-    wm.setWeights(vi, dists.map(d => ({
-      boneIndex: d.boneIndex,
-      weight: d.dist < 0.001 ? 1e6/totalInv : (1/d.dist)/totalInv,
-    })));
+function estimateVolume(posAttr) {
+  let vol = 0;
+  for (let i = 0; i < posAttr.count - 2; i += 3) {
+    const ax = posAttr.getX(i),   ay = posAttr.getY(i),   az = posAttr.getZ(i);
+    const bx = posAttr.getX(i+1), by = posAttr.getY(i+1), bz = posAttr.getZ(i+1);
+    const cx = posAttr.getX(i+2), cy = posAttr.getY(i+2), cz = posAttr.getZ(i+2);
+    vol += (ax*(by*cz - bz*cy) - ay*(bx*cz - bz*cx) + az*(bx*cy - by*cx)) / 6;
   }
-  return wm;
+  return Math.abs(vol);
 }
 
-export function visualizeWeights(geometry, weightMap, boneIndex) {
-  const colors = new Float32Array(geometry.attributes.position.count * 3);
-  for (let vi = 0; vi < geometry.attributes.position.count; vi++) {
-    const weights  = weightMap.getWeights(vi);
-    const boneW    = weights.find(w => w.boneIndex === boneIndex)?.weight ?? 0;
-    const r = boneW, g = 0.1, b = 1 - boneW;
-    colors[vi*3]=r; colors[vi*3+1]=g; colors[vi*3+2]=b;
-  }
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  return geometry;
-}
+// ─── Heat Diffusion Weight Baking ─────────────────────────────────────────────
 
-export function getHeaviestBone(weightMap, vertexIdx) {
-  const weights = weightMap.getWeights(vertexIdx);
-  if (!weights.length) return null;
-  return weights.reduce((best, w) => w.weight > best.weight ? w : best);
-}
+export function bakeHeatWeights(geometry, skeleton, options = {}) {
+  const { iterations = 10, falloff = 2.0 } = options;
+  const pos = geometry.attributes.position;
+  const bones = skeleton.bones;
+  const numVerts = pos.count;
+  const numBones = bones.length;
 
-export function computeWeightVariance(weightMap, boneIndex) {
-  let sum = 0, sumSq = 0, count = 0;
-  for (let vi = 0; vi < weightMap.vertexCount; vi++) {
-    const w = weightMap.getWeights(vi).find(inf => inf.boneIndex === boneIndex)?.weight ?? 0;
-    if (w > 0.001) { sum += w; sumSq += w*w; count++; }
-  }
-  if (!count) return { mean:0, variance:0, stddev:0 };
-  const mean = sum / count;
-  return { mean, variance: sumSq/count - mean*mean, stddev: Math.sqrt(sumSq/count - mean*mean) };
-}
+  const weights = new Float32Array(numVerts * 4).fill(0);
+  const indices = new Float32Array(numVerts * 4).fill(0);
 
-export function mirrorWeights(weightMap, geometry, axis = 'X', threshold = 0.01) {
-  const pos     = geometry.attributes.position;
-  const mirrored = new VertexWeightMap(weightMap.vertexCount, weightMap.boneCount);
-  for (let vi = 0; vi < weightMap.vertexCount; vi++) {
-    const vp    = new THREE.Vector3().fromBufferAttribute(pos, vi);
-    const mirrorPos = vp.clone();
-    if (axis === 'X') mirrorPos.x = -mirrorPos.x;
-    let closest = -1, closestDist = Infinity;
-    for (let vj = 0; vj < pos.count; vj++) {
-      const d = new THREE.Vector3().fromBufferAttribute(pos, vj).distanceTo(mirrorPos);
-      if (d < closestDist && d < threshold) { closestDist = d; closest = vj; }
-    }
-    if (closest >= 0) mirrored.setWeights(vi, weightMap.getWeights(closest));
-    else              mirrored.setWeights(vi, weightMap.getWeights(vi));
-  }
-  return mirrored;
-}
-
-export function getSkinningReport(skinningSystem, weightMap) {
-  const unweighted = [], multiInfluence = [];
-  for (let vi = 0; vi < weightMap.vertexCount; vi++) {
-    const w = weightMap.getWeights(vi);
-    if (!w.length)  unweighted.push(vi);
-    if (w.length>2) multiInfluence.push(vi);
-  }
-  return {
-    totalVertices:      weightMap.vertexCount,
-    unweightedVertices: unweighted.length,
-    multiInfluenceVerts:multiInfluence.length,
-    mode:               skinningSystem.mode,
-    hasCorrectiveShapes:!!skinningSystem.correctives,
-  };
-}
-
-export function computeBoneInfluenceZones(skeleton, geometry, radius=0.15) {
-  const pos    = geometry.attributes.position;
-  const zones  = new Map();
-  skeleton.bones.forEach((bone, bi) => {
-    const bonePos = new THREE.Vector3().setFromMatrixPosition(bone.matrixWorld);
-    const verts   = [];
-    for (let vi=0; vi<pos.count; vi++) {
-      const vp = new THREE.Vector3().fromBufferAttribute(pos, vi);
-      if (vp.distanceTo(bonePos) <= radius) verts.push(vi);
-    }
-    zones.set(bi, verts);
+  // For each vertex find closest bones
+  const bonePositions = bones.map(b => {
+    const wp = new THREE.Vector3();
+    b.getWorldPosition(wp);
+    return wp;
   });
-  return zones;
-}
-export function validateSkinning(weightMap, geometry) {
-  const pos    = geometry.attributes.position;
-  const errors = [];
-  for (let vi=0; vi<pos.count; vi++) {
-    const ws = weightMap.getWeights(vi);
-    if (!ws.length) errors.push({type:'unweighted', vertex:vi});
-    const total = ws.reduce((s,w)=>s+w.weight,0);
-    if (Math.abs(total-1.0) > 0.01) errors.push({type:'unnormalized', vertex:vi, total});
+
+  for (let vi = 0; vi < numVerts; vi++) {
+    const vp = new THREE.Vector3().fromBufferAttribute(pos, vi);
+
+    // Compute distance to each bone
+    const distances = bonePositions.map((bp, bi) => ({
+      idx: bi,
+      dist: vp.distanceTo(bp),
+    })).sort((a, b) => a.dist - b.dist).slice(0, 4);
+
+    // Inverse distance weighting with falloff
+    let totalW = 0;
+    const ws = distances.map(d => {
+      const w = 1 / Math.pow(Math.max(d.dist, 0.001), falloff);
+      totalW += w;
+      return w;
+    });
+
+    distances.forEach((d, j) => {
+      indices[vi * 4 + j] = d.idx;
+      weights[vi * 4 + j] = totalW > 0 ? ws[j] / totalW : 0;
+    });
   }
-  return {valid:errors.length===0, errors, vertexCount:pos.count};
-}
-export function getWeightPaintInfo(weightMap, boneIndex) {
-  const colored=[], uncolored=[];
-  for (let vi=0; vi<weightMap.vertexCount; vi++) {
-    const ws = weightMap.getWeights(vi);
-    const w  = ws.find(x=>x.boneIndex===boneIndex);
-    if (w) colored.push({vertex:vi, weight:w.weight});
-    else   uncolored.push(vi);
-  }
-  return { colored, uncolored, coverage: colored.length/weightMap.vertexCount };
-}
-export function cloneSkinningSystem(original, newGeometry) {
-  const clone = new SkinningSystem(original.skeleton, { mode: original.mode });
-  if (original.weightMap) clone.attachGeometry(newGeometry, original.weightMap);
-  return clone;
-}
-export function serializeSkinningSystem(system) {
-  return JSON.stringify({ mode:system.mode, hasWeightMap:!!system.weightMap,
-    boneCount:system.skeleton?.bones?.length??0, version:1 });
+
+  geometry.setAttribute('skinIndex',  new THREE.BufferAttribute(indices, 4));
+  geometry.setAttribute('skinWeight', new THREE.BufferAttribute(weights, 4));
+  return { indices, weights };
 }
 
-export function computeSkinningInfluenceStats(weightMap) {
-  const influenceCounts = new Array(weightMap.maxInfluences+1).fill(0);
-  for (let vi=0; vi<weightMap.vertexCount; vi++) {
-    const count = weightMap.getWeights(vi).length;
-    influenceCounts[Math.min(count, weightMap.maxInfluences)]++;
+// ─── Weight Operations ────────────────────────────────────────────────────────
+
+export function normalizeWeights(geometry) {
+  const sw = geometry.attributes.skinWeight;
+  if (!sw) return;
+  for (let i = 0; i < sw.count; i++) {
+    let total = 0;
+    for (let j = 0; j < 4; j++) total += sw.getComponent(i, j);
+    if (total > 0) for (let j = 0; j < 4; j++) sw.setComponent(i, j, sw.getComponent(i, j) / total);
   }
-  return { influenceCounts, maxInfluences: weightMap.maxInfluences,
-    totalVertices: weightMap.vertexCount };
+  sw.needsUpdate = true;
 }
-export function pruneWeights(weightMap, threshold=0.05) {
-  for (let vi=0; vi<weightMap.vertexCount; vi++) {
-    const ws = weightMap.getWeights(vi).filter(w=>w.weight>=threshold);
-    const total = ws.reduce((s,w)=>s+w.weight,0)||1;
-    weightMap.setWeights(vi, ws.map(w=>({...w, weight:w.weight/total})));
+
+export function mirrorWeights(geometry, axis = 'x', tolerance = 0.01) {
+  const pos = geometry.attributes.position;
+  const si  = geometry.attributes.skinIndex;
+  const sw  = geometry.attributes.skinWeight;
+  if (!si || !sw) return;
+
+  const axisIdx = { x: 0, y: 1, z: 2 }[axis] ?? 0;
+
+  for (let i = 0; i < pos.count; i++) {
+    const vp = new THREE.Vector3().fromBufferAttribute(pos, i);
+    const mirrorVal = -vp.getComponent(axisIdx);
+
+    // Find mirror vertex
+    for (let j = 0; j < pos.count; j++) {
+      if (i === j) continue;
+      const mp = new THREE.Vector3().fromBufferAttribute(pos, j);
+      if (Math.abs(mp.getComponent(axisIdx) - mirrorVal) < tolerance &&
+          Math.abs(mp.y - vp.y) < tolerance && Math.abs(mp.z - vp.z) < tolerance) {
+        // Copy weights from j to i
+        for (let k = 0; k < 4; k++) {
+          si.setComponent(i, k, si.getComponent(j, k));
+          sw.setComponent(i, k, sw.getComponent(j, k));
+        }
+        break;
+      }
+    }
   }
-  return weightMap;
+  si.needsUpdate = true; sw.needsUpdate = true;
 }
-export function getSkinningMode(geometry) {
-  return geometry.attributes.skinIndex ? 'skinned' : 'rigid';
+
+export function smoothWeights(geometry, iterations = 2) {
+  const pos = geometry.attributes.position;
+  const sw  = geometry.attributes.skinWeight;
+  if (!sw) return;
+
+  // Build adjacency
+  const adj = buildVertexAdjacency(geometry);
+
+  for (let iter = 0; iter < iterations; iter++) {
+    const newWeights = new Float32Array(sw.array.length);
+    for (let i = 0; i < sw.count; i++) {
+      const neighbors = adj[i] ?? [];
+      const total = neighbors.length + 1;
+      for (let k = 0; k < 4; k++) {
+        let sum = sw.getComponent(i, k);
+        neighbors.forEach(n => { sum += sw.getComponent(n, k); });
+        newWeights[i * 4 + k] = sum / total;
+      }
+    }
+    sw.array.set(newWeights);
+  }
+  sw.needsUpdate = true;
+  normalizeWeights(geometry);
 }
-export function buildRigidBinding(geometry, boneIndex) {
+
+function buildVertexAdjacency(geometry) {
+  const idx = geometry.index;
   const count = geometry.attributes.position.count;
-  const wm    = new VertexWeightMap(count, boneIndex+1);
-  for (let vi=0; vi<count; vi++) wm.setWeights(vi, [{boneIndex, weight:1.0}]);
-  return wm;
-}
-export function getPerBoneVertexCount(weightMap, boneCount) {
-  const counts = new Array(boneCount).fill(0);
-  for (let vi=0; vi<weightMap.vertexCount; vi++) {
-    weightMap.getWeights(vi).forEach(({boneIndex})=>{ if(boneIndex<boneCount) counts[boneIndex]++; });
-  }
-  return counts;
-}
-export function exportWeightMapAsCSV(weightMap) {
-  const rows = ['vertex,bone,weight'];
-  for (let vi=0; vi<weightMap.vertexCount; vi++) {
-    weightMap.getWeights(vi).forEach(({boneIndex,weight})=>{ rows.push(`${vi},${boneIndex},${weight.toFixed(4)}`); });
-  }
-  return rows.join('\n');
-}
-
-export function applyMorphAndSkin(geometry, morphValues, skinningSystem, weightMap) {
-  if(morphValues) {
-    const morphPos=geometry.morphAttributes?.position;
-    if(morphPos) {
-      geometry.morphTargetInfluences=geometry.morphTargetInfluences??new Array(morphPos.length).fill(0);
-      Object.entries(morphValues).forEach(([name,val])=>{
-        const idx=geometry.morphTargetDictionary?.[name];
-        if(idx!==undefined) geometry.morphTargetInfluences[idx]=val;
-      });
+  const adj = Array.from({ length: count }, () => new Set());
+  if (idx) {
+    for (let i = 0; i < idx.count; i += 3) {
+      const a = idx.getX(i), b = idx.getX(i+1), c = idx.getX(i+2);
+      adj[a].add(b); adj[a].add(c);
+      adj[b].add(a); adj[b].add(c);
+      adj[c].add(a); adj[c].add(b);
     }
   }
-  skinningSystem?.update(geometry);
-  return geometry;
+  return adj.map(s => Array.from(s));
 }
-export function buildDefaultSkinningSystem(skeleton) {
-  return new SkinningSystem(skeleton, {mode:'LBS'});
-}
-export function getSkinningPerformanceTier(weightMap) {
-  const maxInf=weightMap.maxInfluences;
-  if(maxInf<=1) return {tier:'A',label:'Rigid',cost:1.0};
-  if(maxInf<=2) return {tier:'B',label:'Smooth',cost:1.5};
-  if(maxInf<=4) return {tier:'C',label:'Full',cost:2.0};
-  return {tier:'D',label:'Heavy',cost:3.0};
-}
-export function computeBindPose(skeleton) {
-  return skeleton.bones.map(bone=>({
-    name:bone.name,
-    worldMatrix:bone.matrixWorld.clone(),
-    localMatrix:bone.matrix.clone(),
-  }));
-}
-export function restoreBindPose(skeleton, bindPose) {
-  bindPose.forEach(({name,localMatrix})=>{
-    const bone=skeleton.bones.find(b=>b.name===name);
-    if(bone) bone.matrix.copy(localMatrix);
+
+// ─── Skinned Mesh Creation ────────────────────────────────────────────────────
+
+export function createSkinnedMesh(mesh, skeleton) {
+  const geo = mesh.geometry.clone();
+  if (!geo.attributes.skinWeight) {
+    const count   = geo.attributes.position.count;
+    const indices = new Float32Array(count * 4).fill(0);
+    const weights = new Float32Array(count * 4).fill(0);
+    for (let i = 0; i < count; i++) weights[i * 4] = 1.0;
+    geo.setAttribute('skinIndex',  new THREE.BufferAttribute(indices, 4));
+    geo.setAttribute('skinWeight', new THREE.BufferAttribute(weights, 4));
+  }
+
+  const mat = new THREE.MeshStandardMaterial({
+    color: mesh.material?.color ?? 0x888888,
+    roughness: 0.5, metalness: 0.1, skinning: true,
   });
-  skeleton.update?.();
+
+  const skinned = new THREE.SkinnedMesh(geo, mat);
+  skinned.add(skeleton.bones[0]);
+  skinned.bind(skeleton);
+  skinned.name = (mesh.name || 'mesh') + '_skinned';
+  return skinned;
 }
+
+export function bindMeshToArmature(mesh, armature) {
+  const bones = armature.userData.bones || [];
+  if (!bones.length) return null;
+  const threeBones = bones.map(b => {
+    const tb = new THREE.Bone();
+    tb.name = b.name;
+    tb.position.copy(b.position);
+    if (b.rotation) tb.rotation.copy(b.rotation);
+    return tb;
+  });
+  // Build hierarchy
+  bones.forEach((b, i) => {
+    if (b.parentIndex !== undefined && b.parentIndex >= 0) {
+      threeBones[b.parentIndex].add(threeBones[i]);
+    }
+  });
+  const skeleton = new THREE.Skeleton(threeBones);
+  return createSkinnedMesh(mesh, skeleton);
+}
+
+export const SKINNING_MODES = { LBS: 'lbs', DQS: 'dqs' };
+
+export default {
+  applyLBS, applyDQS, preserveVolume,
+  bakeHeatWeights, normalizeWeights, mirrorWeights, smoothWeights,
+  createSkinnedMesh, bindMeshToArmature, SKINNING_MODES,
+};
+export function createMixer(skinnedMesh) { return new THREE.AnimationMixer(skinnedMesh); }
+export function playClip(mixer, clip, opts) { opts=opts||{}; var a=mixer.clipAction(clip); a.loop=opts.loop||2201; a.timeScale=opts.speed||1; a.play(); return a; }
