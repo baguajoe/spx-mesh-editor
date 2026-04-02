@@ -3678,39 +3678,22 @@ export default function App() {
         onExportGlb={() => window.dispatchEvent(new CustomEvent("spx:mocap-export-glb"))}
       />
 
-      {faceGenOpen && (
-        <FaceGeneratorPanel
-          sceneRef={sceneRef}
-          setStatus={setStatus}
-        />
-      )}
-
-      {foliageGenOpen && (
-        <FoliageGeneratorPanel
-          sceneRef={sceneRef}
-          setStatus={setStatus}
-        />
-      )}
-
-      {vehicleGenOpen && (
-        <VehicleGeneratorPanel
-          sceneRef={sceneRef}
-          setStatus={setStatus}
-        />
-      )}
-
-      {creatureGenOpen && (
-        <CreatureGeneratorPanel
-          sceneRef={sceneRef}
-          setStatus={setStatus}
-        />
-      )}
-
-      {propGenOpen && (
-        <PropGeneratorPanel
-          sceneRef={sceneRef}
-          setStatus={setStatus}
-        />
+      {(faceGenOpen || foliageGenOpen || vehicleGenOpen || creatureGenOpen || propGenOpen) && (
+        <div style={{position:"fixed",top:60,right:0,width:320,height:"calc(100vh - 60px)",zIndex:50,background:"#0d1117",borderLeft:"1px solid #21262d",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",borderBottom:"1px solid #21262d",background:"#161b22"}}>
+            <span style={{color:"#00ffc8",fontWeight:700,fontSize:12,fontFamily:"JetBrains Mono,monospace"}}>
+              {faceGenOpen?"Face Generator":foliageGenOpen?"Foliage Generator":vehicleGenOpen?"Vehicle Generator":creatureGenOpen?"Creature Generator":"Prop Generator"}
+            </span>
+            <button onClick={()=>{setFaceGenOpen(false);setFoliageGenOpen(false);setVehicleGenOpen(false);setCreatureGenOpen(false);setPropGenOpen(false);}} style={{background:"none",border:"none",color:"#8b949e",cursor:"pointer",fontSize:16,lineHeight:1}}>×</button>
+          </div>
+          <div style={{flex:1,overflowY:"auto",padding:8}}>
+            {faceGenOpen && <FaceGeneratorPanel sceneRef={sceneRef} setStatus={setStatus} />}
+            {foliageGenOpen && <FoliageGeneratorPanel sceneRef={sceneRef} setStatus={setStatus} />}
+            {vehicleGenOpen && <VehicleGeneratorPanel sceneRef={sceneRef} setStatus={setStatus} />}
+            {creatureGenOpen && <CreatureGeneratorPanel sceneRef={sceneRef} setStatus={setStatus} />}
+            {propGenOpen && <PropGeneratorPanel sceneRef={sceneRef} setStatus={setStatus} />}
+          </div>
+        </div>
       )}
 
       <RenderWorkspacePanel
