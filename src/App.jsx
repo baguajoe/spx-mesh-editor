@@ -774,6 +774,48 @@ export default function App() {
     console.log("💾 Scene exported to .json");
   };
 
+  const addPrimitive = useCallback(
+    (type) => {
+      // addSceneObject handles everything — creates mesh, adds to scene, stores in sceneObjects
+      addSceneObject(type);
+      clearOverlays();
+      // Build HalfEdge mesh for edit tools from meshRef (set by addSceneObject)
+      setTimeout(() => {
+        const mesh = meshRef.current;
+        if (!mesh || !mesh.geometry) return;
+
+        // Force primitive to be centered at world origin like Blender
+        mesh.geometry.computeBoundingBox();
+        if (mesh.geometry.boundingBox) {
+          const center = new THREE.Vector3();
+          mesh.geometry.boundingBox.getCenter(center);
+          mesh.geometry.translate(-center.x, -center.y, -center.z);
+        }
+        mesh.position.set(0, 0, 0);
+        mesh.rotation.set(0, 0, 0);
+        mesh.scale.set(1, 1, 1);
+        mesh.geometry.computeVertexNormals();
+
+        try {
+          const heMesh = HalfEdgeMesh.fromBufferGeometry(mesh.geometry);
+          heMeshRef.current = heMesh;
+          const [wireframe, setWireframe] = useState(false);
+  const s = heMesh.stats();
+          setStats(s);
+          setStatus(`Added ${type} — ${s.vertices} verts · ${s.faces} faces · ${s.edges} edges`);
+        } catch(e) {
+          setStatus(`Added ${type}`);
+        }
+        setSelectedVerts(new Set());
+        setSelectedEdges(new Set());
+        setSelectedFaces(new Set());
+        if (gizmoRef.current) gizmoRef.current.attach(mesh);
+        setGizmoActive(true);
+      }, 50);
+    },
+    [wireframe]
+  );
+
   const importSpxScene = (file) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -805,7 +847,6 @@ export default function App() {
   
   const [status, setStatus] = useState("Add a primitive to start");
   const [loopCutT, setLoopCutT] = useState(0.5);
-  const [wireframe, setWireframe] = useState(false);
   const [selectedVerts, setSelectedVerts] = useState(new Set());
   const [selectedEdges, setSelectedEdges] = useState(new Set());
   const [selectedFaces, setSelectedFaces] = useState(new Set());
@@ -1690,46 +1731,7 @@ export default function App() {
     }
   }, [activeObjId, sceneObjects, meshRef, sceneRef, addPrimitive, setActiveObjId, importGLB]);
 
-  const addPrimitive = useCallback(
-    (type) => {
-      // addSceneObject handles everything — creates mesh, adds to scene, stores in sceneObjects
-      addSceneObject(type);
-      clearOverlays();
-      // Build HalfEdge mesh for edit tools from meshRef (set by addSceneObject)
-      setTimeout(() => {
-        const mesh = meshRef.current;
-        if (!mesh || !mesh.geometry) return;
 
-        // Force primitive to be centered at world origin like Blender
-        mesh.geometry.computeBoundingBox();
-        if (mesh.geometry.boundingBox) {
-          const center = new THREE.Vector3();
-          mesh.geometry.boundingBox.getCenter(center);
-          mesh.geometry.translate(-center.x, -center.y, -center.z);
-        }
-        mesh.position.set(0, 0, 0);
-        mesh.rotation.set(0, 0, 0);
-        mesh.scale.set(1, 1, 1);
-        mesh.geometry.computeVertexNormals();
-
-        try {
-          const heMesh = HalfEdgeMesh.fromBufferGeometry(mesh.geometry);
-          heMeshRef.current = heMesh;
-          const s = heMesh.stats();
-          setStats(s);
-          setStatus(`Added ${type} — ${s.vertices} verts · ${s.faces} faces · ${s.edges} edges`);
-        } catch(e) {
-          setStatus(`Added ${type}`);
-        }
-        setSelectedVerts(new Set());
-        setSelectedEdges(new Set());
-        setSelectedFaces(new Set());
-        if (gizmoRef.current) gizmoRef.current.attach(mesh);
-        setGizmoActive(true);
-      }, 50);
-    },
-    [wireframe]
-  );
 
   // ── Clear overlays ─────────────────────────────────────────────────────────
   const clearOverlays = () => {

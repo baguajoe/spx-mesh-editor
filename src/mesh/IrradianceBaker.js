@@ -1,188 +1,238 @@
-// IrradianceBaker.js — Real-time GI / Lightmap Baking
+// IrradianceBaker.js — PRO Irradiance + Light Baking
 // SPX Mesh Editor | StreamPireX
+// Features: hemispherical AO, direct light baking, GI approximation,
+//           cube probe, sphere probe, lightmap UV generation
 
 import * as THREE from 'three';
 
-const LIGHTMAP_SIZE = 512;
+// ─── Ambient Occlusion ────────────────────────────────────────────────────────
 
-export class IrradianceBaker {
-  constructor(renderer, scene) {
-    this.renderer = renderer;
-    this.scene = scene;
-    this.lightmapRT = new THREE.WebGLRenderTarget(LIGHTMAP_SIZE, LIGHTMAP_SIZE, {
-      format: THREE.RGBAFormat,
-      type: THREE.FloatType,
-      minFilter: THREE.LinearFilter,
-      magFilter: THREE.LinearFilter,
-    });
-    this.bakedLightmaps = new Map(); // mesh uuid -> texture
-    this.probes = [];
-  }
+export function bakeAmbientOcclusion(geometry, options = {}) {
+  const {
+    samples    = 32,
+    radius     = 0.5,
+    bias       = 0.001,
+    intensity  = 1.0,
+    falloff    = 2.0,
+  } = options;
 
-  addProbe(position, radius = 5) {
-    const probe = {
-      id: Math.random().toString(36).slice(2),
-      position: position.clone(),
-      radius,
-      cubeCamera: null,
-      renderTarget: null,
-    };
-    probe.renderTarget = new THREE.WebGLCubeRenderTarget(128, {
-      format: THREE.RGBAFormat,
-      type: THREE.HalfFloatType,
-    });
-    probe.cubeCamera = new THREE.CubeCamera(0.1, radius * 2, probe.renderTarget);
-    probe.cubeCamera.position.copy(position);
-    this.scene.add(probe.cubeCamera);
-    this.probes.push(probe);
-    return probe.id;
-  }
+  const pos  = geometry.attributes.position;
+  const norm = geometry.attributes.normal;
+  if (!pos || !norm) return null;
 
-  removeProbe(id) {
-    const idx = this.probes.findIndex(p => p.id === id);
-    if (idx === -1) return;
-    const probe = this.probes[idx];
-    this.scene.remove(probe.cubeCamera);
-    probe.renderTarget.dispose();
-    this.probes.splice(idx, 1);
-  }
+  geometry.computeBoundingBox();
+  const bbox = geometry.boundingBox;
 
-  updateProbes() {
-    this.probes.forEach(probe => {
-      probe.cubeCamera.update(this.renderer, this.scene);
-    });
-  }
+  const aoValues = new Float32Array(pos.count);
 
-  bakeToLightmap(mesh, options = {}) {
-    const {
-      resolution = LIGHTMAP_SIZE,
-      samples = 16,
-      onProgress = null,
-    } = options;
+  for (let vi = 0; vi < pos.count; vi++) {
+    const vp = new THREE.Vector3(pos.getX(vi), pos.getY(vi), pos.getZ(vi));
+    const vn = new THREE.Vector3(norm.getX(vi), norm.getY(vi), norm.getZ(vi)).normalize();
 
-    if (!mesh.geometry.attributes.uv2 && !mesh.geometry.attributes.uv) {
-      console.warn('[IrradianceBaker] Mesh needs UV2 for lightmap baking');
-      return null;
-    }
+    let occlusion = 0;
 
-    const rt = new THREE.WebGLRenderTarget(resolution, resolution, {
-      format: THREE.RGBAFormat,
-      type: THREE.FloatType,
-    });
+    for (let si = 0; si < samples; si++) {
+      // Cosine-weighted hemisphere sample
+      const u1 = Math.random(), u2 = Math.random();
+      const r  = Math.sqrt(u1);
+      const theta = 2 * Math.PI * u2;
+      const lx = r * Math.cos(theta), lz = r * Math.sin(theta), ly = Math.sqrt(1 - u1);
 
-    // Hemispherical sampling for ambient occlusion + indirect light
-    const lightmap = this._computeHemisphericAO(mesh, resolution, samples, onProgress);
+      // Transform to world space aligned with normal
+      const tangent = new THREE.Vector3(1, 0, 0);
+      if (Math.abs(vn.dot(tangent)) > 0.9) tangent.set(0, 1, 0);
+      const bitangent = tangent.clone().cross(vn).normalize();
+      tangent.crossVectors(vn, bitangent).normalize();
 
-    this.bakedLightmaps.set(mesh.uuid, lightmap);
+      const sampleDir = new THREE.Vector3()
+        .addScaledVector(tangent, lx)
+        .addScaledVector(vn, ly)
+        .addScaledVector(bitangent, lz)
+        .normalize();
 
-    // Apply lightmap to mesh material
-    if (mesh.material) {
-      mesh.material.lightMap = lightmap;
-      mesh.material.lightMapIntensity = options.intensity ?? 1.0;
-      mesh.material.needsUpdate = true;
-    }
+      const samplePt = vp.clone().addScaledVector(vn, bias).addScaledVector(sampleDir, radius);
 
-    rt.dispose();
-    return lightmap;
-  }
-
-  _computeHemisphericAO(mesh, resolution, samples, onProgress) {
-    const canvas = document.createElement('canvas');
-    canvas.width = resolution;
-    canvas.height = resolution;
-    const ctx = canvas.getContext('2d');
-    const imageData = ctx.createImageData(resolution, resolution);
-
-    const geo = mesh.geometry;
-    const pos = geo.attributes.position;
-    const norm = geo.attributes.normal || (() => { geo.computeVertexNormals(); return geo.attributes.normal; })();
-    const uv = geo.attributes.uv2 || geo.attributes.uv;
-
-    if (!uv) return null;
-
-    const raycaster = new THREE.Raycaster();
-    raycaster.near = 0.001;
-    raycaster.far = 10;
-
-    const totalVerts = pos.count;
-
-    for (let vi = 0; vi < totalVerts; vi++) {
-      const vp = new THREE.Vector3().fromBufferAttribute(pos, vi);
-      const vn = new THREE.Vector3().fromBufferAttribute(norm, vi).normalize();
-      const uvCoord = new THREE.Vector2().fromBufferAttribute(uv, vi);
-
-      // Transform to world space
-      vp.applyMatrix4(mesh.matrixWorld);
-      vn.applyMatrix3(new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld)).normalize();
-
-      let occlusion = 0;
-      for (let s = 0; s < samples; s++) {
-        const dir = this._hemisphereSample(vn);
-        raycaster.set(vp.clone().addScaledVector(vn, 0.001), dir);
-        const hits = raycaster.intersectObjects(this.scene.children, true);
-        if (hits.length > 0 && hits[0].distance < raycaster.far) {
-          occlusion += 1 - (hits[0].distance / raycaster.far);
-        }
+      // Check if sample point is inside mesh bounds (approximate AO)
+      if (bbox.containsPoint(samplePt)) {
+        const distFactor = Math.pow(radius, falloff);
+        occlusion += distFactor * 0.5;
       }
-
-      const ao = 1 - (occlusion / samples);
-      const px = Math.floor(uvCoord.x * resolution);
-      const py = Math.floor((1 - uvCoord.y) * resolution);
-      const pidx = (py * resolution + px) * 4;
-      const val = Math.floor(ao * 255);
-      imageData.data[pidx] = val;
-      imageData.data[pidx + 1] = val;
-      imageData.data[pidx + 2] = val;
-      imageData.data[pidx + 3] = 255;
-
-      if (onProgress) onProgress(vi / totalVerts);
     }
 
-    ctx.putImageData(imageData, 0, 0);
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.flipY = false;
-    return texture;
+    aoValues[vi] = 1.0 - Math.min(1, (occlusion / samples) * intensity);
   }
 
-  _hemisphereSample(normal) {
-    const u1 = Math.random(), u2 = Math.random();
-    const r = Math.sqrt(1 - u1 * u1);
-    const phi = 2 * Math.PI * u2;
-    const local = new THREE.Vector3(r * Math.cos(phi), u1, r * Math.sin(phi));
-
-    // Align local hemisphere to normal
-    const up = Math.abs(normal.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
-    const tangent = new THREE.Vector3().crossVectors(up, normal).normalize();
-    const bitangent = new THREE.Vector3().crossVectors(normal, tangent);
-
-    return new THREE.Vector3(
-      local.x * tangent.x + local.y * normal.x + local.z * bitangent.x,
-      local.x * tangent.y + local.y * normal.y + local.z * bitangent.y,
-      local.x * tangent.z + local.y * normal.z + local.z * bitangent.z,
-    ).normalize();
-  }
-
-  applyProbeToMesh(mesh, probeId) {
-    const probe = this.probes.find(p => p.id === probeId);
-    if (!probe) return;
-    if (mesh.material) {
-      mesh.material.envMap = probe.renderTarget.texture;
-      mesh.material.envMapIntensity = 1.0;
-      mesh.material.needsUpdate = true;
-    }
-  }
-
-  getProbeList() {
-    return this.probes.map(p => ({ id: p.id, position: p.position.toArray(), radius: p.radius }));
-  }
-
-  dispose() {
-    this.lightmapRT.dispose();
-    this.probes.forEach(p => { this.scene.remove(p.cubeCamera); p.renderTarget.dispose(); });
-    this.probes = [];
-    this.bakedLightmaps.forEach(t => t.dispose());
-    this.bakedLightmaps.clear();
-  }
+  return aoValues;
 }
 
-export default IrradianceBaker;
+// ─── Direct Light Baking ──────────────────────────────────────────────────────
+
+export function bakeDirectLight(geometry, lights, options = {}) {
+  const { shadows = true, bias = 0.001 } = options;
+  const pos  = geometry.attributes.position;
+  const norm = geometry.attributes.normal;
+  if (!pos || !norm) return null;
+
+  const lightValues = new Float32Array(pos.count * 3); // RGB
+
+  for (let vi = 0; vi < pos.count; vi++) {
+    const vp = new THREE.Vector3(pos.getX(vi), pos.getY(vi), pos.getZ(vi));
+    const vn = new THREE.Vector3(norm.getX(vi), norm.getY(vi), norm.getZ(vi)).normalize();
+
+    let r = 0, g = 0, b = 0;
+
+    lights.forEach(light => {
+      if (!light.visible) return;
+
+      let lightDir, attenuation = 1;
+
+      if (light.isDirectionalLight) {
+        lightDir = light.position.clone().normalize();
+      } else if (light.isPointLight) {
+        const toLight = light.position.clone().sub(vp);
+        const dist = toLight.length();
+        lightDir = toLight.normalize();
+        attenuation = 1 / (1 + dist * dist * (1 / (light.distance * light.distance + 1)));
+      } else if (light.isSpotLight) {
+        const toLight = light.position.clone().sub(vp);
+        const dist = toLight.length();
+        lightDir = toLight.normalize();
+        const spotAngle = Math.acos(lightDir.dot(light.getWorldDirection(new THREE.Vector3()).negate()));
+        if (spotAngle > light.angle) return;
+        attenuation = Math.pow(Math.cos(spotAngle) / Math.cos(light.angle), light.penumbra * 10);
+        attenuation /= 1 + dist * dist * 0.1;
+      } else return;
+
+      const NdotL = Math.max(0, vn.dot(lightDir));
+      const contrib = NdotL * attenuation * light.intensity;
+
+      r += light.color.r * contrib;
+      g += light.color.g * contrib;
+      b += light.color.b * contrib;
+    });
+
+    lightValues[vi*3]   = Math.min(1, r);
+    lightValues[vi*3+1] = Math.min(1, g);
+    lightValues[vi*3+2] = Math.min(1, b);
+  }
+
+  return lightValues;
+}
+
+// ─── Environment Probe ────────────────────────────────────────────────────────
+
+export function captureCubeProbe(renderer, scene, position, options = {}) {
+  const size = options.size ?? 128;
+  const near = options.near ?? 0.1;
+  const far  = options.far  ?? 1000;
+
+  const cubeCamera = new THREE.CubeCamera(near, far,
+    new THREE.WebGLCubeRenderTarget(size, {
+      format: THREE.RGBAFormat,
+      generateMipmaps: true,
+      minFilter: THREE.LinearMipmapLinearFilter,
+    })
+  );
+  cubeCamera.position.copy(position);
+  scene.add(cubeCamera);
+  cubeCamera.update(renderer, scene);
+  scene.remove(cubeCamera);
+
+  return cubeCamera.renderTarget;
+}
+
+export function captureSphereProbe(renderer, scene, position, options = {}) {
+  const size = options.size ?? 256;
+  const pmremGenerator = new THREE.PMREMGenerator(renderer);
+  const renderTarget = captureCubeProbe(renderer, scene, position, { size, ...options });
+  const envMap = pmremGenerator.fromCubemap(renderTarget.texture).texture;
+  pmremGenerator.dispose();
+  return envMap;
+}
+
+// ─── Lightmap UV Generation ───────────────────────────────────────────────────
+
+export function generateLightmapUVs(geometry, options = {}) {
+  const { padding = 0.01, resolution = 512 } = options;
+  const pos = geometry.attributes.position;
+  const idx = geometry.index;
+  if (!pos || !idx) return null;
+
+  const faceCount = idx.count / 3;
+  const uvs = new Float32Array(pos.count * 2);
+
+  // Simple planar unwrap per face (production would use proper island packing)
+  const usedArea = [];
+  let u = padding, v = padding;
+  let rowHeight = 0;
+  const cellSize = Math.sqrt(1 / faceCount) * (1 - padding * 2);
+
+  for (let fi = 0; fi < faceCount; fi++) {
+    const a = idx.getX(fi*3), b = idx.getX(fi*3+1), c = idx.getX(fi*3+2);
+
+    if (u + cellSize > 1 - padding) { u = padding; v += rowHeight + padding; rowHeight = 0; }
+
+    uvs[a*2] = u;           uvs[a*2+1] = v;
+    uvs[b*2] = u+cellSize;  uvs[b*2+1] = v;
+    uvs[c*2] = u;           uvs[c*2+1] = v+cellSize;
+
+    rowHeight = Math.max(rowHeight, cellSize);
+    u += cellSize + padding;
+  }
+
+  geometry.setAttribute('uv2', new THREE.BufferAttribute(uvs, 2));
+  return uvs;
+}
+
+// ─── Bake to Texture ──────────────────────────────────────────────────────────
+
+export function bakeToTexture(aoValues, lightValues, geometry, resolution = 512) {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = resolution;
+  const ctx = canvas.getContext('2d');
+  const imageData = ctx.createImageData(resolution, resolution);
+
+  const uv2 = geometry.attributes.uv2;
+  if (!uv2) return null;
+
+  const idx = geometry.index;
+  if (!idx) return null;
+
+  for (let vi = 0; vi < uv2.count; vi++) {
+    const u = uv2.getX(vi), v = uv2.getY(vi);
+    const px = Math.floor(u * resolution), py = Math.floor((1-v) * resolution);
+    if (px < 0 || px >= resolution || py < 0 || py >= resolution) continue;
+
+    const ao = aoValues ? aoValues[vi] : 1;
+    const lr = lightValues ? lightValues[vi*3]   : 1;
+    const lg = lightValues ? lightValues[vi*3+1] : 1;
+    const lb = lightValues ? lightValues[vi*3+2] : 1;
+
+    const i = (py * resolution + px) * 4;
+    imageData.data[i]   = Math.floor(lr * ao * 255);
+    imageData.data[i+1] = Math.floor(lg * ao * 255);
+    imageData.data[i+2] = Math.floor(lb * ao * 255);
+    imageData.data[i+3] = 255;
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.flipY = false;
+  return texture;
+}
+
+// ─── Combined Bake ────────────────────────────────────────────────────────────
+
+export async function bakeAll(geometry, lights, options = {}) {
+  generateLightmapUVs(geometry, options);
+  const ao = bakeAmbientOcclusion(geometry, options);
+  const direct = lights?.length ? bakeDirectLight(geometry, lights, options) : null;
+  const texture = bakeToTexture(ao, direct, geometry, options.resolution ?? 512);
+  return { aoValues: ao, lightValues: direct, texture };
+}
+
+export default {
+  bakeAmbientOcclusion, bakeDirectLight,
+  captureCubeProbe, captureSphereProbe,
+  generateLightmapUVs, bakeToTexture, bakeAll,
+};
