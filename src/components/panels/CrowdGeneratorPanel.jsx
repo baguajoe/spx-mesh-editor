@@ -1,190 +1,421 @@
-import React, { useState, useRef, useEffect } from "react";
-import * as THREE from "three";
+import React, { useState, useCallback } from 'react';
 
-const S = {
-  root: { background:"#06060f", color:"#e0e0e0", fontFamily:"JetBrains Mono,monospace", padding:16, height:"100%", overflowY:"auto" },
-  h2: { color:"#00ffc8", fontSize:14, marginBottom:12, letterSpacing:1 },
-  label: { fontSize:11, color:"#aaa", display:"block", marginBottom:4 },
-  input: { width:"100%", background:"#0d0d1a", border:"1px solid #1a1a2e", color:"#e0e0e0", padding:"4px 8px", borderRadius:4, fontFamily:"JetBrains Mono,monospace", fontSize:11, marginBottom:10, boxSizing:"border-box" },
-  select: { width:"100%", background:"#0d0d1a", border:"1px solid #1a1a2e", color:"#e0e0e0", padding:"4px 8px", borderRadius:4, fontFamily:"JetBrains Mono,monospace", fontSize:11, marginBottom:10, boxSizing:"border-box" },
-  btn: { background:"#00ffc8", color:"#06060f", border:"none", borderRadius:4, padding:"7px 16px", fontFamily:"JetBrains Mono,monospace", fontSize:12, fontWeight:700, cursor:"pointer", marginRight:8, marginBottom:8 },
-  btnO: { background:"#FF6600", color:"#fff", border:"none", borderRadius:4, padding:"7px 16px", fontFamily:"JetBrains Mono,monospace", fontSize:12, fontWeight:700, cursor:"pointer", marginRight:8, marginBottom:8 },
-  section: { background:"#0d0d1a", border:"1px solid #1a1a2e", borderRadius:6, padding:12, marginBottom:12 },
-  stat: { fontSize:11, color:"#00ffc8", marginBottom:4 },
-};
-
-const BEHAVIORS = ["Random Walk","Follow Path","Crowd Flow","Panic Scatter","Festival Dance","Military March","Protest Rally"];
-const FORMATION = ["Random","Circle","Grid","Line","Cluster","Spiral"];
-
-function lerpColor(a, b, t){ return `hsl(${Math.round(a[0]+(b[0]-a[0])*t)},${Math.round(a[1]+(b[1]-a[1])*t)}%,${Math.round(a[2]+(b[2]-a[2])*t)}%)`; }
-
-class Agent {
-  constructor(id, pos, behavior, scene){
-    this.id = id;
-    this.behavior = behavior;
-    this.velocity = new THREE.Vector3((Math.random()-0.5)*0.05, 0, (Math.random()-0.5)*0.05);
-    this.target = new THREE.Vector3(pos.x+Math.random()*10-5, pos.y, pos.z+Math.random()*10-5);
-    const h = Math.floor(Math.random()*20+8);
-    const geo = new THREE.CapsuleGeometry(0.25, h*0.06, 4, 8);
-    const skinColors = [0xf5cba7, 0xe8a87c, 0xd4876a, 0xc68642, 0x8d5524, 0x4a2c0a];
-    const mat = new THREE.MeshStandardMaterial({ color: skinColors[Math.floor(Math.random()*skinColors.length)] });
-    this.mesh = new THREE.Mesh(geo, mat);
-    this.mesh.position.copy(pos);
-    this.mesh.position.y = h*0.03;
-    this.mesh.castShadow = true;
-    scene.add(this.mesh);
-    // Clothes
-    const torsoGeo = new THREE.BoxGeometry(0.4, 0.35, 0.2);
-    const clothColors = [0x2244aa, 0xaa2222, 0x22aa44, 0xaaaa22, 0x884400, 0x224466];
-    const torso = new THREE.Mesh(torsoGeo, new THREE.MeshStandardMaterial({color:clothColors[Math.floor(Math.random()*clothColors.length)]}));
-    torso.position.y = 0.12;
-    this.mesh.add(torso);
-  }
-
-  update(dt, agents, bounds, behavior){
-    const beh = behavior || this.behavior;
-    if(beh === "Panic Scatter"){
-      const away = this.mesh.position.clone().normalize().multiplyScalar(0.08);
-      this.velocity.add(away);
-    } else if(beh === "Crowd Flow"){
-      this.velocity.x += 0.002;
-    } else if(beh === "Military March"){
-      this.velocity.set(0,0,0.04);
-    } else if(beh === "Festival Dance"){
-      this.velocity.x = Math.sin(Date.now()*0.003+this.id)*0.02;
-      this.velocity.z = Math.cos(Date.now()*0.003+this.id)*0.02;
-    } else {
-      // Seek target with separation
-      const toTarget = this.target.clone().sub(this.mesh.position);
-      if(toTarget.length() < 1.5){
-        this.target.set(
-          (Math.random()-0.5)*bounds*2,
-          0,
-          (Math.random()-0.5)*bounds*2
-        );
-      }
-      const seek = toTarget.normalize().multiplyScalar(0.03);
-      this.velocity.add(seek);
-      // Separation
-      for(const other of agents){
-        if(other.id === this.id) continue;
-        const d = this.mesh.position.distanceTo(other.mesh.position);
-        if(d < 1.2 && d > 0){
-          const away = this.mesh.position.clone().sub(other.mesh.position).normalize().multiplyScalar(0.05/d);
-          this.velocity.add(away);
-        }
-      }
-    }
-    this.velocity.clampLength(0, 0.12);
-    this.mesh.position.addScaledVector(this.velocity, dt*60);
-    // Clamp to bounds
-    this.mesh.position.x = Math.max(-bounds, Math.min(bounds, this.mesh.position.x));
-    this.mesh.position.z = Math.max(-bounds, Math.min(bounds, this.mesh.position.z));
-    this.mesh.position.y = 0;
-    // Face direction
-    if(this.velocity.length() > 0.001){
-      this.mesh.rotation.y = Math.atan2(this.velocity.x, this.velocity.z);
-      // Subtle walk bob
-      this.mesh.position.y = Math.abs(Math.sin(Date.now()*0.005+this.id))*0.05;
-    }
-  }
-
-  dispose(scene){ scene.remove(this.mesh); this.mesh.geometry?.dispose(); this.mesh.material?.dispose(); }
+function Slider({ label, value, min = 0, max = 1, step = 0.01, onChange, unit = '' }) {
+  return (
+    <div style={{ marginBottom: 5 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#888' }}>
+        <span>{label}</span>
+        <span style={{ color: '#00ffc8', fontWeight: 600 }}>
+          {typeof value === 'number' ? (step < 0.1 ? value.toFixed(2) : Math.round(value)) : value}{unit}
+        </span>
+      </div>
+      <input type="range" min={min} max={max} step={step} value={value}
+        onChange={e => onChange(parseFloat(e.target.value))}
+        style={{ width: '100%', accentColor: '#00ffc8', cursor: 'pointer', height: 16 }} />
+    </div>
+  );
 }
+function Select({ label, value, options, onChange }) {
+  return (
+    <div style={{ marginBottom: 6 }}>
+      {label && <div style={{ fontSize: 10, color: '#888', marginBottom: 2 }}>{label}</div>}
+      <select value={value} onChange={e => onChange(e.target.value)} style={{
+        width: '100%', background: '#0d1117', color: '#e0e0e0',
+        border: '1px solid #21262d', padding: '3px 6px', borderRadius: 4, fontSize: 11, cursor: 'pointer',
+      }}>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+function Check({ label, value, onChange }) {
+  return (
+    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11,
+      color: '#ccc', cursor: 'pointer', marginBottom: 4 }}>
+      <input type="checkbox" checked={value} onChange={e => onChange(e.target.checked)}
+        style={{ accentColor: '#00ffc8', width: 12, height: 12 }} />
+      {label}
+    </label>
+  );
+}
+function ColorRow({ label, value, onChange }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+      <span style={{ fontSize: 10, color: '#888', flex: 1 }}>{label}</span>
+      <input type="color" value={value} onChange={e => onChange(e.target.value)}
+        style={{ width: 32, height: 22, border: 'none', cursor: 'pointer', borderRadius: 3 }} />
+      <span style={{ fontSize: 9, color: '#555', fontFamily: 'monospace' }}>{value}</span>
+    </div>
+  );
+}
+function Section({ title, children, defaultOpen = true }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ marginBottom: 6, border: '1px solid #21262d', borderRadius: 5, overflow: 'hidden' }}>
+      <div onClick={() => setOpen(o => !o)} style={{
+        padding: '5px 8px', cursor: 'pointer', background: '#0d1117',
+        display: 'flex', justifyContent: 'space-between',
+        fontSize: 11, fontWeight: 600, color: '#00ffc8', userSelect: 'none',
+      }}>
+        <span>{title}</span>
+        <span style={{ fontSize: 9, opacity: 0.7 }}>{open ? '\u25b2' : '\u25bc'}</span>
+      </div>
+      {open && <div style={{ padding: '6px 8px', background: '#06060f' }}>{children}</div>}
+    </div>
+  );
+}
+function Badges({ items, active, onSelect }) {
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>
+      {items.map(item => (
+        <button key={item} onClick={() => onSelect(item)} style={{
+          padding: '2px 7px', fontSize: 9, borderRadius: 4, cursor: 'pointer',
+          background: active === item ? '#00ffc8' : '#1a1f2c',
+          color: active === item ? '#06060f' : '#ccc',
+          border: `1px solid ${active === item ? '#00ffc8' : '#21262d'}`,
+        }}>{item}</button>
+      ))}
+    </div>
+  );
+}
+function NumInput({ label, value, min, max, step = 1, onChange, unit = '' }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+      <span style={{ fontSize: 10, color: '#888', flex: 1 }}>{label}</span>
+      <input type="number" value={value} min={min} max={max} step={step}
+        onChange={e => onChange(parseFloat(e.target.value))}
+        style={{ width: 60, background: '#0d1117', color: '#e0e0e0',
+          border: '1px solid #21262d', padding: '2px 4px', borderRadius: 3, fontSize: 11, textAlign: 'right' }} />
+      {unit && <span style={{ fontSize: 9, color: '#555' }}>{unit}</span>}
+    </div>
+  );
+}
+function GenBtn({ label, onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      width: '100%', background: '#00ffc8', color: '#06060f', border: 'none',
+      borderRadius: 4, padding: '7px 0', cursor: 'pointer', fontWeight: 700,
+      fontSize: 12, marginTop: 6, letterSpacing: 0.5, fontFamily: 'JetBrains Mono, monospace',
+    }}>{label}</button>
+  );
+}
+function RandBtn({ onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      background: '#1a1f2c', color: '#888', border: '1px solid #21262d',
+      borderRadius: 4, padding: '6px 10px', cursor: 'pointer', fontSize: 11,
+    }}>\u{1F3B2}</button>
+  );
+}
+const P = { fontFamily: 'JetBrains Mono, monospace', color: '#e0e0e0', fontSize: 12, userSelect: 'none', width: '100%' };
 
-export default function CrowdGeneratorPanel({ scene }){
-  const [count, setCount] = useState(50);
-  const [behavior, setBehavior] = useState("Random Walk");
-  const [formation, setFormation] = useState("Random");
-  const [bounds, setBounds] = useState(20);
-  const [animated, setAnimated] = useState(true);
-  const [status, setStatus] = useState("");
-  const [stats, setStats] = useState(null);
-  const agents = useRef([]);
-  const raf = useRef(null);
-  const lastT = useRef(0);
+const ANIM_STATES   = ['Idle','Walk','Run','Cheer','Talk','Sit','Stand','Fight','Dance','Pray','Work'];
+const LOD_PROFILES  = ['Aggressive','Balanced','Quality','Custom'];
+const FORMATION     = ['Random','Grid','Circle','Line','Cluster','Wave'];
+const CROWD_STYLES  = ['Generic','Medieval','Modern','Sci-Fi','Fantasy','Military','Sports','Zombie','Ritual'];
+const POLY_OPTIONS  = ['Low','Mid','High'];
 
-  function clearCrowd(){
-    cancelAnimationFrame(raf.current);
-    agents.current.forEach(a=>a.dispose(scene));
-    agents.current = [];
-    setStats(null); setStatus("");
-  }
+export default function CrowdGeneratorPanel({ onGenerate }) {
+  const [crowdStyle,      setCrowdStyle]      = useState('Generic');
+  const [seed,            setSeed]            = useState(42);
+  // Size & Spacing
+  const [crowdSize,       setCrowdSize]       = useState(50);
+  const [agentRadius,     setAgentRadius]     = useState(0.40);
+  const [spacing,         setSpacing]         = useState(1.20);
+  const [formation,       setFormation]       = useState('Random');
+  const [areaW,           setAreaW]           = useState(20);
+  const [areaD,           setAreaD]           = useState(20);
+  // Animation
+  const [animState,       setAnimState]       = useState('Idle');
+  const [animVariation,   setAnimVariation]   = useState(0.30);
+  const [animOffset,      setAnimOffset]      = useState(0.40);
+  const [syncLevel,       setSyncLevel]       = useState(0.20);
+  // Variation
+  const [heightVariation, setHeightVariation] = useState(0.20);
+  const [widthVariation,  setWidthVariation]  = useState(0.15);
+  const [genderRatio,     setGenderRatio]     = useState(0.50);
+  const [ageVariation,    setAgeVariation]    = useState(0.30);
+  const [skinVariation,   setSkinVariation]   = useState(0.60);
+  const [outfitVariation, setOutfitVariation] = useState(0.70);
+  const [hairVariation,   setHairVariation]   = useState(0.80);
+  // Randomize options
+  const [randomGender,    setRandomGender]    = useState(true);
+  const [randomOutfit,    setRandomOutfit]    = useState(true);
+  const [randomHair,      setRandomHair]      = useState(true);
+  const [randomScale,     setRandomScale]     = useState(true);
+  const [randomAnim,      setRandomAnim]      = useState(false);
+  // LOD & Performance
+  const [lodProfile,      setLodProfile]      = useState('Balanced');
+  const [lodDist1,        setLodDist1]        = useState(10);
+  const [lodDist2,        setLodDist2]        = useState(30);
+  const [lodDist3,        setLodDist3]        = useState(60);
+  const [batchInstancing, setBatchInstancing] = useState(true);
+  const [occlusionCull,   setOcclusionCull]   = useState(true);
+  const [impostorDist,    setImpostorDist]    = useState(80);
+  const [maxDrawCalls,    setMaxDrawCalls]    = useState(100);
+  // Output
+  const [polyBudget,      setPolyBudget]      = useState('Low');
+  const [addNavMesh,      setAddNavMesh]      = useState(false);
+  const [separateAgents,  setSeparateAgents]  = useState(false);
 
-  function spawnPosition(i, total, form, bounds){
-    switch(form){
-      case "Circle": { const a=i/total*Math.PI*2, r=bounds*0.6; return new THREE.Vector3(Math.cos(a)*r,0,Math.sin(a)*r); }
-      case "Grid": { const w=Math.ceil(Math.sqrt(total)), gx=i%w-w/2, gz=Math.floor(i/w)-w/2; return new THREE.Vector3(gx*2,0,gz*2); }
-      case "Line": return new THREE.Vector3((i-total/2)*1.5, 0, 0);
-      case "Spiral": { const a=i*0.4, r=i*0.3; return new THREE.Vector3(Math.cos(a)*r,0,Math.sin(a)*r); }
-      case "Cluster": { const cx=(Math.random()-0.5)*bounds, cz=(Math.random()-0.5)*bounds; return new THREE.Vector3(cx+(Math.random()-0.5)*4,0,cz+(Math.random()-0.5)*4); }
-      default: return new THREE.Vector3((Math.random()-0.5)*bounds*2, 0, (Math.random()-0.5)*bounds*2);
-    }
-  }
-
-  function generate(){
-    if(!scene){ setStatus("No scene"); return; }
-    clearCrowd();
-    setStatus("Spawning crowd…");
-    const newAgents = [];
-    for(let i=0; i<count; i++){
-      const pos = spawnPosition(i, count, formation, bounds);
-      newAgents.push(new Agent(i, pos, behavior, scene));
-    }
-    agents.current = newAgents;
-    setStats({ count, behavior, formation });
-    setStatus(`✓ ${count} agents spawned`);
-
-    if(animated){
-      const tick = (t)=>{
-        const dt = Math.min((t-lastT.current)/1000, 0.05);
-        lastT.current = t;
-        agents.current.forEach(a=>a.update(dt, agents.current, bounds, behavior));
-        raf.current = requestAnimationFrame(tick);
-      };
-      raf.current = requestAnimationFrame(tick);
-    }
-  }
-
-  useEffect(()=>()=>{ cancelAnimationFrame(raf.current); },[]);
-
-  function setBehaviorLive(b){ setBehavior(b); agents.current.forEach(a=>a.behavior=b); }
+  const randomize = useCallback(() => {
+    const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+    setCrowdStyle(pick(CROWD_STYLES));
+    setCrowdSize(Math.round(20 + Math.random() * 180));
+    setFormation(pick(FORMATION));
+    setAnimState(pick(ANIM_STATES));
+    setSeed(Math.floor(Math.random() * 9999));
+  }, []);
 
   return (
-    <div style={S.root}>
-      <div style={S.h2}>👥 CROWD GENERATOR</div>
-      <div style={S.section}>
-        <label style={S.label}>Agent Count: {count}</label>
-        <input style={S.input} type="range" min={5} max={500} step={5} value={count} onChange={e=>setCount(+e.target.value)}/>
-        <label style={S.label}>Formation</label>
-        <select style={S.select} value={formation} onChange={e=>setFormation(e.target.value)}>
-          {FORMATION.map(f=><option key={f}>{f}</option>)}
-        </select>
-        <label style={S.label}>Behavior</label>
-        <select style={S.select} value={behavior} onChange={e=>setBehaviorLive(e.target.value)}>
-          {BEHAVIORS.map(b=><option key={b}>{b}</option>)}
-        </select>
-        <label style={S.label}>Bounds Radius: {bounds}m</label>
-        <input style={S.input} type="range" min={5} max={100} value={bounds} onChange={e=>setBounds(+e.target.value)}/>
-        <label style={{...S.label,cursor:"pointer"}}><input type="checkbox" checked={animated} onChange={e=>setAnimated(e.target.checked)}/> Animate in Real-Time</label>
-      </div>
-      <button style={S.btn} onClick={generate}>⚡ Generate Crowd</button>
-      <button style={S.btnO} onClick={clearCrowd}>🗑 Clear</button>
-      {status && <div style={{...S.stat,marginTop:8}}>{status}</div>}
-      {stats && (
-        <div style={S.section}>
-          <div style={S.stat}>Agents: {stats.count}</div>
-          <div style={S.stat}>Behavior: {stats.behavior}</div>
-          <div style={S.stat}>Formation: {stats.formation}</div>
-        </div>
-      )}
-      <div style={S.section}>
-        <div style={{fontSize:10,color:"#888",lineHeight:1.6}}>
-          Steering: seek-target + separation + velocity clamping<br/>
-          Each agent: capsule body + colored torso + walk bob<br/>
-          Behaviors update live without re-spawning
-        </div>
+    <div style={P}>
+      <Section title="\u{1F465} Crowd Style">
+        <Badges items={CROWD_STYLES} active={crowdStyle} onSelect={setCrowdStyle} />
+        <Slider label="Random Seed" value={seed} min={0} max={9999} step={1} onChange={setSeed} />
+      </Section>
+      <Section title="Size & Layout">
+        <NumInput label="Agent Count"  value={crowdSize}   min={1}  max={500} onChange={setCrowdSize}   />
+        <NumInput label="Area Width"   value={areaW}       min={5}  max={200} onChange={setAreaW}       unit="m" />
+        <NumInput label="Area Depth"   value={areaD}       min={5}  max={200} onChange={setAreaD}       unit="m" />
+        <Slider   label="Agent Radius" value={agentRadius} onChange={setAgentRadius} />
+        <Slider   label="Min Spacing"  value={spacing}     min={0.5} max={5} step={0.1} onChange={setSpacing} />
+        <Select   label="Formation"    value={formation}   options={FORMATION} onChange={setFormation}  />
+      </Section>
+      <Section title="Animation">
+        <Badges items={ANIM_STATES} active={animState} onSelect={setAnimState} />
+        <Slider label="Variation"    value={animVariation} onChange={setAnimVariation} />
+        <Slider label="Time Offset"  value={animOffset}    onChange={setAnimOffset}    />
+        <Slider label="Sync Level"   value={syncLevel}     onChange={setSyncLevel}     />
+        <Check  label="Random Anim per Agent" value={randomAnim} onChange={setRandomAnim} />
+      </Section>
+      <Section title="Agent Variation">
+        <Slider label="Height"    value={heightVariation}  onChange={setHeightVariation}  />
+        <Slider label="Width"     value={widthVariation}   onChange={setWidthVariation}   />
+        <Slider label="Gender Ratio (M\u2192F)" value={genderRatio} onChange={setGenderRatio} />
+        <Slider label="Age"       value={ageVariation}     onChange={setAgeVariation}     />
+        <Slider label="Skin Tone" value={skinVariation}    onChange={setSkinVariation}    />
+        <Slider label="Outfit"    value={outfitVariation}  onChange={setOutfitVariation}  />
+        <Slider label="Hair"      value={hairVariation}    onChange={setHairVariation}    />
+        <Check  label="Random Gender"  value={randomGender}  onChange={setRandomGender}  />
+        <Check  label="Random Outfit"  value={randomOutfit}  onChange={setRandomOutfit}  />
+        <Check  label="Random Hair"    value={randomHair}    onChange={setRandomHair}    />
+        <Check  label="Random Scale"   value={randomScale}   onChange={setRandomScale}   />
+      </Section>
+      <Section title="\u26A1 LOD & Performance" defaultOpen={false}>
+        <Select   label="LOD Profile"     value={lodProfile}     options={LOD_PROFILES} onChange={setLodProfile}     />
+        <NumInput label="LOD 1 Distance"  value={lodDist1}  min={5}  max={50}  onChange={setLodDist1}  unit="m" />
+        <NumInput label="LOD 2 Distance"  value={lodDist2}  min={20} max={100} onChange={setLodDist2}  unit="m" />
+        <NumInput label="LOD 3 Distance"  value={lodDist3}  min={40} max={200} onChange={setLodDist3}  unit="m" />
+        <NumInput label="Impostor Dist"   value={impostorDist} min={50} max={300} onChange={setImpostorDist} unit="m" />
+        <NumInput label="Max Draw Calls"  value={maxDrawCalls} min={10} max={500} onChange={setMaxDrawCalls}  />
+        <Check  label="GPU Instancing"    value={batchInstancing} onChange={setBatchInstancing} />
+        <Check  label="Occlusion Culling" value={occlusionCull}   onChange={setOcclusionCull}   />
+      </Section>
+      <Section title="\u2699 Output" defaultOpen={false}>
+        <Select label="Poly Budget per Agent" value={polyBudget} options={POLY_OPTIONS} onChange={setPolyBudget} />
+        <Check  label="Add Nav Mesh"           value={addNavMesh}      onChange={setAddNavMesh}      />
+        <Check  label="Separate Agent Objects" value={separateAgents}  onChange={setSeparateAgents}  />
+      </Section>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <RandBtn onClick={randomize} />
+        <GenBtn label="\u26a1 Generate Crowd" onClick={() => onGenerate?.({
+          crowdStyle, seed,
+          layout: { crowdSize, agentRadius, spacing, formation, areaW, areaD },
+          animation: { animState, animVariation, animOffset, syncLevel, randomAnim },
+          variation: { heightVariation, widthVariation, genderRatio, ageVariation, skinVariation, outfitVariation, hairVariation, randomGender, randomOutfit, randomHair, randomScale },
+          lod: { lodProfile, lodDist1, lodDist2, lodDist3, impostorDist, maxDrawCalls, batchInstancing, occlusionCull },
+          output: { polyBudget, addNavMesh, separateAgents },
+        })} />
       </div>
     </div>
   );
 }
+
+// -----------------------------------------------------------------------------
+// SPX Mesh Editor — Generator Panel
+// Props: onGenerate(params)  |  onReset()
+// Design: #06060f bg  #0d1117 panel  #21262d border  #00ffc8 teal
+// Font: JetBrains Mono  |  All sliders normalized 0.0–1.0
+// Keyboard: Enter=Generate  Shift+R=Randomize  Ctrl+Z=Undo
+// Presets: localStorage spx_presets_<PanelName>
+// Integration: mounts in SPX Mesh Editor right sidebar
+// Generated geometry: THREE.Group with userData.params
+// -----------------------------------------------------------------------------
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//

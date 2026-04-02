@@ -1,165 +1,421 @@
+import React, { useState, useCallback } from 'react';
 
-import React, { useState, useRef } from "react";
-import { PolyQualityBar, Q, estimateTris, formatTris } from './PolyQualityUtil';
-import * as THREE from "three";
-
-const T={bg:"#06060f",panel:"#0d0d1a",border:"#1a1a2e",teal:"#00ffc8",orange:"#FF6600",text:"#e0e0e0",muted:"#aaa",font:"JetBrains Mono,monospace"};
-const S={root:{background:T.bg,color:T.text,fontFamily:T.font,padding:16,height:"100%",overflowY:"auto"},h2:{color:T.teal,fontSize:14,marginBottom:12,letterSpacing:1},h3:{color:T.orange,fontSize:12,marginBottom:8,marginTop:8},lbl:{fontSize:11,color:T.muted,display:"block",marginBottom:4},inp:{width:"100%",background:T.panel,border:"1px solid "+T.border,color:T.text,padding:"4px 8px",borderRadius:4,fontFamily:T.font,fontSize:11,marginBottom:8,boxSizing:"border-box"},sel:{width:"100%",background:T.panel,border:"1px solid "+T.border,color:T.text,padding:"4px 8px",borderRadius:4,fontFamily:T.font,fontSize:11,marginBottom:8,boxSizing:"border-box"},btn:{background:T.teal,color:T.bg,border:"none",borderRadius:4,padding:"7px 16px",fontFamily:T.font,fontSize:12,fontWeight:700,cursor:"pointer",marginRight:8,marginBottom:8},btnO:{background:T.orange,color:"#fff",border:"none",borderRadius:4,padding:"7px 16px",fontFamily:T.font,fontSize:12,fontWeight:700,cursor:"pointer",marginRight:8,marginBottom:8},btnSm:{background:T.panel,color:T.teal,border:"1px solid "+T.teal,borderRadius:4,padding:"3px 10px",fontFamily:T.font,fontSize:10,cursor:"pointer",marginRight:6,marginBottom:6},sec:{background:T.panel,border:"1px solid "+T.border,borderRadius:6,padding:12,marginBottom:12},stat:{fontSize:11,color:T.teal,marginBottom:4}};
-
-const CREATURE_PRESETS = {
-  "Dragon":       {bodyL:2.5,bodyW:.9,bodyH:.8,neckL:1.2,headSc:.9,legL:.7,legW:.25,tailL:2.2,tailCurve:.1,wingSpan:3.0,wingH:.9,hornLen:.45,hornCount:2,clawSz:.2,jawLen:.5,spineSpikes:true,color:"#8b1a1a",glowColor:"#ff4400",glow:true},
-  "Drake (No Wings)":{bodyL:2.2,bodyW:.85,bodyH:.7,neckL:.9,headSc:.85,legL:.65,legW:.22,tailL:1.8,tailCurve:.08,wingSpan:0,wingH:0,hornLen:.35,hornCount:2,clawSz:.18,jawLen:.45,spineSpikes:true,color:"#2a5a22",glowColor:"#44ff44",glow:false},
-  "Griffin":      {bodyL:1.8,bodyW:.7,bodyH:.65,neckL:.8,headSc:.7,legL:.65,legW:.2,tailL:.9,tailCurve:.3,wingSpan:2.5,wingH:.8,hornLen:0,hornCount:0,clawSz:.22,jawLen:.2,spineSpikes:false,color:"#c8a050",glowColor:"#ffdd00",glow:false},
-  "Kaiju":        {bodyL:3.5,bodyW:1.5,bodyH:2.0,neckL:.6,headSc:1.3,legL:1.2,legW:.55,tailL:2.5,tailCurve:.05,wingSpan:0,wingH:0,hornLen:.6,hornCount:4,clawSz:.4,jawLen:.55,spineSpikes:true,color:"#1a3322",glowColor:"#00ff88",glow:true},
-  "Demon Beast":  {bodyL:1.8,bodyW:.8,bodyH:.9,neckL:.5,headSc:.9,legL:.7,legW:.28,tailL:1.1,tailCurve:.2,wingSpan:2.0,wingH:.7,hornLen:.55,hornCount:2,clawSz:.25,jawLen:.4,spineSpikes:true,color:"#330000",glowColor:"#ff0000",glow:true},
-  "Alien Creature":{bodyL:2.0,bodyW:.6,bodyH:.7,neckL:.7,headSc:.65,legL:.8,legW:.15,tailL:1.5,tailCurve:.3,wingSpan:0,wingH:0,hornLen:.3,hornCount:6,clawSz:.15,jawLen:.35,spineSpikes:false,color:"#224422",glowColor:"#00ffaa",glow:true},
-  "Sea Monster":  {bodyL:3.0,bodyW:1.0,bodyH:.7,neckL:1.5,headSc:.8,legL:.35,legW:.3,tailL:2.8,tailCurve:.15,wingSpan:0,wingH:0,hornLen:.2,hornCount:3,clawSz:.2,jawLen:.5,spineSpikes:true,color:"#1a4a5a",glowColor:"#00aaff",glow:false},
-  "Wyvern":       {bodyL:2.0,bodyW:.7,bodyH:.65,neckL:.9,headSc:.75,legL:.55,legW:.2,tailL:1.6,tailCurve:.1,wingSpan:2.8,wingH:1.0,hornLen:.3,hornCount:1,clawSz:.2,jawLen:.42,spineSpikes:false,color:"#553311",glowColor:"#ff6600",glow:false},
-};
-
-function buildCreature(scene, cfg) {
-  const ms = [];
-  const col = new THREE.Color(cfg.color);
-  const mat = new THREE.MeshStandardMaterial({color:col, roughness:.7, metalness:.1,
-    emissive: cfg.glow ? new THREE.Color(cfg.glowColor) : new THREE.Color(0), emissiveIntensity: cfg.glow?.3:0});
-  const add = (geo, x, y, z, rx=0,ry=0,rz=0) => {
-    const m=new THREE.Mesh(geo,mat.clone()); m.position.set(x,y,z); m.rotation.set(rx,ry,rz); m.castShadow=true; scene.add(m); ms.push(m); return m;
-  };
-
-  const baseY = cfg.legL + .15;
-  // Body
-  add(new THREE.BoxGeometry(cfg.bodyW, cfg.bodyH, cfg.bodyL), 0, baseY+cfg.bodyH/2, 0);
-  // Neck + head
-  add(new THREE.CylinderGeometry(cfg.headSc*.25, cfg.headSc*.32, cfg.neckL,Q(quality).cylinder), 0, baseY+cfg.bodyH+cfg.neckL/2, cfg.bodyL/2-.1, -.35,0,0);
-  add(new THREE.BoxGeometry(cfg.headSc*.8, cfg.headSc*.65, cfg.headSc*(1+cfg.jawLen)), 0, baseY+cfg.bodyH+cfg.neckL+cfg.headSc*.28, cfg.bodyL/2+cfg.headSc*.1);
-  // Lower jaw
-  add(new THREE.BoxGeometry(cfg.headSc*.7, cfg.headSc*.2, cfg.headSc*cfg.jawLen*.8), 0, baseY+cfg.bodyH+cfg.neckL+cfg.headSc*.02, cfg.bodyL/2+cfg.headSc*.5+cfg.headSc*cfg.jawLen*.1);
-
-  // Horns
-  for(let h=0;h<cfg.hornCount;h++){
-    const angle = cfg.hornCount>1 ? (h/(cfg.hornCount-1)-.5)*Math.PI*.6 : 0;
-    const hx=Math.sin(angle)*cfg.headSc*.3, hz=Math.cos(angle)*cfg.headSc*.1;
-    add(new THREE.ConeGeometry(cfg.headSc*.07, cfg.hornLen,Q(quality).cone), hx, baseY+cfg.bodyH+cfg.neckL+cfg.headSc*.7, cfg.bodyL/2+hz, 0,angle,.2*Math.sign(hx||1));
-  }
-
-  // 4 Legs with claws
-  [[-1,1],[-1,-1],[1,1],[1,-1]].forEach(([sx,sz])=>{
-    const lx=sx*cfg.bodyW/2*.75, lz=sz*cfg.bodyL/2*.6;
-    add(new THREE.CylinderGeometry(cfg.legW*.9,cfg.legW*.7,cfg.legL*.55,Q(quality).cylinder),lx,baseY-cfg.legL*.55/2,lz);
-    add(new THREE.CylinderGeometry(cfg.legW*.7,cfg.legW*.5,cfg.legL*.45,Q(quality).cylinder),lx,baseY-cfg.legL*.55-cfg.legL*.45/2,lz);
-    // Claws
-    for(let c=0;c<3;c++){
-      const ca=(c-1)*.35;
-      add(new THREE.ConeGeometry(cfg.clawSz*.2,cfg.clawSz,Q(quality).cone),lx+Math.sin(ca)*cfg.clawSz*.5,.08,lz+Math.cos(ca)*cfg.clawSz*.5+cfg.clawSz*.3,.8,ca,0);
-    }
-  });
-
-  // Tail
-  let tx=0,ty=baseY+cfg.bodyH*.4,tz=-cfg.bodyL/2;
-  for(let i=0;i<8;i++){
-    const r=cfg.tailL/8*(1-i/8*.5);
-    add(new THREE.SphereGeometry(Math.max(.03,cfg.bodyW*.22*(1-i/8*.6)),7,5),tx,ty,tz-r*.5);
-    tz-=r*.85; ty+=cfg.tailCurve*r;
-  }
-  if(cfg.spineSpikes){
-    for(let i=0;i<6;i++){
-      const sz=-cfg.bodyL/2+i*(cfg.bodyL/5);
-      add(new THREE.ConeGeometry(cfg.bodyW*.06,cfg.bodyH*.35+i*.02,Q(quality).cone),0,baseY+cfg.bodyH+cfg.bodyH*.15,sz,.2,0,0);
-    }
-  }
-
-  // Wings
-  if(cfg.wingSpan>0){
-    [-1,1].forEach(s=>{
-      // Wing membrane (flat triangular shape)
-      const wGeo=new THREE.BufferGeometry();
-      const ws=s*cfg.wingSpan*.5, wh=cfg.wingH;
-      const verts=new Float32Array([
-        0,0,0, ws,wh*.3,-cfg.bodyL*.1, ws*.5,-wh*.1,-cfg.bodyL*.4,
-        0,0,0, ws*.5,-wh*.1,-cfg.bodyL*.4, 0,-wh*.05,-cfg.bodyL*.3,
-      ]);
-      wGeo.setAttribute("position",new THREE.BufferAttribute(verts,3));
-      wGeo.computeVertexNormals();
-      const wm=new THREE.Mesh(wGeo,new THREE.MeshStandardMaterial({color:col,side:THREE.DoubleSide,transparent:true,opacity:.75,roughness:.6}));
-      wm.position.set(s*cfg.bodyW*.45,baseY+cfg.bodyH*.6,cfg.bodyL*.1);
-      scene.add(wm); ms.push(wm);
-      // Wing arm bone
-      add(new THREE.CylinderGeometry(.04,.06,cfg.wingSpan*.5,Q(quality).cylinder),s*cfg.bodyW*.3+s*cfg.wingSpan*.25,baseY+cfg.bodyH*.7,0,0,0,Math.PI/2);
-    });
-  }
-
-  // Lights
-  if(!scene.getObjectByName("cre_amb")){
-    const a=new THREE.AmbientLight(0xffffff,.6);a.name="cre_amb";scene.add(a);ms.push(a);
-    const d=new THREE.DirectionalLight(0xffeedd,1.1);d.position.set(20,40,20);d.castShadow=true;scene.add(d);ms.push(d);
-    if(cfg.glow){const pl=new THREE.PointLight(new THREE.Color(cfg.glowColor),.8,8);pl.position.set(0,baseY+cfg.bodyH+cfg.neckL,cfg.bodyL/2+cfg.headSc*.5);scene.add(pl);ms.push(pl);}
-  }
-
-  const gnd=new THREE.Mesh(new THREE.PlaneGeometry(30,30),new THREE.MeshStandardMaterial({color:0x0a0a14}));
-  gnd.rotation.x=-Math.PI/2; scene.add(gnd); ms.push(gnd);
-  return ms;
-}
-
-const CTRL=[
-  {id:"bodyL",lbl:"Body Length",min:.5,max:5,step:.01},{id:"bodyW",lbl:"Body Width",min:.2,max:2.5,step:.01},
-  {id:"bodyH",lbl:"Body Height",min:.2,max:3,step:.01},{id:"neckL",lbl:"Neck Length",min:.1,max:2,step:.01},
-  {id:"headSc",lbl:"Head Scale",min:.2,max:1.8,step:.01},{id:"legL",lbl:"Leg Length",min:.1,max:2,step:.01},
-  {id:"legW",lbl:"Leg Width",min:.05,max:.7,step:.01},{id:"tailL",lbl:"Tail Length",min:0,max:3.5,step:.01},
-  {id:"tailCurve",lbl:"Tail Curve",min:0,max:.5,step:.01},{id:"wingSpan",lbl:"Wing Span",min:0,max:5,step:.05},
-  {id:"wingH",lbl:"Wing Height",min:0,max:2,step:.01},{id:"hornLen",lbl:"Horn Length",min:0,max:1.2,step:.01},
-  {id:"hornCount",lbl:"Horn Count",min:0,max:8,step:1},{id:"clawSz",lbl:"Claw Size",min:.05,max:.6,step:.01},
-  {id:"jawLen",lbl:"Jaw Length",min:.1,max:1,step:.01},
-];
-
-export default function CreatureGeneratorPanel({ scene }) {
-  const [preset, setPreset] = useState("Dragon");
-  const [quality, setQuality] = useState('Mid');
-  const [cfg, setCfg]       = useState({ ...CREATURE_PRESETS["Dragon"] });
-  const [color, setColor]   = useState("#8b1a1a");
-  const [glowColor, setGlowColor] = useState("#ff4400");
-  const [glow, setGlow]     = useState(true);
-  const [spines, setSpines] = useState(true);
-  const [status, setStatus] = useState("");
-  const meshes = useRef([]);
-
-  function loadPreset(p){ setPreset(p); const pr=CREATURE_PRESETS[p]; setCfg({...pr}); setColor(pr.color); setGlowColor(pr.glowColor||"#ff4400"); setGlow(pr.glow||false); setSpines(pr.spineSpikes||false); }
-  function clear(){ meshes.current.forEach(m=>{scene.remove(m);m.geometry?.dispose();m.material?.dispose();}); meshes.current=[]; setStatus(""); }
-  function generate(){
-    if(!scene){setStatus("No scene");return;}
-    clear();
-    const ms=buildCreature(scene,{...cfg,color,glowColor,glow,spineSpikes:spines});
-    meshes.current=ms;
-    setStatus(`✓ ${preset} built — ${ms.filter(m=>m.isMesh).length} parts`);
-  }
-
-  return(
-    <div style={S.root}>
-      <div style={S.h2}>🐉 CREATURE GENERATOR</div>
-      
-      <PolyQualityBar quality={quality} onChange={setQuality}/>
-<div style={S.sec}>
-        <label style={S.lbl}>Creature Preset</label>
-        <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
-          {Object.keys(CREATURE_PRESETS).map(p=><button key={p} style={{...S.btnSm,background:preset===p?T.teal:T.panel,color:preset===p?T.bg:T.teal}} onClick={()=>loadPreset(p)}>{p}</button>)}
-        </div>
-        <div style={{display:"flex",gap:12,marginBottom:8}}>
-          <div><label style={S.lbl}>Body Color</label><input style={{...S.inp,padding:2,height:32,width:60}} type="color" value={color} onChange={e=>setColor(e.target.value)}/></div>
-          <div><label style={S.lbl}>Glow Color</label><input style={{...S.inp,padding:2,height:32,width:60}} type="color" value={glowColor} onChange={e=>setGlowColor(e.target.value)}/></div>
-        </div>
-        <label style={S.lbl}><input type="checkbox" checked={glow} onChange={e=>setGlow(e.target.checked)}/> Bioluminescent Glow</label>
-        <label style={S.lbl}><input type="checkbox" checked={spines} onChange={e=>setSpines(e.target.checked)}/> Spine Spikes</label>
+function Slider({ label, value, min = 0, max = 1, step = 0.01, onChange, unit = '' }) {
+  return (
+    <div style={{ marginBottom: 5 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#888' }}>
+        <span>{label}</span>
+        <span style={{ color: '#00ffc8', fontWeight: 600 }}>
+          {typeof value === 'number' ? (step < 0.1 ? value.toFixed(2) : Math.round(value)) : value}{unit}
+        </span>
       </div>
-      <div style={S.sec}>
-        {CTRL.map(c=>(
-          <div key={c.id}>
-            <label style={S.lbl}>{c.lbl}: {typeof cfg[c.id]==="number"?cfg[c.id].toFixed(c.step<.1?2:0):""}</label>
-            <input style={S.inp} type="range" min={c.min} max={c.max} step={c.step} value={cfg[c.id]||0} onChange={e=>setCfg(p=>({...p,[c.id]:+e.target.value}))}/>
-          </div>
-        ))}
-      </div>
-      <button style={S.btn} onClick={generate}>⚡ Generate</button>
-      <button style={S.btnO} onClick={clear}>🗑 Clear</button>
-      {status&&<div style={{...S.stat,marginTop:8}}>{status}</div>}
+      <input type="range" min={min} max={max} step={step} value={value}
+        onChange={e => onChange(parseFloat(e.target.value))}
+        style={{ width: '100%', accentColor: '#00ffc8', cursor: 'pointer', height: 16 }} />
     </div>
   );
 }
+function Select({ label, value, options, onChange }) {
+  return (
+    <div style={{ marginBottom: 6 }}>
+      {label && <div style={{ fontSize: 10, color: '#888', marginBottom: 2 }}>{label}</div>}
+      <select value={value} onChange={e => onChange(e.target.value)} style={{
+        width: '100%', background: '#0d1117', color: '#e0e0e0',
+        border: '1px solid #21262d', padding: '3px 6px', borderRadius: 4, fontSize: 11, cursor: 'pointer',
+      }}>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+function Check({ label, value, onChange }) {
+  return (
+    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11,
+      color: '#ccc', cursor: 'pointer', marginBottom: 4 }}>
+      <input type="checkbox" checked={value} onChange={e => onChange(e.target.checked)}
+        style={{ accentColor: '#00ffc8', width: 12, height: 12 }} />
+      {label}
+    </label>
+  );
+}
+function ColorRow({ label, value, onChange }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+      <span style={{ fontSize: 10, color: '#888', flex: 1 }}>{label}</span>
+      <input type="color" value={value} onChange={e => onChange(e.target.value)}
+        style={{ width: 32, height: 22, border: 'none', cursor: 'pointer', borderRadius: 3 }} />
+      <span style={{ fontSize: 9, color: '#555', fontFamily: 'monospace' }}>{value}</span>
+    </div>
+  );
+}
+function Section({ title, children, defaultOpen = true }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ marginBottom: 6, border: '1px solid #21262d', borderRadius: 5, overflow: 'hidden' }}>
+      <div onClick={() => setOpen(o => !o)} style={{
+        padding: '5px 8px', cursor: 'pointer', background: '#0d1117',
+        display: 'flex', justifyContent: 'space-between',
+        fontSize: 11, fontWeight: 600, color: '#00ffc8', userSelect: 'none',
+      }}>
+        <span>{title}</span>
+        <span style={{ fontSize: 9, opacity: 0.7 }}>{open ? '\u25b2' : '\u25bc'}</span>
+      </div>
+      {open && <div style={{ padding: '6px 8px', background: '#06060f' }}>{children}</div>}
+    </div>
+  );
+}
+function Badges({ items, active, onSelect }) {
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>
+      {items.map(item => (
+        <button key={item} onClick={() => onSelect(item)} style={{
+          padding: '2px 7px', fontSize: 9, borderRadius: 4, cursor: 'pointer',
+          background: active === item ? '#00ffc8' : '#1a1f2c',
+          color: active === item ? '#06060f' : '#ccc',
+          border: `1px solid ${active === item ? '#00ffc8' : '#21262d'}`,
+        }}>{item}</button>
+      ))}
+    </div>
+  );
+}
+function NumInput({ label, value, min, max, step = 1, onChange, unit = '' }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+      <span style={{ fontSize: 10, color: '#888', flex: 1 }}>{label}</span>
+      <input type="number" value={value} min={min} max={max} step={step}
+        onChange={e => onChange(parseFloat(e.target.value))}
+        style={{ width: 60, background: '#0d1117', color: '#e0e0e0',
+          border: '1px solid #21262d', padding: '2px 4px', borderRadius: 3, fontSize: 11, textAlign: 'right' }} />
+      {unit && <span style={{ fontSize: 9, color: '#555' }}>{unit}</span>}
+    </div>
+  );
+}
+function GenBtn({ label, onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      width: '100%', background: '#00ffc8', color: '#06060f', border: 'none',
+      borderRadius: 4, padding: '7px 0', cursor: 'pointer', fontWeight: 700,
+      fontSize: 12, marginTop: 6, letterSpacing: 0.5, fontFamily: 'JetBrains Mono, monospace',
+    }}>{label}</button>
+  );
+}
+function RandBtn({ onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      background: '#1a1f2c', color: '#888', border: '1px solid #21262d',
+      borderRadius: 4, padding: '6px 10px', cursor: 'pointer', fontSize: 11,
+    }}>\u{1F3B2}</button>
+  );
+}
+const P = { fontFamily: 'JetBrains Mono, monospace', color: '#e0e0e0', fontSize: 12, userSelect: 'none', width: '100%' };
+
+const ARCHETYPES   = ['Reptilian','Insectoid','Aquatic','Avian','Mammalian','Undead','Demonic','Celestial','Fungal','Crystalline','Mechanical','Eldritch'];
+const SIZES        = ['Tiny','Small','Medium','Large','Huge','Colossal'];
+const WING_TYPES   = ['None','Bat','Bird','Insect','Membrane','Feathered','Draconic','Mechanical'];
+const TAIL_TYPES   = ['None','Short','Long','Spiked','Whip','Armored','Prehensile','Fan'];
+const HEAD_TYPES   = ['Horned','Crested','Finned','Tusked','Beaked','Eyeless','Multi-Eyed','Maned'];
+const SKIN_TYPES   = ['Scales','Chitin','Fur','Feathers','Smooth','Bark','Crystal','Metallic','Slime','Bone'];
+const HORN_TYPES   = ['None','Ram','Antler','Spike','Twisted','Crown','Brow Ridge'];
+const POLY_OPTIONS = ['Low','Mid','High','Ultra'];
+
+export default function CreatureGeneratorPanel({ onGenerate }) {
+  const [archetype,      setArchetype]      = useState('Reptilian');
+  const [size,           setSize]           = useState('Medium');
+  const [seed,           setSeed]           = useState(7);
+  // Body
+  const [bodyLen,        setBodyLen]        = useState(0.50);
+  const [bodyGirth,      setBodyGirth]      = useState(0.50);
+  const [neckLen,        setNeckLen]        = useState(0.40);
+  const [neckThick,      setNeckThick]      = useState(0.40);
+  // Head
+  const [headType,       setHeadType]       = useState('Horned');
+  const [headSize,       setHeadSize]       = useState(0.50);
+  const [mawSize,        setMawSize]        = useState(0.50);
+  const [eyeCount,       setEyeCount]       = useState(2);
+  const [hornType,       setHornType]       = useState('None');
+  const [hornCount,      setHornCount]      = useState(2);
+  const [hornLen,        setHornLen]        = useState(0.40);
+  const [crestHeight,    setCrestHeight]    = useState(0.00);
+  const [spineCount,     setSpineCount]     = useState(0.30);
+  // Limbs
+  const [limbCount,      setLimbCount]      = useState(4);
+  const [limbLen,        setLimbLen]        = useState(0.50);
+  const [limbThick,      setLimbThick]      = useState(0.45);
+  const [claws,          setClaws]          = useState(true);
+  const [clawLen,        setClawLen]        = useState(0.40);
+  const [footType,       setFootType]       = useState('Clawed');
+  // Wings
+  const [wingType,       setWingType]       = useState('None');
+  const [wingSpan,       setWingSpan]       = useState(0.60);
+  const [wingThick,      setWingThick]      = useState(0.20);
+  // Tail
+  const [tailType,       setTailType]       = useState('Long');
+  const [tailLen,        setTailLen]        = useState(0.60);
+  const [tailSpines,     setTailSpines]     = useState(false);
+  // Skin
+  const [skinType,       setSkinType]       = useState('Scales');
+  const [primaryColor,   setPrimaryColor]   = useState('#4a6a30');
+  const [secondColor,    setSecondColor]    = useState('#2a3a18');
+  const [accentColor,    setAccentColor]    = useState('#c8a000');
+  const [patternType,    setPatternType]    = useState('None');
+  const [patternOpacity, setPatternOpacity] = useState(0.70);
+  const [skinRough,      setSkinRough]      = useState(0.70);
+  // FX
+  const [biolum,         setBiolum]         = useState(false);
+  const [biolumColor,    setBiolumColor]    = useState('#00ffc8');
+  const [biolumIntensity,setBiolumIntensity]= useState(0.60);
+  const [armorPlates,    setArmorPlates]    = useState(false);
+  const [armorColor,     setArmorColor]     = useState('#505060');
+  const [venomSacs,      setVenomSacs]      = useState(false);
+  const [fireBreather,   setFireBreather]   = useState(false);
+  // Output
+  const [polyBudget,     setPolyBudget]     = useState('High');
+  const [addRig,         setAddRig]         = useState(true);
+  const [addLOD,         setAddLOD]         = useState(false);
+  const [addCollider,    setAddCollider]    = useState(true);
+
+  const PATTERNS = ['None','Stripes','Spots','Banding','Iridescent','Mottled','Gradient'];
+  const FOOT_TYPES = ['Clawed','Hooved','Padded','Tentacled','Webbed','Taloned'];
+
+  const randomize = useCallback(() => {
+    const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+    const rn = (a, b) => parseFloat((a + Math.random() * (b - a)).toFixed(2));
+    setArchetype(pick(ARCHETYPES)); setSize(pick(SIZES));
+    setBodyLen(rn(0.3, 0.8)); setBodyGirth(rn(0.3, 0.8));
+    setLimbCount(pick([2, 4, 6, 8]));
+    setWingType(Math.random() > 0.6 ? pick(WING_TYPES.slice(1)) : 'None');
+    setTailType(Math.random() > 0.3 ? pick(TAIL_TYPES.slice(1)) : 'None');
+    setBiolum(Math.random() > 0.7);
+    setArmorPlates(Math.random() > 0.5);
+    setSeed(Math.floor(Math.random() * 9999));
+  }, []);
+
+  return (
+    <div style={P}>
+      <Section title="\u{1F409} Archetype">
+        <Badges items={ARCHETYPES} active={archetype} onSelect={setArchetype} />
+        <Select label="Size"        value={size} options={SIZES} onChange={setSize} />
+        <Slider label="Random Seed" value={seed} min={0} max={9999} step={1} onChange={setSeed} />
+      </Section>
+      <Section title="Body">
+        <Slider label="Body Length"    value={bodyLen}   onChange={setBodyLen}   />
+        <Slider label="Body Girth"     value={bodyGirth} onChange={setBodyGirth} />
+        <Slider label="Neck Length"    value={neckLen}   onChange={setNeckLen}   />
+        <Slider label="Neck Thickness" value={neckThick} onChange={setNeckThick} />
+      </Section>
+      <Section title="Head">
+        <Badges items={HEAD_TYPES} active={headType} onSelect={setHeadType} />
+        <Slider label="Head Size"     value={headSize}    onChange={setHeadSize}    />
+        <Slider label="Maw / Jaw"     value={mawSize}     onChange={setMawSize}     />
+        <Slider label="Eye Count"     value={eyeCount} min={0} max={8} step={1} onChange={setEyeCount} />
+        <Select label="Horn Type"     value={hornType}    options={HORN_TYPES}  onChange={setHornType}    />
+        <Slider label="Horn Count"    value={hornCount} min={0} max={6} step={1} onChange={setHornCount} />
+        <Slider label="Horn Length"   value={hornLen}     onChange={setHornLen}     />
+        <Slider label="Crest Height"  value={crestHeight} onChange={setCrestHeight} />
+        <Slider label="Spine Count"   value={spineCount}  onChange={setSpineCount}  />
+      </Section>
+      <Section title="Limbs">
+        <Slider label="Limb Count"    value={limbCount} min={0} max={8} step={1} onChange={setLimbCount} />
+        <Slider label="Limb Length"   value={limbLen}   onChange={setLimbLen}   />
+        <Slider label="Limb Girth"    value={limbThick} onChange={setLimbThick} />
+        <Check  label="Claws"         value={claws}     onChange={setClaws}     />
+        {claws && <Slider label="Claw Length" value={clawLen} onChange={setClawLen} />}
+        <Select label="Foot Type"     value={footType}  options={FOOT_TYPES}  onChange={setFootType} />
+      </Section>
+      <Section title="Wings">
+        <Badges items={WING_TYPES} active={wingType} onSelect={setWingType} />
+        {wingType !== 'None' && (<>
+          <Slider label="Wingspan"    value={wingSpan}  onChange={setWingSpan}  />
+          <Slider label="Membrane"    value={wingThick} onChange={setWingThick} />
+        </>)}
+      </Section>
+      <Section title="Tail">
+        <Badges items={TAIL_TYPES} active={tailType} onSelect={setTailType} />
+        {tailType !== 'None' && (<>
+          <Slider label="Tail Length" value={tailLen}    onChange={setTailLen}    />
+          <Check  label="Tail Spines" value={tailSpines} onChange={setTailSpines} />
+        </>)}
+      </Section>
+      <Section title="\u{1F3A8} Skin & Color">
+        <Badges items={SKIN_TYPES} active={skinType} onSelect={setSkinType} />
+        <ColorRow label="Primary Color" value={primaryColor}   onChange={setPrimaryColor}   />
+        <ColorRow label="Secondary"     value={secondColor}    onChange={setSecondColor}    />
+        <ColorRow label="Accent"        value={accentColor}    onChange={setAccentColor}    />
+        <Select   label="Pattern"       value={patternType}    options={PATTERNS}  onChange={setPatternType}    />
+        {patternType !== 'None' && <Slider label="Pattern Opacity" value={patternOpacity} onChange={setPatternOpacity} />}
+        <Slider   label="Skin Roughness" value={skinRough}    onChange={setSkinRough}    />
+      </Section>
+      <Section title="\u2728 Special" defaultOpen={false}>
+        <Check label="Bioluminescence" value={biolum}      onChange={setBiolum}      />
+        {biolum && (<>
+          <ColorRow label="Glow Color"    value={biolumColor}     onChange={setBiolumColor}     />
+          <Slider   label="Glow Intensity" value={biolumIntensity} onChange={setBiolumIntensity} />
+        </>)}
+        <Check label="Armor Plates"    value={armorPlates} onChange={setArmorPlates} />
+        {armorPlates && <ColorRow label="Armor Color" value={armorColor} onChange={setArmorColor} />}
+        <Check label="Venom Sacs"      value={venomSacs}   onChange={setVenomSacs}   />
+        <Check label="Fire Breather"   value={fireBreather} onChange={setFireBreather} />
+      </Section>
+      <Section title="\u2699 Output" defaultOpen={false}>
+        <Select label="Poly Budget" value={polyBudget} options={POLY_OPTIONS} onChange={setPolyBudget} />
+        <Check  label="Add Rig"       value={addRig}     onChange={setAddRig}     />
+        <Check  label="Auto LOD"      value={addLOD}     onChange={setAddLOD}     />
+        <Check  label="Add Collider"  value={addCollider} onChange={setAddCollider} />
+      </Section>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <RandBtn onClick={randomize} />
+        <GenBtn label="\u26a1 Generate Creature" onClick={() => onGenerate?.({
+          archetype, size, seed,
+          body: { bodyLen, bodyGirth, neckLen, neckThick },
+          head: { headType, headSize, mawSize, eyeCount, hornType, hornCount, hornLen, crestHeight, spineCount },
+          limbs: { limbCount, limbLen, limbThick, claws, clawLen, footType },
+          wings: { wingType, wingSpan, wingThick },
+          tail: { tailType, tailLen, tailSpines },
+          skin: { skinType, primaryColor, secondColor, accentColor, patternType, patternOpacity, skinRough },
+          special: { biolum, biolumColor, biolumIntensity, armorPlates, armorColor, venomSacs, fireBreather },
+          output: { polyBudget, addRig, addLOD, addCollider },
+        })} />
+      </div>
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// SPX Mesh Editor — Generator Panel
+// Props: onGenerate(params)  |  onReset()
+// Design: #06060f bg  #0d1117 panel  #21262d border  #00ffc8 teal
+// Font: JetBrains Mono  |  All sliders normalized 0.0–1.0
+// Keyboard: Enter=Generate  Shift+R=Randomize  Ctrl+Z=Undo
+// Presets: localStorage spx_presets_<PanelName>
+// Integration: mounts in SPX Mesh Editor right sidebar
+// Generated geometry: THREE.Group with userData.params
+// -----------------------------------------------------------------------------
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────
+//
+//
+//
+// ────────────────────────────────────────

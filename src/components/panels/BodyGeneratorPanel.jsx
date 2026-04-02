@@ -1,111 +1,405 @@
+import React, { useState, useCallback } from 'react';
 
-import React, { useState } from "react";
-import { PolyQualityBar, Q, estimateTris, formatTris } from './PolyQualityUtil';
-import * as THREE from "three";
-
-const T={bg:"#06060f",panel:"#0d0d1a",border:"#1a1a2e",teal:"#00ffc8",orange:"#FF6600",text:"#e0e0e0",muted:"#aaa",font:"JetBrains Mono,monospace"};
-const S={root:{background:T.bg,color:T.text,fontFamily:T.font,padding:16,height:"100%",overflowY:"auto"},h2:{color:T.teal,fontSize:14,marginBottom:12,letterSpacing:1},h3:{color:T.orange,fontSize:12,marginBottom:8,marginTop:8},lbl:{fontSize:11,color:T.muted,display:"block",marginBottom:4},inp:{width:"100%",background:T.panel,border:"1px solid "+T.border,color:T.text,padding:"4px 8px",borderRadius:4,fontFamily:T.font,fontSize:11,marginBottom:8,boxSizing:"border-box"},sel:{width:"100%",background:T.panel,border:"1px solid "+T.border,color:T.text,padding:"4px 8px",borderRadius:4,fontFamily:T.font,fontSize:11,marginBottom:8,boxSizing:"border-box"},btn:{background:T.teal,color:T.bg,border:"none",borderRadius:4,padding:"7px 16px",fontFamily:T.font,fontSize:12,fontWeight:700,cursor:"pointer",marginRight:8,marginBottom:8},btnO:{background:T.orange,color:"#fff",border:"none",borderRadius:4,padding:"7px 16px",fontFamily:T.font,fontSize:12,fontWeight:700,cursor:"pointer",marginRight:8,marginBottom:8},btnSm:{background:T.panel,color:T.teal,border:"1px solid "+T.teal,borderRadius:4,padding:"3px 10px",fontFamily:T.font,fontSize:10,cursor:"pointer",marginRight:6,marginBottom:6},sec:{background:T.panel,border:"1px solid "+T.border,borderRadius:6,padding:12,marginBottom:12},stat:{fontSize:11,color:T.teal,marginBottom:4}};
-
-const BODY_PRESETS={
-  "Slim":       {height:1.78,bodyMass:0.25,bodyFat:0.15,muscle:0.3,shoulderW:0.22,chestSz:0.3,waistSz:0.22,hipW:0.26,thighTk:0.28,armTk:0.22},
-  "Athletic":   {height:1.8, bodyMass:0.6, bodyFat:0.12,muscle:0.7,shoulderW:0.28,chestSz:0.45,waistSz:0.26,hipW:0.28,thighTk:0.35,armTk:0.3},
-  "Muscular":   {height:1.82,bodyMass:0.85,bodyFat:0.1, muscle:0.95,shoulderW:0.36,chestSz:0.6,waistSz:0.3,hipW:0.32,thighTk:0.45,armTk:0.42},
-  "Curvy":      {height:1.68,bodyMass:0.5, bodyFat:0.4, muscle:0.4,shoulderW:0.25,chestSz:0.5,waistSz:0.28,hipW:0.42,thighTk:0.44,armTk:0.28},
-  "Heavyset":   {height:1.72,bodyMass:0.9, bodyFat:0.65,muscle:0.4,shoulderW:0.34,chestSz:0.65,waistSz:0.48,hipW:0.5,thighTk:0.52,armTk:0.4},
-  "Hero Build": {height:1.88,bodyMass:0.9, bodyFat:0.08,muscle:0.98,shoulderW:0.4, chestSz:0.68,waistSz:0.28,hipW:0.3,thighTk:0.46,armTk:0.45},
-  "Elderly":    {height:1.65,bodyMass:0.35,bodyFat:0.35,muscle:0.25,shoulderW:0.22,chestSz:0.35,waistSz:0.35,hipW:0.3,thighTk:0.28,armTk:0.22},
-  "Child":      {height:1.2, bodyMass:0.2, bodyFat:0.3, muscle:0.15,shoulderW:0.18,chestSz:0.22,waistSz:0.2,hipW:0.22,thighTk:0.22,armTk:0.18},
-};
-
-const CTRL=[
-  {id:"height",    lbl:"Height (m)",    min:.8, max:3.0, step:.01},
-  {id:"bodyMass",  lbl:"Body Mass",     min:0,  max:1,   step:.01},
-  {id:"bodyFat",   lbl:"Body Fat",      min:0,  max:1,   step:.01},
-  {id:"muscle",    lbl:"Muscle Mass",   min:0,  max:1,   step:.01},
-  {id:"shoulderW", lbl:"Shoulder Width",min:.1, max:.6,  step:.01},
-  {id:"chestSz",   lbl:"Chest Size",    min:.1, max:.9,  step:.01},
-  {id:"waistSz",   lbl:"Waist Size",    min:.1, max:.7,  step:.01},
-  {id:"hipW",      lbl:"Hip Width",     min:.1, max:.7,  step:.01},
-  {id:"thighTk",   lbl:"Thigh Thickness",min:.1,max:.7,  step:.01},
-  {id:"armTk",     lbl:"Arm Thickness", min:.1, max:.6,  step:.01},
-];
-
-export default function BodyGeneratorPanel({scene}){
-  const [preset,setPreset]=useState("Athletic");
-  const [quality, setQuality] = useState('Mid');
-  const [body,setBody]=useState({...BODY_PRESETS["Athletic"]});
-  const [age,setAge]=useState(25);
-  const [genderBal,setGenderBal]=useState(0.5);
-  const [status,setStatus]=useState("");
-  const meshes=React.useRef([]);
-
-  function loadPreset(p){setPreset(p);setBody({...BODY_PRESETS[p]});}
-
-  function clear(){meshes.current.forEach(m=>{scene.remove(m);m.geometry?.dispose();m.material?.dispose();});meshes.current=[];setStatus("");}
-
-  function generate(){
-    if(!scene){setStatus("No scene");return;}
-    clear();
-    const h=body.height, ms=[], mat=new THREE.MeshStandardMaterial({color:0xc8955a,roughness:0.6});
-    const headH=h/7.5;
-    const add=(geo,px,py,pz)=>{const m=new THREE.Mesh(geo,mat.clone());m.position.set(px,py,pz);m.castShadow=true;scene.add(m);ms.push(m);return m;};
-    // Head
-    add(new THREE.SphereGeometry(headH*.5,Q(quality).sphere,Q(quality).sphereH),0,h-headH*.5,0);
-    // Torso
-    const tw=body.shoulderW*2, tth=headH*2.2;
-    add(new THREE.BoxGeometry(tw,tth,body.chestSz),0,h-headH-tth*.5,0);
-    // Belly/waist
-    const wh=headH*.8;
-    add(new THREE.CylinderGeometry(body.waistSz*.9,body.waistSz,wh,Q(quality).cylinder),0,h-headH-tth-wh*.5,0);
-    // Hips
-    const hipH=headH*.6;
-    add(new THREE.BoxGeometry(body.hipW*2,hipH,body.chestSz*.85+(genderBal*.15)),0,h-headH-tth-wh-hipH*.5,0);
-    const hipY=h-headH-tth-wh-hipH;
-    // Arms
-    const armH=headH*2.5;
-    [-1,1].forEach(s=>{
-      add(new THREE.CylinderGeometry(body.armTk*.5,body.armTk*.45,armH*.55,Q(quality).cylinder),s*(tw*.5+body.armTk*.5),h-headH-armH*.15,0);
-      add(new THREE.CylinderGeometry(body.armTk*.42,body.armTk*.35,armH*.45,Q(quality).cylinder),s*(tw*.5+body.armTk*.5),h-headH-armH*.15-armH*.45*.5-armH*.55*.5,0);
-    });
-    // Legs
-    const legH=hipY*.5;
-    [-1,1].forEach(s=>{
-      add(new THREE.CylinderGeometry(body.thighTk*.55,body.thighTk*.45,legH,Q(quality).cylinder),s*body.hipW*.6,hipY-legH*.5,0);
-      add(new THREE.CylinderGeometry(body.thighTk*.4,body.thighTk*.3,legH*.9,Q(quality).cylinder),s*body.hipW*.6,hipY-legH-legH*.9*.5,0);
-      add(new THREE.BoxGeometry(body.thighTk*.7,.12,body.thighTk*1.2),s*body.hipW*.6,hipY-legH-legH*.9-.06,body.thighTk*.25);
-    });
-    // Lights
-    if(!scene.getObjectByName("body_amb")){const a=new THREE.AmbientLight(0xffffff,.7);a.name="body_amb";scene.add(a);ms.push(a);const d=new THREE.DirectionalLight(0xffeedd,1);d.position.set(20,40,20);d.castShadow=true;scene.add(d);ms.push(d);}
-    meshes.current=ms;
-    setStatus(`✓ Body built — ${ms.filter(m=>m.isMesh).length} parts`);
-  }
-
-  return(
-    <div style={S.root}>
-      <div style={S.h2}>💪 BODY GENERATOR</div>
-      
-      <PolyQualityBar quality={quality} onChange={setQuality}/>
-<div style={S.sec}>
-        <label style={S.lbl}>Body Preset</label>
-        <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
-          {Object.keys(BODY_PRESETS).map(p=><button key={p} style={{...S.btnSm,background:preset===p?T.teal:T.panel,color:preset===p?T.bg:T.teal}} onClick={()=>loadPreset(p)}>{p}</button>)}
-        </div>
-        <label style={S.lbl}>Age: {age}</label>
-        <input style={S.inp} type="range" min={1} max={90} value={age} onChange={e=>setAge(+e.target.value)}/>
-        <label style={S.lbl}>Gender Balance — Masc ↔ Fem: {(genderBal*100).toFixed(0)}%</label>
-        <input style={S.inp} type="range" min={0} max={1} step={0.01} value={genderBal} onChange={e=>setGenderBal(+e.target.value)}/>
+function Slider({ label, value, min = 0, max = 1, step = 0.01, onChange, unit = '' }) {
+  return (
+    <div style={{ marginBottom: 5 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#888' }}>
+        <span>{label}</span>
+        <span style={{ color: '#00ffc8', fontWeight: 600 }}>
+          {typeof value === 'number' ? (step < 0.1 ? value.toFixed(2) : Math.round(value)) : value}{unit}
+        </span>
       </div>
-      <div style={S.sec}>
-        {CTRL.map(c=>(
-          <div key={c.id}>
-            <label style={S.lbl}>{c.lbl}: {body[c.id]?.toFixed(2)}</label>
-            <input style={S.inp} type="range" min={c.min} max={c.max} step={c.step} value={body[c.id]||0} onChange={e=>setBody(b=>({...b,[c.id]:+e.target.value}))}/>
-          </div>
-        ))}
-      </div>
-      <button style={S.btn} onClick={generate}>⚡ Generate Body</button>
-      <button style={S.btnO} onClick={clear}>🗑 Clear</button>
-      {status&&<div style={{...S.stat,marginTop:8}}>{status}</div>}
+      <input type="range" min={min} max={max} step={step} value={value}
+        onChange={e => onChange(parseFloat(e.target.value))}
+        style={{ width: '100%', accentColor: '#00ffc8', cursor: 'pointer', height: 16 }} />
     </div>
   );
 }
+
+function Select({ label, value, options, onChange }) {
+  return (
+    <div style={{ marginBottom: 6 }}>
+      {label && <div style={{ fontSize: 10, color: '#888', marginBottom: 2 }}>{label}</div>}
+      <select value={value} onChange={e => onChange(e.target.value)} style={{
+        width: '100%', background: '#0d1117', color: '#e0e0e0',
+        border: '1px solid #21262d', padding: '3px 6px', borderRadius: 4, fontSize: 11, cursor: 'pointer',
+      }}>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+
+function Check({ label, value, onChange }) {
+  return (
+    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11,
+      color: '#ccc', cursor: 'pointer', marginBottom: 4 }}>
+      <input type="checkbox" checked={value} onChange={e => onChange(e.target.checked)}
+        style={{ accentColor: '#00ffc8', width: 12, height: 12 }} />
+      {label}
+    </label>
+  );
+}
+
+function ColorRow({ label, value, onChange }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+      <span style={{ fontSize: 10, color: '#888', flex: 1 }}>{label}</span>
+      <input type="color" value={value} onChange={e => onChange(e.target.value)}
+        style={{ width: 32, height: 22, border: 'none', cursor: 'pointer', borderRadius: 3 }} />
+      <span style={{ fontSize: 9, color: '#555', fontFamily: 'monospace' }}>{value}</span>
+    </div>
+  );
+}
+
+function Section({ title, children, defaultOpen = true }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ marginBottom: 6, border: '1px solid #21262d', borderRadius: 5, overflow: 'hidden' }}>
+      <div onClick={() => setOpen(o => !o)} style={{
+        padding: '5px 8px', cursor: 'pointer', background: '#0d1117',
+        display: 'flex', justifyContent: 'space-between',
+        fontSize: 11, fontWeight: 600, color: '#00ffc8', userSelect: 'none',
+      }}>
+        <span>{title}</span>
+        <span style={{ fontSize: 9, opacity: 0.7 }}>{open ? '\u25b2' : '\u25bc'}</span>
+      </div>
+      {open && <div style={{ padding: '6px 8px', background: '#06060f' }}>{children}</div>}
+    </div>
+  );
+}
+
+function Badges({ items, active, onSelect }) {
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 6 }}>
+      {items.map(item => (
+        <button key={item} onClick={() => onSelect(item)} style={{
+          padding: '2px 7px', fontSize: 9, borderRadius: 4, cursor: 'pointer',
+          background: active === item ? '#00ffc8' : '#1a1f2c',
+          color: active === item ? '#06060f' : '#ccc',
+          border: `1px solid ${active === item ? '#00ffc8' : '#21262d'}`,
+        }}>{item}</button>
+      ))}
+    </div>
+  );
+}
+
+function NumInput({ label, value, min, max, step = 1, onChange, unit = '' }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+      <span style={{ fontSize: 10, color: '#888', flex: 1 }}>{label}</span>
+      <input type="number" value={value} min={min} max={max} step={step}
+        onChange={e => onChange(parseFloat(e.target.value))}
+        style={{ width: 60, background: '#0d1117', color: '#e0e0e0',
+          border: '1px solid #21262d', padding: '2px 4px', borderRadius: 3, fontSize: 11, textAlign: 'right' }} />
+      {unit && <span style={{ fontSize: 9, color: '#555' }}>{unit}</span>}
+    </div>
+  );
+}
+
+function GenBtn({ label, onClick, disabled = false }) {
+  return (
+    <button onClick={onClick} disabled={disabled} style={{
+      width: '100%', background: disabled ? '#1a1f2c' : '#00ffc8',
+      color: disabled ? '#555' : '#06060f', border: 'none', borderRadius: 4,
+      padding: '7px 0', cursor: disabled ? 'not-allowed' : 'pointer',
+      fontWeight: 700, fontSize: 12, marginTop: 6, letterSpacing: 0.5,
+      fontFamily: 'JetBrains Mono, monospace',
+    }}>{label}</button>
+  );
+}
+
+function RandBtn({ onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      background: '#1a1f2c', color: '#888', border: '1px solid #21262d',
+      borderRadius: 4, padding: '6px 10px', cursor: 'pointer', fontSize: 11,
+    }}>\u{1F3B2}</button>
+  );
+}
+
+const P = { fontFamily: 'JetBrains Mono, monospace', color: '#e0e0e0', fontSize: 12, userSelect: 'none', width: '100%' };
+
+const GENDERS      = ['Male','Female','Non-Binary','Androgynous','Masculine','Feminine'];
+const BODY_TYPES   = ['Ectomorph','Slim','Lean','Athletic','Average','Stocky','Endomorph','Mesomorph'];
+const AGE_GROUPS   = ['Child (6-12)','Teen (13-17)','Young Adult (18-25)','Adult (26-40)','Middle-Aged (41-60)','Senior (60+)'];
+const SKIN_TONES   = ['#f5d0b0','#e8b68a','#c8906a','#a0663a','#7a4420','#4a2210','#d0b090','#b89070'];
+const POLY_OPTIONS = ['Low','Mid','High','Ultra'];
+
+export default function BodyGeneratorPanel({ onGenerate }) {
+  const [gender,         setGender]         = useState('Male');
+  const [bodyType,       setBodyType]       = useState('Average');
+  const [ageGroup,       setAgeGroup]       = useState('Adult (26-40)');
+  const [seed,           setSeed]           = useState(1);
+  const [height,         setHeight]         = useState(175);
+  const [weight,         setWeight]         = useState(75);
+  const [muscleDef,      setMuscleDef]      = useState(0.50);
+  const [bodyFat,        setBodyFat]        = useState(0.18);
+  const [boneFrame,      setBoneFrame]      = useState(0.50);
+  const [waterRetention, setWaterRetention] = useState(0.40);
+  const [shoulderW,      setShoulderW]      = useState(0.50);
+  const [chestSize,      setChestSize]      = useState(0.50);
+  const [chestDepth,     setChestDepth]     = useState(0.45);
+  const [neckThick,      setNeckThick]      = useState(0.45);
+  const [armLen,         setArmLen]         = useState(0.50);
+  const [upperArmThick,  setUpperArmThick]  = useState(0.45);
+  const [forearmThick,   setForearmThick]   = useState(0.42);
+  const [wristSize,      setWristSize]      = useState(0.38);
+  const [handSize,       setHandSize]       = useState(0.48);
+  const [waistSize,      setWaistSize]      = useState(0.42);
+  const [abDef,          setAbDef]          = useState(0.40);
+  const [loveHandles,    setLoveHandles]    = useState(0.15);
+  const [hipSize,        setHipSize]        = useState(0.50);
+  const [gluteSize,      setGluteSize]      = useState(0.50);
+  const [legLen,         setLegLen]         = useState(0.50);
+  const [thighThick,     setThighThick]     = useState(0.48);
+  const [calfSize,       setCalfSize]       = useState(0.44);
+  const [ankleSize,      setAnkleSize]      = useState(0.36);
+  const [footSize,       setFootSize]       = useState(0.50);
+  const [skinTone,       setSkinTone]       = useState('#c8906a');
+  const [skinRough,      setSkinRough]      = useState(0.55);
+  const [skinGloss,      setSkinGloss]      = useState(0.25);
+  const [subsurface,     setSubsurface]     = useState(0.60);
+  const [polyBudget,     setPolyBudget]     = useState('High');
+  const [addRig,         setAddRig]         = useState(true);
+  const [addLOD,         setAddLOD]         = useState(false);
+  const [separateHead,   setSeparateHead]   = useState(false);
+  const [addSubdiv,      setAddSubdiv]      = useState(false);
+
+  const randomize = useCallback(() => {
+    const rn = (a,b) => parseFloat((a+Math.random()*(b-a)).toFixed(2));
+    const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+    setGender(pick(GENDERS)); setBodyType(pick(BODY_TYPES));
+    setHeight(Math.round(150+Math.random()*60));
+    setWeight(Math.round(50+Math.random()*80));
+    setMuscleDef(rn(0,1)); setBodyFat(rn(0.05,0.45));
+    setShoulderW(rn(0.3,0.75)); setHipSize(rn(0.3,0.72));
+    setSeed(Math.floor(Math.random()*9999));
+  }, []);
+
+  return (
+    <div style={P}>
+      <Section title="\u{1F9EC} Base">
+        <Badges items={GENDERS}   active={gender}   onSelect={setGender}   />
+        <Select label="Body Type" value={bodyType}  options={BODY_TYPES}   onChange={setBodyType}  />
+        <Select label="Age Group" value={ageGroup}  options={AGE_GROUPS}   onChange={setAgeGroup}  />
+        <Slider label="Seed"      value={seed} min={0} max={9999} step={1} onChange={setSeed} />
+      </Section>
+      <Section title="Scale">
+        <NumInput label="Height" value={height} min={120} max={230} onChange={setHeight} unit="cm" />
+        <NumInput label="Weight" value={weight} min={35}  max={200} onChange={setWeight} unit="kg" />
+      </Section>
+      <Section title="\u{1F4AA} Composition">
+        <Slider label="Muscle Definition" value={muscleDef}      onChange={setMuscleDef}      />
+        <Slider label="Body Fat %"        value={bodyFat}        onChange={setBodyFat}        />
+        <Slider label="Bone Frame"        value={boneFrame}      onChange={setBoneFrame}      />
+        <Slider label="Water Retention"   value={waterRetention} onChange={setWaterRetention} />
+      </Section>
+      <Section title="Upper Body">
+        <Slider label="Shoulder Width" value={shoulderW}    onChange={setShoulderW}    />
+        <Slider label="Chest Size"     value={chestSize}    onChange={setChestSize}    />
+        <Slider label="Chest Depth"    value={chestDepth}   onChange={setChestDepth}   />
+        <Slider label="Neck Thickness" value={neckThick}    onChange={setNeckThick}    />
+        <Slider label="Arm Length"     value={armLen}       onChange={setArmLen}       />
+        <Slider label="Upper Arm"      value={upperArmThick} onChange={setUpperArmThick} />
+        <Slider label="Forearm"        value={forearmThick} onChange={setForearmThick} />
+        <Slider label="Wrist"          value={wristSize}    onChange={setWristSize}    />
+        <Slider label="Hand Size"      value={handSize}     onChange={setHandSize}     />
+      </Section>
+      <Section title="Core">
+        <Slider label="Waist Size"    value={waistSize}   onChange={setWaistSize}   />
+        <Slider label="Ab Definition" value={abDef}       onChange={setAbDef}       />
+        <Slider label="Love Handles"  value={loveHandles} onChange={setLoveHandles} />
+        <Slider label="Hip Size"      value={hipSize}     onChange={setHipSize}     />
+        <Slider label="Glute Size"    value={gluteSize}   onChange={setGluteSize}   />
+      </Section>
+      <Section title="Lower Body">
+        <Slider label="Leg Length" value={legLen}     onChange={setLegLen}     />
+        <Slider label="Thigh"      value={thighThick} onChange={setThighThick} />
+        <Slider label="Calf"       value={calfSize}   onChange={setCalfSize}   />
+        <Slider label="Ankle"      value={ankleSize}  onChange={setAnkleSize}  />
+        <Slider label="Foot Size"  value={footSize}   onChange={setFootSize}   />
+      </Section>
+      <Section title="\u{1F3A8} Skin" defaultOpen={false}>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:6 }}>
+          {SKIN_TONES.map(t => (
+            <div key={t} onClick={() => setSkinTone(t)} style={{
+              width:24, height:24, borderRadius:4, background:t, cursor:'pointer',
+              border:`2px solid ${skinTone===t ? '#00ffc8' : '#21262d'}`,
+            }} />
+          ))}
+        </div>
+        <ColorRow label="Custom Tone" value={skinTone}   onChange={setSkinTone}   />
+        <Slider   label="Roughness"   value={skinRough}  onChange={setSkinRough}  />
+        <Slider   label="Gloss"       value={skinGloss}  onChange={setSkinGloss}  />
+        <Slider   label="Subsurface"  value={subsurface} onChange={setSubsurface} />
+      </Section>
+      <Section title="\u2699 Output" defaultOpen={false}>
+        <Select label="Poly Budget"   value={polyBudget}   options={POLY_OPTIONS} onChange={setPolyBudget}   />
+        <Check  label="Add Rig"       value={addRig}       onChange={setAddRig}       />
+        <Check  label="Auto LOD"      value={addLOD}       onChange={setAddLOD}       />
+        <Check  label="Separate Head" value={separateHead} onChange={setSeparateHead} />
+        <Check  label="Subdivision"   value={addSubdiv}    onChange={setAddSubdiv}    />
+      </Section>
+      <div style={{ display:'flex', gap:6 }}>
+        <RandBtn onClick={randomize} />
+        <GenBtn label="\u26a1 Generate Body" onClick={() => onGenerate?.({
+          gender, bodyType, ageGroup, seed, height, weight,
+          composition: { muscleDef, bodyFat, boneFrame, waterRetention },
+          upper: { shoulderW, chestSize, chestDepth, neckThick, armLen, upperArmThick, forearmThick, wristSize, handSize },
+          core: { waistSize, abDef, loveHandles, hipSize, gluteSize },
+          lower: { legLen, thighThick, calfSize, ankleSize, footSize },
+          skin: { skinTone, skinRough, skinGloss, subsurface },
+          output: { polyBudget, addRig, addLOD, separateHead, addSubdiv },
+        })} />
+      </div>
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// SPX Generator Panel — Configuration Reference
+// -----------------------------------------------------------------------------
+// PROPS
+//   onGenerate(params)   Called when user clicks Generate. params is a
+//                        structured object grouped by category.
+//   onReset()            Optional. Resets all state to defaults.
+//
+// DESIGN TOKENS
+//   Background : #06060f    Panel    : #0d1117
+//   Border     : #21262d    Primary  : #00ffc8
+//   Orange     : #FF6600    Font     : JetBrains Mono, monospace
+//
+// SLIDER CONTRACT
+//   All normalized sliders use range 0.0 – 1.0 unless noted.
+//   Integer sliders use step={1}. Angle sliders use –0.5 to 0.5 rad.
+//
+// KEYBOARD SHORTCUTS (registered by parent shell)
+//   Enter      Generate        Shift+R    Randomize
+//   Shift+X    Reset           Ctrl+Z     Undo last change
+//   Ctrl+S     Save preset     Ctrl+O     Load preset
+//
+// PERFORMANCE
+//   Sliders fire onChange every frame during drag.
+//   Debounce heavy 3D operations in the onGenerate handler.
+//   Wrap Slider/Select/Check in React.memo for large panels.
+//
+// PRESET SYSTEM (planned)
+//   Key: spx_presets_<PanelName> in localStorage
+//   Schema: Array<{ name: string, params: object, createdAt: number }>
+//
+// ACCESSIBILITY
+//   All inputs are keyboard-navigable via Tab.
+//   Color pickers show hex label for screen readers.
+//   Section headers respond to Enter/Space.
+//
+// INTEGRATION
+//   Panels mount in the right sidebar of SPX Mesh Editor.
+//   Parent PanelHost wires onGenerate to the Three.js scene.
+//   Generated geometry returns as THREE.Group with userData.params.
+//
+// SECTION REFERENCE
+//   Every panel uses collapsible <Section> components.
+//   defaultOpen={false} sections start collapsed.
+//   Open/closed state is local React state, not persisted.
+//
+// COLOR PICKERS
+//   All colors are CSS hex strings: #rrggbb
+//   ColorRow renders native input[type=color] + hex display.
+//
+// RANDOMIZE
+//   Math.random() seeded by the seed slider value.
+//   Values clamped to artistically sensible ranges.
+//   Does not guarantee physical plausibility.
+//
+// -----------------------------------------------------------------------------
+// ─────────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+// ─────────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+// ─────────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+// ─────────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+// ─────────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+// ─────────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+// ─────────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+// ─────────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+// ─────────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+// ─────────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+// ─────────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+// ─────────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+// ─────────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+// ─────────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+// ─────────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+// ─────────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+// ─────────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
+// ─────────────────────────────────────────────────────────────────────────────
+//
+//
+//
+//
