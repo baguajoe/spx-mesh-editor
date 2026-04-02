@@ -1,158 +1,258 @@
-
-import React, { useState, useRef } from "react";
-import { PolyQualityBar, Q, estimateTris, formatTris } from './PolyQualityUtil';
+import React, { useState, useRef, useCallback } from "react";
 import * as THREE from "three";
 
 const T={bg:"#06060f",panel:"#0d0d1a",border:"#1a1a2e",teal:"#00ffc8",orange:"#FF6600",text:"#e0e0e0",muted:"#aaa",font:"JetBrains Mono,monospace"};
-const S={root:{background:T.bg,color:T.text,fontFamily:T.font,padding:16,height:"100%",overflowY:"auto"},h2:{color:T.teal,fontSize:14,marginBottom:12,letterSpacing:1},h3:{color:T.orange,fontSize:12,marginBottom:8,marginTop:8},lbl:{fontSize:11,color:T.muted,display:"block",marginBottom:4},inp:{width:"100%",background:T.panel,border:"1px solid "+T.border,color:T.text,padding:"4px 8px",borderRadius:4,fontFamily:T.font,fontSize:11,marginBottom:8,boxSizing:"border-box"},sel:{width:"100%",background:T.panel,border:"1px solid "+T.border,color:T.text,padding:"4px 8px",borderRadius:4,fontFamily:T.font,fontSize:11,marginBottom:8,boxSizing:"border-box"},btn:{background:T.teal,color:T.bg,border:"none",borderRadius:4,padding:"7px 16px",fontFamily:T.font,fontSize:12,fontWeight:700,cursor:"pointer",marginRight:8,marginBottom:8},btnO:{background:T.orange,color:"#fff",border:"none",borderRadius:4,padding:"7px 16px",fontFamily:T.font,fontSize:12,fontWeight:700,cursor:"pointer",marginRight:8,marginBottom:8},sec:{background:T.panel,border:"1px solid "+T.border,borderRadius:6,padding:12,marginBottom:12},stat:{fontSize:11,color:T.teal,marginBottom:4}};
-
-const ARCHETYPES=["Realistic Human","Stylized Human","Hero/Superhero","Creature Humanoid","Demon Humanoid","Dragon Humanoid","Kaiju Humanoid","Vampire","Monster Hybrid","Robot/Android","Elder/Ancient","Child/Youth"];
-const ANCESTRY=["African Inspired","East Asian Inspired","South Asian Inspired","Middle Eastern Inspired","European Inspired","Afro-Brazilian Inspired","Nordic Inspired","Mixed/Global Neutral","Fantasy Heritage","Alien Heritage"];
-const PROPORTIONS=["Realistic","Heroic (8-head)","Stylized (7-head)","Exaggerated","Chibi (4-head)","Elongated","Hulking"];
-const TOPOLOGY=["Animation Ready","High Detail","Low Poly Game","Base Mesh","Hero Topology","Creature Ready"];
-const GENDER=["Masculine","Feminine","Neutral/Androgynous","Non-binary Custom"];
-
-const PROP_DATA={
-  "Realistic":       {headRatio:7.5, shoulderW:1.5, hipW:1.2, torsoLen:1.0, legLen:1.0, armLen:1.0},
-  "Heroic (8-head)": {headRatio:8,   shoulderW:2.0, hipW:1.3, torsoLen:1.1, legLen:1.15, armLen:1.1},
-  "Stylized (7-head)":{headRatio:7,  shoulderW:1.6, hipW:1.25,torsoLen:1.0, legLen:1.0, armLen:1.0},
-  "Exaggerated":     {headRatio:6,   shoulderW:2.4, hipW:1.4, torsoLen:0.9, legLen:1.3, armLen:1.2},
-  "Chibi (4-head)":  {headRatio:4,   shoulderW:1.2, hipW:1.1, torsoLen:0.6, legLen:0.55,armLen:0.7},
-  "Elongated":       {headRatio:9,   shoulderW:1.3, hipW:1.0, torsoLen:1.2, legLen:1.4, armLen:1.2},
-  "Hulking":         {headRatio:7,   shoulderW:2.8, hipW:1.5, torsoLen:1.1, legLen:1.0, armLen:1.15},
+const S={
+  root:{background:T.bg,color:T.text,fontFamily:T.font,padding:16,height:"100%",overflowY:"auto",boxSizing:"border-box"},
+  h2:{color:T.teal,fontSize:14,marginBottom:12,letterSpacing:1},
+  h3:{color:T.orange,fontSize:12,marginBottom:8,marginTop:12},
+  lbl:{fontSize:11,color:T.muted,display:"block",marginBottom:4},
+  inp:{width:"100%",background:T.panel,border:"1px solid "+T.border,color:T.text,padding:"4px 8px",borderRadius:4,fontFamily:T.font,fontSize:11,marginBottom:8,boxSizing:"border-box"},
+  sel:{width:"100%",background:T.panel,border:"1px solid "+T.border,color:T.text,padding:"4px 8px",borderRadius:4,fontFamily:T.font,fontSize:11,marginBottom:8,boxSizing:"border-box"},
+  btn:{background:T.teal,color:T.bg,border:"none",borderRadius:4,padding:"7px 16px",fontFamily:T.font,fontSize:12,fontWeight:700,cursor:"pointer",marginRight:8,marginBottom:8},
+  btnO:{background:T.orange,color:"#fff",border:"none",borderRadius:4,padding:"7px 16px",fontFamily:T.font,fontSize:12,fontWeight:700,cursor:"pointer",marginRight:8,marginBottom:8},
+  btnSm:{background:T.panel,color:T.teal,border:"1px solid "+T.teal,borderRadius:4,padding:"3px 10px",fontFamily:T.font,fontSize:10,cursor:"pointer",marginRight:6,marginBottom:6},
+  sec:{background:T.panel,border:"1px solid "+T.border,borderRadius:6,padding:12,marginBottom:12},
+  stat:{fontSize:11,color:T.teal,marginBottom:4},
+  row:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8},
+  tag:{display:"inline-block",background:T.panel,color:T.muted,borderRadius:3,padding:"2px 6px",fontSize:10,marginRight:4,marginBottom:4,cursor:"pointer"},
+  tagOn:{display:"inline-block",background:T.teal,color:T.bg,borderRadius:3,padding:"2px 6px",fontSize:10,marginRight:4,marginBottom:4,cursor:"pointer",fontWeight:700},
 };
 
-function buildCharacterMesh(scene, cfg) {
-  const meshes = [];
-  const p = PROP_DATA[cfg.proportions] || PROP_DATA["Realistic"];
-  const h = cfg.height;
-  const headH = h / p.headRatio;
-  const genderFem = cfg.gender === "Feminine" ? 1 : 0;
-  const matCol = new THREE.Color(0xc8955a);
-  const mat = new THREE.MeshStandardMaterial({ color: matCol, roughness: 0.6 });
+const PRIMITIVES = ["Box","Sphere","Cylinder","Cone","Torus","Plane","Circle","Icosahedron","Tetrahedron","Octahedron","Dodecahedron","TorusKnot","Capsule","Lathe","Ring"];
+const OPERATIONS = ["Union","Subtract","Intersect","Slice"];
+const STYLES     = ["Smooth","Flat","Wireframe","Low Poly","Subdivision","Faceted"];
+const PIVOT_OPTS = ["Center","Bottom","Top","Front","Back","Left","Right"];
+const SYMMETRY   = ["None","X Axis","Y Axis","Z Axis","Radial","Bilateral"];
 
-  const add = (geo, px, py, pz, rx=0, ry=0, rz=0) => {
-    const m = new THREE.Mesh(geo, mat.clone());
-    m.position.set(px, py, pz);
-    m.rotation.set(rx, ry, rz);
-    m.castShadow = true;
-    scene.add(m); meshes.push(m); return m;
-  };
+const PRIM_DEFAULTS = {
+  Box:         {w:1,h:1,d:1,wSegs:1,hSegs:1,dSegs:1},
+  Sphere:      {r:0.5,wSegs:16,hSegs:8},
+  Cylinder:    {rt:0.5,rb:0.5,h:1,radSegs:16,hSegs:1},
+  Cone:        {r:0.5,h:1,radSegs:16},
+  Torus:       {r:0.5,tube:0.2,rSegs:16,tSegs:100},
+  TorusKnot:   {r:0.5,tube:0.15,p:2,q:3,radSegs:64,tubSegs:8},
+  Plane:       {w:1,h:1,wSegs:1,hSegs:1},
+  Icosahedron: {r:0.5,detail:0},
+  Capsule:     {r:0.5,l:1,capSegs:4,radSegs:8},
+};
 
-  // Head
-  add(new THREE.SphereGeometry(headH * 0.5,Q(quality).sphere,Q(quality).sphereH), 0, h - headH * 0.5, 0);
-  // Neck
-  add(new THREE.CylinderGeometry(headH*0.18, headH*0.22, headH*0.35,Q(quality).cylinder), 0, h - headH - headH*0.175, 0);
-  // Torso
-  const tw = headH * p.shoulderW, th = headH * 2.2 * p.torsoLen;
-  const torsoGeo = new THREE.BoxGeometry(tw, th, headH * 0.7);
-  add(torsoGeo, 0, h - headH - headH*0.35 - th*0.5, 0);
-  // Hips
-  const hw = headH * (p.hipW + genderFem * 0.2), hh = headH * 0.6;
-  add(new THREE.BoxGeometry(hw, hh, headH * 0.6), 0, h - headH - headH*0.35 - th - hh*0.5, 0);
-  // Upper arms
-  const armW = headH * 0.22, armH = headH * 1.3 * p.armLen;
-  [-1, 1].forEach(side => {
-    add(new THREE.CylinderGeometry(armW, armW*0.9, armH,Q(quality).cylinder), side*(tw/2+armW), h-headH-headH*.4-armH*.5, 0);
-    // Forearm
-    add(new THREE.CylinderGeometry(armW*0.85, armW*0.7, armH*0.9,Q(quality).cylinder), side*(tw/2+armW), h-headH-headH*.4-armH-armH*.9*.5, 0);
-    // Hand
-    add(new THREE.BoxGeometry(headH*0.25, headH*0.3, headH*0.15), side*(tw/2+armW), h-headH-headH*.4-armH-armH*.9-headH*.15, 0);
-  });
-  // Legs
-  const legW = headH * 0.26, legH = headH * 2.3 * p.legLen;
-  const hipY = h - headH - headH*0.35 - th - hh;
-  [-1, 1].forEach(side => {
-    // Thigh
-    add(new THREE.CylinderGeometry(legW*1.1, legW*0.9, legH,Q(quality).cylinder), side*headH*0.3, hipY - legH*0.5, 0);
-    // Shin
-    add(new THREE.CylinderGeometry(legW*0.9, legW*0.7, legH*0.95,Q(quality).cylinder), side*headH*0.3, hipY - legH - legH*.95*.5, 0);
-    // Foot
-    add(new THREE.BoxGeometry(headH*0.35, headH*0.18, headH*0.55), side*headH*0.3, hipY - legH - legH*.95 - headH*.09, headH*0.15);
-  });
+function Slider({label,value,min,max,step=0.01,onChange}){
+  return(
+    <div>
+      <label style={S.lbl}>{label}: <span style={{color:T.teal}}>{typeof value==="number"?value.toFixed(2):value}</span></label>
+      <input style={S.inp} type="range" min={min} max={max} step={step} value={value} onChange={e=>onChange(Number(e.target.value))}/>
+    </div>
+  );
+}
 
-  // Eyes
-  const eyeY = h - headH*0.55, eyeGeo = new THREE.SphereGeometry(headH*0.1,Q(quality).sphere,Q(quality).sphereH);
-  [-1,1].forEach(s=>{const em=add(eyeGeo,s*headH*0.2,eyeY,headH*0.42);em.material=new THREE.MeshStandardMaterial({color:cfg.eyeColor||0x224488,roughness:0.05,metalness:0.3});});
-
-  // Creature / demon extras
-  if(cfg.archetype.includes("Dragon")||cfg.archetype.includes("Kaiju")){
-    const tailGeo=new THREE.CylinderGeometry(headH*0.15,headH*0.05,headH*2,Q(quality).cylinder);
-    add(tailGeo,0,hipY-headH*0.5,-(headH*0.5),0.8,0,0);
+function buildGeometry(type, p){
+  switch(type){
+    case "Box":         return new THREE.BoxGeometry(p.w||1,p.h||1,p.d||1,p.wSegs||1,p.hSegs||1,p.dSegs||1);
+    case "Sphere":      return new THREE.SphereGeometry(p.r||0.5,p.wSegs||16,p.hSegs||8);
+    case "Cylinder":    return new THREE.CylinderGeometry(p.rt||0.5,p.rb||0.5,p.h||1,p.radSegs||16,p.hSegs||1);
+    case "Cone":        return new THREE.ConeGeometry(p.r||0.5,p.h||1,p.radSegs||16);
+    case "Torus":       return new THREE.TorusGeometry(p.r||0.5,p.tube||0.2,p.rSegs||16,p.tSegs||100);
+    case "TorusKnot":   return new THREE.TorusKnotGeometry(p.r||0.5,p.tube||0.15,p.radSegs||64,p.tubSegs||8,p.p||2,p.q||3);
+    case "Plane":       return new THREE.PlaneGeometry(p.w||1,p.h||1,p.wSegs||1,p.hSegs||1);
+    case "Circle":      return new THREE.CircleGeometry(p.r||0.5,p.segs||16);
+    case "Icosahedron": return new THREE.IcosahedronGeometry(p.r||0.5,p.detail||0);
+    case "Tetrahedron": return new THREE.TetrahedronGeometry(p.r||0.5,p.detail||0);
+    case "Octahedron":  return new THREE.OctahedronGeometry(p.r||0.5,p.detail||0);
+    case "Dodecahedron":return new THREE.DodecahedronGeometry(p.r||0.5,p.detail||0);
+    case "Ring":        return new THREE.RingGeometry(p.ri||0.2,p.ro||0.5,p.tSegs||16);
+    case "Capsule":     return new THREE.CapsuleGeometry(p.r||0.5,p.l||1,p.capSegs||4,p.radSegs||8);
+    default:            return new THREE.BoxGeometry(1,1,1);
   }
-  if(cfg.archetype.includes("Demon")){
-    [[-.25,.35,.22],[.25,.35,.22]].forEach(([x,y,z])=>{
-      const hg=new THREE.ConeGeometry(headH*.1,headH*.4,Q(quality).cone);
-      const hm=add(hg,x*headH,(h-headH*.15+y*headH),z*headH);
-      hm.material=new THREE.MeshStandardMaterial({color:0x442200,roughness:0.7});
-    });
-  }
-
-  // Ambient + directional lights
-  if(!scene.getObjectByName("model_amb")){
-    const a=new THREE.AmbientLight(0xffffff,.7);a.name="model_amb";scene.add(a);meshes.push(a);
-    const d=new THREE.DirectionalLight(0xffeedd,1);d.position.set(20,40,20);d.castShadow=true;scene.add(d);meshes.push(d);
-  }
-
-  return meshes;
 }
 
 export default function ModelGeneratorPanel({scene}){
-  const [archetype,setArchetype]=useState("Realistic Human");
-  const [quality, setQuality] = useState('Mid');
-  const [ancestry,setAncestry]=useState("Mixed/Global Neutral");
-  const [proportions,setProportions]=useState("Realistic");
-  const [topology,setTopology]=useState("Animation Ready");
-  const [gender,setGender]=useState("Neutral/Androgynous");
-  const [height,setHeight]=useState(1.75);
-  const [realism,setRealism]=useState(0.8);
-  const [mascFem,setMascFem]=useState(0.5);
-  const [eyeColor,setEyeColor]=useState("#224488");
-  const [status,setStatus]=useState("");
-  const [stats,setStats]=useState(null);
-  const meshes=useRef([]);
+  const [primType, setPrimType]   = useState("Box");
+  const [params,   setParams]     = useState({...PRIM_DEFAULTS.Box});
+  const [style,    setStyle]      = useState("Smooth");
+  const [pivot,    setPivot]      = useState("Center");
+  const [symmetry, setSymmetry]   = useState("None");
+  const [color,    setColor]      = useState("#888888");
+  const [roughness,setRoughness]  = useState(0.5);
+  const [metalness,setMetalness]  = useState(0.0);
+  const [posX,     setPosX]       = useState(0);
+  const [posY,     setPosY]       = useState(0);
+  const [posZ,     setPosZ]       = useState(0);
+  const [rotX,     setRotX]       = useState(0);
+  const [rotY,     setRotY]       = useState(0);
+  const [rotZ,     setRotZ]       = useState(0);
+  const [scaleX,   setScaleX]     = useState(1);
+  const [scaleY,   setScaleY]     = useState(1);
+  const [scaleZ,   setScaleZ]     = useState(1);
+  const [stack,    setStack]      = useState([]);
+  const [status,   setStatus]     = useState("");
+  const [wireframe,setWireframe]  = useState(false);
+  const [castShadow,setCastShadow]= useState(true);
+  const [name,     setName]       = useState("");
 
-  function clear(){meshes.current.forEach(m=>{scene.remove(m);m.geometry?.dispose();m.material?.dispose();});meshes.current=[];setStats(null);}
+  const set = useCallback((k,v) => setParams(p=>({...p,[k]:v})), []);
+
+  function selectPrim(type){
+    setPrimType(type);
+    setParams({...PRIM_DEFAULTS[type]||{}});
+  }
 
   function generate(){
-    if(!scene){setStatus("No scene");return;}
-    clear();setStatus("Building character…");
-    const cfg={archetype,ancestry,proportions,topology,gender,height,realism,mascFem,eyeColor:new THREE.Color(eyeColor)};
-    const ms=buildCharacterMesh(scene,cfg);
-    meshes.current=ms;
-    setStats({archetype,proportions,gender,height,meshCount:ms.filter(m=>m.isMesh).length});
-    setStatus(`✓ ${archetype} built — ${ms.filter(m=>m.isMesh).length} meshes`);
+    if(!scene){ setStatus("No scene connected"); return; }
+    const geo = buildGeometry(primType, params);
+
+    // Apply style
+    if(style==="Flat") geo.computeVertexNormals();
+    if(style==="Low Poly"){ /* keep faceted */ }
+
+    const mat = new THREE.MeshStandardMaterial({
+      color, roughness, metalness,
+      wireframe: style==="Wireframe",
+      flatShading: style==="Flat"||style==="Faceted"||style==="Low Poly",
+    });
+
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.name = name || `${primType}_${Date.now()}`;
+    mesh.position.set(posX, posY, posZ);
+    mesh.rotation.set(rotX*Math.PI/180, rotY*Math.PI/180, rotZ*Math.PI/180);
+    mesh.scale.set(scaleX, scaleY, scaleZ);
+    mesh.castShadow = castShadow;
+    mesh.receiveShadow = true;
+
+    // Pivot adjustment
+    if(pivot==="Bottom"){ const bbox=new THREE.Box3().setFromObject(mesh); mesh.position.y-=bbox.min.y; }
+    else if(pivot==="Top"){ const bbox=new THREE.Box3().setFromObject(mesh); mesh.position.y-=bbox.max.y; }
+
+    scene.add(mesh);
+    setStack(s=>[...s,{id:mesh.uuid,name:mesh.name,type:primType}]);
+    setStatus(`✓ Added ${mesh.name} (${geo.attributes.position.count} vertices)`);
   }
+
+  function clearScene(){
+    if(!scene) return;
+    stack.forEach(item=>{
+      const obj=scene.getObjectByProperty('uuid',item.id);
+      if(obj) scene.remove(obj);
+    });
+    setStack([]); setStatus("Scene cleared");
+  }
+
+  function exportGLB(){
+    setStatus("Export: use File → Export → GLB from the main menu");
+  }
+
+  const paramFields = {
+    Box:[
+      {k:"w",l:"Width",min:0.01,max:10},{k:"h",l:"Height",min:0.01,max:10},{k:"d",l:"Depth",min:0.01,max:10},
+      {k:"wSegs",l:"Width Segs",min:1,max:32,step:1},{k:"hSegs",l:"Height Segs",min:1,max:32,step:1},{k:"dSegs",l:"Depth Segs",min:1,max:32,step:1},
+    ],
+    Sphere:[{k:"r",l:"Radius",min:0.01,max:5},{k:"wSegs",l:"Width Segs",min:3,max:64,step:1},{k:"hSegs",l:"Height Segs",min:2,max:32,step:1}],
+    Cylinder:[{k:"rt",l:"Top Radius",min:0,max:5},{k:"rb",l:"Bot Radius",min:0,max:5},{k:"h",l:"Height",min:0.01,max:10},{k:"radSegs",l:"Radial Segs",min:3,max:64,step:1}],
+    Cone:[{k:"r",l:"Radius",min:0.01,max:5},{k:"h",l:"Height",min:0.01,max:10},{k:"radSegs",l:"Radial Segs",min:3,max:64,step:1}],
+    Torus:[{k:"r",l:"Radius",min:0.1,max:5},{k:"tube",l:"Tube",min:0.01,max:2},{k:"rSegs",l:"Radial Segs",min:3,max:32,step:1},{k:"tSegs",l:"Tubular Segs",min:3,max:200,step:1}],
+    TorusKnot:[{k:"r",l:"Radius",min:0.1,max:5},{k:"tube",l:"Tube",min:0.01,max:1},{k:"p",l:"P",min:1,max:10,step:1},{k:"q",l:"Q",min:1,max:10,step:1}],
+    Plane:[{k:"w",l:"Width",min:0.01,max:20},{k:"h",l:"Height",min:0.01,max:20},{k:"wSegs",l:"W Segs",min:1,max:64,step:1},{k:"hSegs",l:"H Segs",min:1,max:64,step:1}],
+    Icosahedron:[{k:"r",l:"Radius",min:0.01,max:5},{k:"detail",l:"Detail",min:0,max:5,step:1}],
+    Capsule:[{k:"r",l:"Radius",min:0.01,max:5},{k:"l",l:"Length",min:0.01,max:10},{k:"capSegs",l:"Cap Segs",min:1,max:16,step:1},{k:"radSegs",l:"Rad Segs",min:3,max:32,step:1}],
+  };
 
   return(
     <div style={S.root}>
-      <div style={S.h2}>🧍 MODEL GENERATOR</div>
-      
-      <PolyQualityBar quality={quality} onChange={setQuality}/>
-<div style={S.sec}>
-        <label style={S.lbl}>Archetype</label>
-        <select style={S.sel} value={archetype} onChange={e=>setArchetype(e.target.value)}>{ARCHETYPES.map(a=><option key={a}>{a}</option>)}</select>
-        <label style={S.lbl}>Ancestry / Heritage</label>
-        <select style={S.sel} value={ancestry} onChange={e=>setAncestry(e.target.value)}>{ANCESTRY.map(a=><option key={a}>{a}</option>)}</select>
-        <label style={S.lbl}>Proportions</label>
-        <select style={S.sel} value={proportions} onChange={e=>setProportions(e.target.value)}>{PROPORTIONS.map(p=><option key={p}>{p}</option>)}</select>
-        <label style={S.lbl}>Topology</label>
-        <select style={S.sel} value={topology} onChange={e=>setTopology(e.target.value)}>{TOPOLOGY.map(t=><option key={t}>{t}</option>)}</select>
-        <label style={S.lbl}>Gender Expression</label>
-        <select style={S.sel} value={gender} onChange={e=>setGender(e.target.value)}>{GENDER.map(g=><option key={g}>{g}</option>)}</select>
-        <label style={S.lbl}>Height: {height.toFixed(2)}m</label>
-        <input style={S.inp} type="range" min={.9} max={3.5} step={.01} value={height} onChange={e=>setHeight(+e.target.value)}/>
-        <label style={S.lbl}>Realism ↔ Stylized: {(realism*100).toFixed(0)}%</label>
-        <input style={S.inp} type="range" min={0} max={1} step={.01} value={realism} onChange={e=>setRealism(+e.target.value)}/>
-        <label style={S.lbl}>Masculine ↔ Feminine: {(mascFem*100).toFixed(0)}%</label>
-        <input style={S.inp} type="range" min={0} max={1} step={.01} value={mascFem} onChange={e=>setMascFem(+e.target.value)}/>
-        <label style={S.lbl}>Eye Color</label>
-        <input style={{...S.inp,padding:2,height:32}} type="color" value={eyeColor} onChange={e=>setEyeColor(e.target.value)}/>
+      <div style={S.h2}>🔷 MODEL GENERATOR</div>
+
+      <div style={S.sec}>
+        <div style={S.h3}>Primitive Type</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+          {PRIMITIVES.map(p=><span key={p} style={primType===p?S.tagOn:S.tag} onClick={()=>selectPrim(p)}>{p}</span>)}
+        </div>
       </div>
+
+      <div style={S.sec}>
+        <div style={S.h3}>Parameters</div>
+        {(paramFields[primType]||[]).map(f=>(
+          <Slider key={f.k} label={f.l} value={params[f.k]||0} min={f.min} max={f.max} step={f.step||0.01} onChange={v=>set(f.k,v)}/>
+        ))}
+      </div>
+
+      <div style={S.sec}>
+        <div style={S.h3}>Style</div>
+        <div style={S.row}>
+          <div>
+            <label style={S.lbl}>Render Style</label>
+            <select style={S.sel} value={style} onChange={e=>setStyle(e.target.value)}>
+              {STYLES.map(s=><option key={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={S.lbl}>Symmetry</label>
+            <select style={S.sel} value={symmetry} onChange={e=>setSymmetry(e.target.value)}>
+              {SYMMETRY.map(s=><option key={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={S.row}>
+          <div>
+            <label style={S.lbl}>Pivot Point</label>
+            <select style={S.sel} value={pivot} onChange={e=>setPivot(e.target.value)}>
+              {PIVOT_OPTS.map(p=><option key={p}>{p}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={S.lbl}>Base Color</label>
+            <input type="color" value={color} onChange={e=>setColor(e.target.value)} style={{width:"100%",height:32,borderRadius:4,border:"none",cursor:"pointer"}}/>
+          </div>
+        </div>
+        <Slider label="Roughness" value={roughness} min={0} max={1} onChange={setRoughness}/>
+        <Slider label="Metalness" value={metalness} min={0} max={1} onChange={setMetalness}/>
+        <div style={{display:"flex",gap:8,marginTop:4}}>
+          <span style={wireframe?S.tagOn:S.tag} onClick={()=>setWireframe(!wireframe)}>Wireframe</span>
+          <span style={castShadow?S.tagOn:S.tag} onClick={()=>setCastShadow(!castShadow)}>Cast Shadow</span>
+        </div>
+      </div>
+
+      <div style={S.sec}>
+        <div style={S.h3}>Transform</div>
+        <div style={S.row}>
+          <Slider label="Pos X" value={posX} min={-10} max={10} onChange={setPosX}/>
+          <Slider label="Pos Y" value={posY} min={-10} max={10} onChange={setPosY}/>
+        </div>
+        <div style={S.row}>
+          <Slider label="Pos Z" value={posZ} min={-10} max={10} onChange={setPosZ}/>
+          <Slider label="Rot X" value={rotX} min={-180} max={180} step={1} onChange={setRotX}/>
+        </div>
+        <div style={S.row}>
+          <Slider label="Rot Y" value={rotY} min={-180} max={180} step={1} onChange={setRotY}/>
+          <Slider label="Rot Z" value={rotZ} min={-180} max={180} step={1} onChange={setRotZ}/>
+        </div>
+        <div style={S.row}>
+          <Slider label="Scale X" value={scaleX} min={0.01} max={10} onChange={setScaleX}/>
+          <Slider label="Scale Y" value={scaleY} min={0.01} max={10} onChange={setScaleY}/>
+        </div>
+        <Slider label="Scale Z" value={scaleZ} min={0.01} max={10} onChange={setScaleZ}/>
+      </div>
+
+      <div style={S.sec}>
+        <div style={S.h3}>Name & Operations</div>
+        <label style={S.lbl}>Object Name</label>
+        <input style={S.inp} type="text" value={name} placeholder={`${primType}_001`} onChange={e=>setName(e.target.value)}/>
+        <label style={S.lbl}>Boolean Operation</label>
+        <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:8}}>
+          {OPERATIONS.map(o=><span key={o} style={S.tag}>{o}</span>)}
+        </div>
+      </div>
+
+      {stack.length>0&&(
+        <div style={S.sec}>
+          <div style={S.h3}>Scene Objects ({stack.length})</div>
+          {stack.slice(-5).map(item=><div key={item.id} style={{...S.stat,marginBottom:2}}>▸ {item.name} ({item.type})</div>)}
+          {stack.length>5&&<div style={{color:T.muted,fontSize:10}}>...and {stack.length-5} more</div>}
+        </div>
+      )}
+
       <button style={S.btn} onClick={generate}>⚡ Generate</button>
-      <button style={S.btnO} onClick={clear}>🗑 Clear</button>
+      <button style={S.btnO} onClick={clearScene}>🗑 Clear</button>
+      <button style={{...S.btnO,background:"#333"}} onClick={exportGLB}>💾 Export</button>
       {status&&<div style={{...S.stat,marginTop:8}}>{status}</div>}
-      {stats&&<div style={S.sec}><div style={S.stat}>Type: {stats.archetype}</div><div style={S.stat}>Proportions: {stats.proportions}</div><div style={S.stat}>Gender: {stats.gender}</div><div style={S.stat}>Height: {stats.height}m | Meshes: {stats.meshCount}</div></div>}
     </div>
   );
 }

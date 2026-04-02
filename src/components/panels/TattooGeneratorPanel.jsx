@@ -1,137 +1,181 @@
-
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import * as THREE from "three";
 
 const T={bg:"#06060f",panel:"#0d0d1a",border:"#1a1a2e",teal:"#00ffc8",orange:"#FF6600",text:"#e0e0e0",muted:"#aaa",font:"JetBrains Mono,monospace"};
-const S={root:{background:T.bg,color:T.text,fontFamily:T.font,padding:16,height:"100%",overflowY:"auto"},h2:{color:T.teal,fontSize:14,marginBottom:12,letterSpacing:1},h3:{color:T.orange,fontSize:12,marginBottom:8,marginTop:8},lbl:{fontSize:11,color:T.muted,display:"block",marginBottom:4},inp:{width:"100%",background:T.panel,border:"1px solid "+T.border,color:T.text,padding:"4px 8px",borderRadius:4,fontFamily:T.font,fontSize:11,marginBottom:8,boxSizing:"border-box"},sel:{width:"100%",background:T.panel,border:"1px solid "+T.border,color:T.text,padding:"4px 8px",borderRadius:4,fontFamily:T.font,fontSize:11,marginBottom:8,boxSizing:"border-box"},btn:{background:T.teal,color:T.bg,border:"none",borderRadius:4,padding:"7px 16px",fontFamily:T.font,fontSize:12,fontWeight:700,cursor:"pointer",marginRight:8,marginBottom:8},btnO:{background:T.orange,color:"#fff",border:"none",borderRadius:4,padding:"7px 16px",fontFamily:T.font,fontSize:12,fontWeight:700,cursor:"pointer",marginRight:8,marginBottom:8},btnSm:{background:T.panel,color:T.teal,border:"1px solid "+T.teal,borderRadius:4,padding:"3px 10px",fontFamily:T.font,fontSize:10,cursor:"pointer",marginRight:6,marginBottom:6},sec:{background:T.panel,border:"1px solid "+T.border,borderRadius:6,padding:12,marginBottom:12},stat:{fontSize:11,color:T.teal,marginBottom:4},prev:{width:"100%",height:140,borderRadius:6,border:"2px solid "+T.border,display:"block",marginBottom:8}};
+const S={
+  root:{background:T.bg,color:T.text,fontFamily:T.font,padding:16,height:"100%",overflowY:"auto",boxSizing:"border-box"},
+  h2:{color:T.teal,fontSize:14,marginBottom:12,letterSpacing:1},
+  h3:{color:T.orange,fontSize:12,marginBottom:8,marginTop:12},
+  lbl:{fontSize:11,color:T.muted,display:"block",marginBottom:4},
+  inp:{width:"100%",background:T.panel,border:"1px solid "+T.border,color:T.text,padding:"4px 8px",borderRadius:4,fontFamily:T.font,fontSize:11,marginBottom:8,boxSizing:"border-box"},
+  sel:{width:"100%",background:T.panel,border:"1px solid "+T.border,color:T.text,padding:"4px 8px",borderRadius:4,fontFamily:T.font,fontSize:11,marginBottom:8,boxSizing:"border-box"},
+  btn:{background:T.teal,color:T.bg,border:"none",borderRadius:4,padding:"7px 16px",fontFamily:T.font,fontSize:12,fontWeight:700,cursor:"pointer",marginRight:8,marginBottom:8},
+  btnO:{background:T.orange,color:"#fff",border:"none",borderRadius:4,padding:"7px 16px",fontFamily:T.font,fontSize:12,fontWeight:700,cursor:"pointer",marginRight:8,marginBottom:8},
+  sec:{background:T.panel,border:"1px solid "+T.border,borderRadius:6,padding:12,marginBottom:12},
+  stat:{fontSize:11,color:T.teal,marginBottom:4},
+  prev:{width:"100%",height:200,borderRadius:6,border:"2px solid "+T.border,display:"block",marginBottom:8,cursor:"crosshair"},
+  row:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8},
+  tag:{display:"inline-block",background:T.panel,color:T.muted,borderRadius:3,padding:"2px 6px",fontSize:10,marginRight:4,marginBottom:4,cursor:"pointer"},
+  tagOn:{display:"inline-block",background:T.teal,color:T.bg,borderRadius:3,padding:"2px 6px",fontSize:10,marginRight:4,marginBottom:4,cursor:"pointer",fontWeight:700},
+};
 
-const PLACEMENTS=["Face","Neck","Chest","Back","Left Arm","Right Arm","Left Hand","Right Hand","Left Leg","Right Leg","Full Body Sleeve"];
-const STYLES=["Tribal","Geometric","Minimal Line Art","Traditional Bold","Watercolor","Blackwork","Dotwork","Japanese Irezumi","Fantasy Runes","Magical Markings","Creature Markings","Circuit/Tech","Celtic Knotwork","Biomechanical","Script/Text"];
+const STYLES_T=["Traditional","Neo Traditional","Realistic","Japanese","Geometric","Tribal","Watercolor","Blackwork","Dotwork","Minimalist","Script","Biomechanical","Celtic","Maori","Floral"];
+const MOTIFS=["Dragon","Phoenix","Skull","Rose","Wolf","Tiger","Eagle","Koi","Lotus","Mandala","Anchor","Compass","Samurai","Geisha","Butterfly","Snake","Raven","Lion","Bear","Fox","Medusa","Kraken","Demon","Angel","Serpent"];
+const PLACEMENTS=["Full Sleeve","Half Sleeve","Chest","Back","Leg","Neck","Hand","Forearm","Calf","Rib","Shoulder","Wrist","Ankle","Behind Ear","Face"];
+const COLOR_SCHEMES=["Black & Grey","Full Color","Monochrome Red","Neo Traditional","Watercolor Splash","Neon","Sepia","Minimal Black"];
 
-function drawTattooPreview(canvas, cfg){
+function drawTattooPreview(canvas, tattoo, strokes){
   const ctx=canvas.getContext("2d"),w=canvas.width,h=canvas.height;
-  ctx.fillStyle="#0d0d1a";ctx.fillRect(0,0,w,h);
-  const col=cfg.color||"#111111";
-  const fade=cfg.inkFade||0;
-  const bw=w*.7,bh=h*.8,bx=w*.15,by=h*.1;
-  // Body silhouette
-  ctx.beginPath();ctx.ellipse(w/2,h/2,bw/2,bh/2,0,0,Math.PI*2);ctx.fillStyle="rgba(200,140,90,.3)";ctx.fill();
-  ctx.strokeStyle="rgba(200,140,90,.5)";ctx.lineWidth=1;ctx.stroke();
-  ctx.globalAlpha=1-fade*.5;
-  // Draw style
-  const style=cfg.style||"Tribal";
-  const sc=cfg.scale||1;
-  ctx.strokeStyle=col;ctx.fillStyle=col;
-  ctx.save();ctx.translate(w/2,h/2);ctx.scale(sc,sc);
-  if(style==="Tribal"){
-    for(let i=0;i<6;i++){ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(i*Math.PI/3)*50,Math.sin(i*Math.PI/3)*50);ctx.lineTo(Math.cos(i*Math.PI/3+.3)*40,Math.sin(i*Math.PI/3+.3)*40);ctx.closePath();ctx.lineWidth=3;ctx.stroke();}
-  }else if(style==="Geometric"){
-    for(let i=0;i<4;i++){ctx.beginPath();const r=15+i*15;ctx.arc(0,0,r,0,Math.PI*2);ctx.lineWidth=1.5;ctx.stroke();}
-    for(let i=0;i<6;i++){ctx.beginPath();ctx.moveTo(Math.cos(i/6*Math.PI*2)*10,Math.sin(i/6*Math.PI*2)*10);ctx.lineTo(Math.cos(i/6*Math.PI*2)*55,Math.sin(i/6*Math.PI*2)*55);ctx.lineWidth=1;ctx.stroke();}
-  }else if(style==="Fantasy Runes"){
-    ctx.font="bold 18px serif";ctx.textAlign="center";
-    ["ᚠ","ᚢ","ᚦ","ᚨ","ᚱ","ᚲ"].forEach((r,i)=>{ctx.fillText(r,(i%3-1)*25,Math.floor(i/3)*28-14);});
-  }else if(style==="Magical Markings"){
-    ctx.lineWidth=2;
-    ctx.beginPath();ctx.arc(0,0,40,0,Math.PI*2);ctx.stroke();
-    for(let i=0;i<5;i++){const a=i*Math.PI*2/5-Math.PI/2;ctx.beginPath();ctx.moveTo(Math.cos(a)*40,Math.sin(a)*40);ctx.lineTo(Math.cos(a+Math.PI*4/5)*40,Math.sin(a+Math.PI*4/5)*40);ctx.stroke();}
-  }else if(style==="Circuit/Tech"){
-    ctx.lineWidth=1.5;
-    let px=0,py=0;
-    for(let i=0;i<10;i++){const nx=px+(Math.random()-.5)*50,ny=py+(Math.random()-.5)*50;ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(nx,py);ctx.lineTo(nx,ny);ctx.stroke();ctx.beginPath();ctx.arc(nx,ny,2,0,Math.PI*2);ctx.fill();px=nx;py=ny;}
-  }else if(style==="Creature Markings"){
-    ctx.lineWidth=2;
-    for(let i=0;i<5;i++){ctx.beginPath();ctx.moveTo(-40+i*20,-(30-Math.abs(i-2)*8));ctx.quadraticCurveTo(0,40,40-i*20,-(30-Math.abs(i-2)*8));ctx.stroke();}
-  }else if(style==="Watercolor"){
-    for(let i=0;i<8;i++){ctx.globalAlpha=(1-fade*.5)*.3;ctx.beginPath();ctx.arc((Math.random()-.5)*60,(Math.random()-.5)*60,10+Math.random()*25,0,Math.PI*2);ctx.fillStyle=col;ctx.fill();}
-    ctx.globalAlpha=1-fade*.5;
-  }else{
-    // Generic lines
-    ctx.lineWidth=2;
-    for(let i=0;i<4;i++){ctx.beginPath();ctx.moveTo(-45+i*30,-30+i*20);ctx.quadraticCurveTo(0,0,45-i*30,30-i*20);ctx.stroke();}
+  ctx.fillStyle="#2a1a0a";ctx.fillRect(0,0,w,h);
+  // Skin texture
+  for(let i=0;i<200;i++){
+    ctx.beginPath();ctx.arc(Math.random()*w,Math.random()*h,Math.random()*2,0,Math.PI*2);
+    ctx.fillStyle="rgba(180,120,80,0.03)";ctx.fill();
   }
-  ctx.restore();ctx.globalAlpha=1;
+
+  // Draw strokes
+  if(strokes.length>1){
+    ctx.lineCap="round";ctx.lineJoin="round";
+    const color=tattoo.inkColor||"#111111";
+    const opacity=tattoo.opacity||0.9;
+    ctx.strokeStyle=color.replace("#","rgba(").replace(/(..)(..)(..)$/,(_,r,g,b)=>`${parseInt(r,16)},${parseInt(g,16)},${parseInt(b,16)},${opacity})`)||color;
+    ctx.lineWidth=tattoo.brushSize||3;
+    ctx.beginPath();
+    strokes.forEach((pt,i)=>i===0?ctx.moveTo(pt.x,pt.y):ctx.lineTo(pt.x,pt.y));
+    ctx.stroke();
+  }
+
+  // Style label
+  ctx.fillStyle="rgba(0,255,200,0.6)";ctx.font="10px "+T.font;
+  ctx.fillText(`${tattoo.style||"Traditional"} · ${tattoo.motif||"Dragon"}`,8,h-8);
+}
+
+function Slider({label,value,min,max,step=0.01,onChange}){
+  return(
+    <div>
+      <label style={S.lbl}>{label}: <span style={{color:T.teal}}>{typeof value==="number"?value.toFixed(2):value}</span></label>
+      <input style={S.inp} type="range" min={min} max={max} step={step} value={value} onChange={e=>onChange(Number(e.target.value))}/>
+    </div>
+  );
 }
 
 export default function TattooGeneratorPanel({scene}){
-  const [placement,setPlacement]=useState("Left Arm");
-  const [style,setStyle]=useState("Tribal");
-  const [color,setColor]=useState("#111111");
-  const [scale,setScale]=useState(1);
-  const [rotation,setRotation]=useState(0);
-  const [opacity,setOpacity]=useState(0.9);
-  const [inkFade,setInkFade]=useState(0.1);
-  const [blur,setBlur]=useState(0);
-  const [layers,setLayers]=useState([]);
-  const [status,setStatus]=useState("");
-  const prevRef=useRef(null);
+  const [style,     setStyle]    = useState("Traditional");
+  const [motif,     setMotif]    = useState("Dragon");
+  const [placement, setPlacement]= useState("Full Sleeve");
+  const [colorScheme,setScheme]  = useState("Black & Grey");
+  const [inkColor,  setInkColor] = useState("#111111");
+  const [opacity,   setOpacity]  = useState(0.9);
+  const [brushSize, setBrushSize]= useState(3);
+  const [lineWeight,setWeight]   = useState(0.6);
+  const [detailLevel,setDetail]  = useState(0.7);
+  const [aging,     setAging]    = useState(0);
+  const [coverage,  setCoverage] = useState(0.7);
+  const [scaleX,    setScaleX]   = useState(1);
+  const [scaleY,    setScaleY]   = useState(1);
+  const [rotation,  setRotation] = useState(0);
+  const [posX,      setPosX]     = useState(0);
+  const [posY,      setPosY]     = useState(0);
+  const [strokes,   setStrokes]  = useState([]);
+  const [drawing,   setDrawing]  = useState(false);
+  const [status,    setStatus]   = useState("");
+  const prevRef = useRef(null);
 
-  function preview(){if(prevRef.current)drawTattooPreview(prevRef.current,{style,color,scale,inkFade});}
+  useEffect(()=>{ if(prevRef.current) drawTattooPreview(prevRef.current,{style,motif,inkColor,opacity,brushSize},strokes); },[style,motif,inkColor,opacity,brushSize,strokes]);
 
-  function addLayer(){
-    setLayers(l=>[...l,{style,color,placement,scale,opacity,inkFade,id:Date.now()}]);
-    setStatus(`Layer added — ${layers.length+1} total`);
-  }
+  const handleMouseDown=(e)=>{
+    setDrawing(true);
+    const rect=prevRef.current.getBoundingClientRect();
+    const scl=prevRef.current.width/rect.width;
+    setStrokes(s=>[...s,{x:(e.clientX-rect.left)*scl,y:(e.clientY-rect.top)*scl}]);
+  };
+  const handleMouseMove=(e)=>{
+    if(!drawing) return;
+    const rect=prevRef.current.getBoundingClientRect();
+    const scl=prevRef.current.width/rect.width;
+    setStrokes(s=>[...s,{x:(e.clientX-rect.left)*scl,y:(e.clientY-rect.top)*scl}]);
+  };
+  const handleMouseUp=()=>setDrawing(false);
+
+  function clearCanvas(){ setStrokes([]); }
 
   function applyToScene(){
-    if(!scene){setStatus("No scene");return;}
-    const allLayers=layers.length?layers:[{style,color,placement,scale,opacity,inkFade}];
+    if(!scene){ setStatus("No scene"); return; }
+    const c=document.createElement("canvas");c.width=1024;c.height=1024;
+    drawTattooPreview(c,{style,motif,inkColor,opacity,brushSize:brushSize*2},strokes.map(s=>({x:s.x*1024/400,y:s.y*1024/200})));
+    const tex=new THREE.CanvasTexture(c);
     let n=0;
-    allLayers.forEach((layer,idx)=>{
-      const c=document.createElement("canvas");c.width=c.height=512;
-      drawTattooPreview(c,layer);
-      const tex=new THREE.CanvasTexture(c);
-      tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
-      const mat=new THREE.MeshStandardMaterial({map:tex,transparent:true,opacity:layer.opacity||.9,roughness:.9,alphaTest:.05});
-      scene.traverse(o=>{if(o.isMesh&&!o.userData.isTattoo){
-        const decal=new THREE.Mesh(new THREE.BoxGeometry(.001,.2,.1),mat.clone());
-        decal.position.copy(o.position);decal.position.y+=.3*(idx*.1);
-        decal.userData.isTattoo=true;scene.add(decal);n++;
-      }});
+    scene.traverse(o=>{
+      if(o.isMesh&&(o.name.toLowerCase().includes("skin")||o.userData.isSkin||o.userData.acceptsTattoo)){
+        const mat=new THREE.MeshStandardMaterial({map:tex,transparent:true,roughness:0.8});
+        o.material=mat;n++;
+      }
     });
-    setStatus(`✓ ${allLayers.length} tattoo layer(s) applied`);
+    setStatus(n>0?`✓ Applied tattoo to ${n} mesh(es)`:"No skin meshes found — tag meshes with userData.acceptsTattoo=true");
   }
 
-  function downloadTexture(){
-    const c=document.createElement("canvas");c.width=c.height=512;drawTattooPreview(c,{style,color,scale,inkFade});
-    const a=document.createElement("a");a.href=c.toDataURL("image/png");a.download=`tattoo_${style.replace(/ /g,"_")}.png`;a.click();
+  function exportTex(){
+    const c=document.createElement("canvas");c.width=1024;c.height=1024;
+    drawTattooPreview(c,{style,motif,inkColor,opacity,brushSize:brushSize*2},strokes.map(s=>({x:s.x*2.56,y:s.y*5.12})));
+    const a=document.createElement("a");a.href=c.toDataURL("image/png");a.download=`tattoo_${motif}_${style}.png`;a.click();
   }
 
   return(
     <div style={S.root}>
-      <div style={S.h2}>💉 TATTOO GENERATOR</div>
+      <div style={S.h2}>🎨 TATTOO GENERATOR</div>
       <div style={S.sec}>
-        <label style={S.lbl}>Placement Zone</label>
-        <select style={S.sel} value={placement} onChange={e=>setPlacement(e.target.value)}>{PLACEMENTS.map(p=><option key={p}>{p}</option>)}</select>
-        <label style={S.lbl}>Tattoo Style</label>
-        <select style={S.sel} value={style} onChange={e=>{setStyle(e.target.value);setTimeout(preview,50);}}>
-          {STYLES.map(s=><option key={s}>{s}</option>)}
+        <div style={S.h3}>Draw Tattoo</div>
+        <canvas ref={prevRef} width={400} height={200} style={S.prev}
+          onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}/>
+        <button style={{...S.btnO,fontSize:10,padding:"3px 10px"}} onClick={clearCanvas}>🗑 Clear Canvas</button>
+      </div>
+      <div style={S.sec}>
+        <div style={S.h3}>Style & Motif</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
+          {STYLES_T.map(s=><span key={s} style={style===s?S.tagOn:S.tag} onClick={()=>setStyle(s)}>{s}</span>)}
+        </div>
+        <label style={S.lbl}>Motif</label>
+        <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
+          {MOTIFS.map(m=><span key={m} style={motif===m?S.tagOn:S.tag} onClick={()=>setMotif(m)}>{m}</span>)}
+        </div>
+        <label style={S.lbl}>Color Scheme</label>
+        <select style={S.sel} value={colorScheme} onChange={e=>setScheme(e.target.value)}>
+          {COLOR_SCHEMES.map(c=><option key={c}>{c}</option>)}
         </select>
-        <canvas ref={prevRef} width={300} height={140} style={S.prev}/>
-        <button style={{background:T.panel,color:T.teal,border:"1px solid "+T.teal,borderRadius:4,padding:"3px 10px",fontFamily:T.font,fontSize:10,cursor:"pointer"}} onClick={preview}>👁 Preview</button>
+        <label style={S.lbl}>Placement</label>
+        <select style={S.sel} value={placement} onChange={e=>setPlacement(e.target.value)}>
+          {PLACEMENTS.map(p=><option key={p}>{p}</option>)}
+        </select>
       </div>
       <div style={S.sec}>
-        <label style={S.lbl}>Ink Color</label>
-        <input style={{...S.inp,padding:2,height:32}} type="color" value={color} onChange={e=>{setColor(e.target.value);preview();}}/>
-        <label style={S.lbl}>Scale: {scale.toFixed(2)}</label>
-        <input style={S.inp} type="range" min={.2} max={3} step={.01} value={scale} onChange={e=>{setScale(+e.target.value);preview();}}/>
-        <label style={S.lbl}>Rotation: {rotation}°</label>
-        <input style={S.inp} type="range" min={0} max={360} value={rotation} onChange={e=>setRotation(+e.target.value)}/>
-        <label style={S.lbl}>Opacity: {opacity.toFixed(2)}</label>
-        <input style={S.inp} type="range" min={.1} max={1} step={.01} value={opacity} onChange={e=>setOpacity(+e.target.value)}/>
-        <label style={S.lbl}>Ink Fade: {inkFade.toFixed(2)}</label>
-        <input style={S.inp} type="range" min={0} max={1} step={.01} value={inkFade} onChange={e=>{setInkFade(+e.target.value);preview();}}/>
-        <label style={S.lbl}>Blur: {blur.toFixed(2)}</label>
-        <input style={S.inp} type="range" min={0} max={1} step={.01} value={blur} onChange={e=>setBlur(+e.target.value)}/>
+        <div style={S.h3}>Brush & Ink</div>
+        <div style={S.row}>
+          <div><label style={S.lbl}>Ink Color</label>
+            <input type="color" value={inkColor} onChange={e=>setInkColor(e.target.value)} style={{width:"100%",height:28,borderRadius:4,border:"none",cursor:"pointer"}}/></div>
+          <div><label style={S.lbl}>Brush Size: {brushSize}</label>
+            <input style={S.inp} type="range" min={1} max={20} step={0.5} value={brushSize} onChange={e=>setBrushSize(Number(e.target.value))}/></div>
+        </div>
+        <Slider label="Opacity"      value={opacity}     min={0.1} max={1}   onChange={setOpacity}/>
+        <Slider label="Line Weight"  value={lineWeight}  min={0.1} max={1}   onChange={setWeight}/>
+        <Slider label="Detail Level" value={detailLevel} min={0.1} max={1}   onChange={setDetail}/>
+        <Slider label="Coverage"     value={coverage}    min={0.1} max={1}   onChange={setCoverage}/>
+        <Slider label="Aging/Fading" value={aging}       min={0}   max={1}   onChange={setAging}/>
       </div>
       <div style={S.sec}>
-        <div style={S.h3}>Layers ({layers.length})</div>
-        <button style={S.btnSm} onClick={addLayer}>+ Add Layer</button>
-        <button style={S.btnSm} onClick={()=>{setLayers([]);setStatus("Layers cleared");}}>Clear Layers</button>
-        {layers.map((l,i)=><div key={l.id} style={{fontSize:10,color:"#888",padding:"2px 0"}}>{i+1}. {l.style} on {l.placement}</div>)}
+        <div style={S.h3}>Transform</div>
+        <div style={S.row}>
+          <Slider label="Scale X" value={scaleX} min={0.1} max={3} onChange={setScaleX}/>
+          <Slider label="Scale Y" value={scaleY} min={0.1} max={3} onChange={setScaleY}/>
+        </div>
+        <div style={S.row}>
+          <Slider label="Pos X"  value={posX}     min={-1}   max={1}   onChange={setPosX}/>
+          <Slider label="Pos Y"  value={posY}     min={-1}   max={1}   onChange={setPosY}/>
+        </div>
+        <Slider label="Rotation" value={rotation} min={-180} max={180} step={1} onChange={setRotation}/>
       </div>
       <button style={S.btn} onClick={applyToScene}>✓ Apply to Scene</button>
-      <button style={S.btnO} onClick={downloadTexture}>💾 Download PNG</button>
+      <button style={S.btnO} onClick={exportTex}>💾 Export PNG</button>
       {status&&<div style={{...S.stat,marginTop:8}}>{status}</div>}
     </div>
   );

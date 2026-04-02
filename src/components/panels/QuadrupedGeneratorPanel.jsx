@@ -1,154 +1,265 @@
-
-import React, { useState, useRef } from "react";
-import { PolyQualityBar, Q, estimateTris, formatTris } from './PolyQualityUtil';
+import React, { useState, useCallback } from "react";
 import * as THREE from "three";
 
 const T={bg:"#06060f",panel:"#0d0d1a",border:"#1a1a2e",teal:"#00ffc8",orange:"#FF6600",text:"#e0e0e0",muted:"#aaa",font:"JetBrains Mono,monospace"};
-const S={root:{background:T.bg,color:T.text,fontFamily:T.font,padding:16,height:"100%",overflowY:"auto"},h2:{color:T.teal,fontSize:14,marginBottom:12,letterSpacing:1},h3:{color:T.orange,fontSize:12,marginBottom:8,marginTop:8},lbl:{fontSize:11,color:T.muted,display:"block",marginBottom:4},inp:{width:"100%",background:T.panel,border:"1px solid "+T.border,color:T.text,padding:"4px 8px",borderRadius:4,fontFamily:T.font,fontSize:11,marginBottom:8,boxSizing:"border-box"},sel:{width:"100%",background:T.panel,border:"1px solid "+T.border,color:T.text,padding:"4px 8px",borderRadius:4,fontFamily:T.font,fontSize:11,marginBottom:8,boxSizing:"border-box"},btn:{background:T.teal,color:T.bg,border:"none",borderRadius:4,padding:"7px 16px",fontFamily:T.font,fontSize:12,fontWeight:700,cursor:"pointer",marginRight:8,marginBottom:8},btnO:{background:T.orange,color:"#fff",border:"none",borderRadius:4,padding:"7px 16px",fontFamily:T.font,fontSize:12,fontWeight:700,cursor:"pointer",marginRight:8,marginBottom:8},btnSm:{background:T.panel,color:T.teal,border:"1px solid "+T.teal,borderRadius:4,padding:"3px 10px",fontFamily:T.font,fontSize:10,cursor:"pointer",marginRight:6,marginBottom:6},sec:{background:T.panel,border:"1px solid "+T.border,borderRadius:6,padding:12,marginBottom:12},stat:{fontSize:11,color:T.teal,marginBottom:4}};
-
-const PRESETS = {
-  "Dog/Wolf":    {bodyL:1.2,bodyW:0.45,bodyH:0.38,neckL:0.35,headSc:0.55,legL:0.55,legW:0.12,pawSz:0.14,tailL:0.7,tailCurve:0.4,earSz:0.18,earUp:true,snoutL:0.28,color:"#886644",furColor:"#aa8855"},
-  "Cat":         {bodyL:0.9,bodyW:0.32,bodyH:0.28,neckL:0.25,headSc:0.45,legL:0.38,legW:0.09,pawSz:0.1,tailL:0.85,tailCurve:0.7,earSz:0.12,earUp:true,snoutL:0.14,color:"#aa8855",furColor:"#cc9966"},
-  "Lion":        {bodyL:1.6,bodyW:0.65,bodyH:0.58,neckL:0.45,headSc:0.78,legL:0.65,legW:0.2,pawSz:0.22,tailL:0.9,tailCurve:0.2,earSz:0.14,earUp:true,snoutL:0.22,color:"#c8a050",furColor:"#d4aa55"},
-  "Tiger":       {bodyL:1.7,bodyW:0.62,bodyH:0.55,neckL:0.4,headSc:0.75,legL:0.62,legW:0.22,pawSz:0.24,tailL:0.85,tailCurve:0.15,earSz:0.13,earUp:true,snoutL:0.24,color:"#c87830",furColor:"#dd9944"},
-  "Horse":       {bodyL:2.2,bodyW:0.7,bodyH:0.75,neckL:0.9,headSc:0.7,legL:1.1,legW:0.18,pawSz:0.16,tailL:1.2,tailCurve:0.1,earSz:0.16,earUp:true,snoutL:0.42,color:"#885533",furColor:"#996644"},
-  "Bear":        {bodyL:1.8,bodyW:0.9,bodyH:0.8,neckL:0.28,headSc:0.85,legL:0.55,legW:0.32,pawSz:0.35,tailL:0.1,tailCurve:0,earSz:0.16,earUp:true,snoutL:0.2,color:"#4a2c0a",furColor:"#5c3a18"},
-  "Deer":        {bodyL:1.5,bodyW:0.45,bodyH:0.55,neckL:0.65,headSc:0.5,legL:0.9,legW:0.1,pawSz:0.1,tailL:0.2,tailCurve:0.1,earSz:0.22,earUp:true,snoutL:0.25,color:"#aa7744",furColor:"#bb8855"},
-  "Elephant":    {bodyL:2.8,bodyW:1.4,bodyH:1.6,neckL:0.3,headSc:1.2,legL:0.9,legW:0.5,pawSz:0.45,tailL:0.6,tailCurve:0.05,earSz:0.7,earUp:false,snoutL:0.0,color:"#778888",furColor:"#889999"},
-  "Crocodile":   {bodyL:2.5,bodyW:0.6,bodyH:0.22,neckL:0.35,headSc:0.65,legL:0.28,legW:0.18,pawSz:0.2,tailL:1.4,tailCurve:0.05,earSz:0.04,earUp:false,snoutL:0.55,color:"#3a5a32",furColor:"#2a4a22"},
-  "Dinosaur":    {bodyL:3.0,bodyW:0.9,bodyH:1.0,neckL:0.8,headSc:0.9,legL:0.9,legW:0.35,pawSz:0.3,tailL:2.0,tailCurve:0.05,earSz:0.05,earUp:false,snoutL:0.45,color:"#556633",furColor:"#447722"},
+const S={
+  root:{background:T.bg,color:T.text,fontFamily:T.font,padding:16,height:"100%",overflowY:"auto",boxSizing:"border-box"},
+  h2:{color:T.teal,fontSize:14,marginBottom:12,letterSpacing:1},
+  h3:{color:T.orange,fontSize:12,marginBottom:8,marginTop:12},
+  lbl:{fontSize:11,color:T.muted,display:"block",marginBottom:4},
+  inp:{width:"100%",background:T.panel,border:"1px solid "+T.border,color:T.text,padding:"4px 8px",borderRadius:4,fontFamily:T.font,fontSize:11,marginBottom:8,boxSizing:"border-box"},
+  sel:{width:"100%",background:T.panel,border:"1px solid "+T.border,color:T.text,padding:"4px 8px",borderRadius:4,fontFamily:T.font,fontSize:11,marginBottom:8,boxSizing:"border-box"},
+  btn:{background:T.teal,color:T.bg,border:"none",borderRadius:4,padding:"7px 16px",fontFamily:T.font,fontSize:12,fontWeight:700,cursor:"pointer",marginRight:8,marginBottom:8},
+  btnO:{background:T.orange,color:"#fff",border:"none",borderRadius:4,padding:"7px 16px",fontFamily:T.font,fontSize:12,fontWeight:700,cursor:"pointer",marginRight:8,marginBottom:8},
+  btnSm:{background:T.panel,color:T.teal,border:"1px solid "+T.teal,borderRadius:4,padding:"3px 10px",fontFamily:T.font,fontSize:10,cursor:"pointer",marginRight:6,marginBottom:6},
+  sec:{background:T.panel,border:"1px solid "+T.border,borderRadius:6,padding:12,marginBottom:12},
+  stat:{fontSize:11,color:T.teal,marginBottom:4},
+  row:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:4},
+  tag:{display:"inline-block",background:T.panel,color:T.muted,borderRadius:3,padding:"2px 6px",fontSize:10,marginRight:4,marginBottom:4,cursor:"pointer"},
+  tagOn:{display:"inline-block",background:T.teal,color:T.bg,borderRadius:3,padding:"2px 6px",fontSize:10,marginRight:4,marginBottom:4,cursor:"pointer",fontWeight:700},
 };
 
-function buildQuadruped(scene, cfg) {
-  const ms = [];
-  const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(cfg.color), roughness: 0.8 });
-  const add = (geo, x, y, z, rx=0, ry=0, rz=0, m=mat) => {
-    const mesh = new THREE.Mesh(geo, m.clone());
-    mesh.position.set(x, y, z);
-    mesh.rotation.set(rx, ry, rz);
-    mesh.castShadow = true;
-    scene.add(mesh); ms.push(mesh); return mesh;
-  };
+const SPECIES=["Dog","Cat","Horse","Wolf","Lion","Tiger","Bear","Deer","Fox","Rabbit","Dragon","Dinosaur","Lizard","Elephant","Rhino","Gorilla","Panther","Cheetah","Hyena","Boar"];
+const BREEDS={
+  Dog:["Generic","German Shepherd","Husky","Bulldog","Poodle","Great Dane","Chihuahua","Border Collie"],
+  Cat:["Generic","Domestic","Persian","Bengal","Siamese","Maine Coon","Sphynx"],
+  Horse:["Generic","Arabian","Thoroughbred","Draft","Mustang","Clydesdale"],
+  Wolf:["Generic","Grey Wolf","Arctic Wolf","Black Wolf","Dire Wolf"],
+};
+const COAT_TYPES=["Short Fur","Long Fur","Scales","Smooth Skin","Feathered","Armored","Wet","Dry"];
+const POSES=["Neutral","Walk","Run","Sit","Lie Down","Alert","Aggressive","Playful","Eating","Sleeping"];
+const BODY_BUILDS=["Slim","Athletic","Heavy","Muscular","Stocky","Lean","Massive"];
 
-  const bL=cfg.bodyL, bW=cfg.bodyW, bH=cfg.bodyH;
-  const lL=cfg.legL, lW=cfg.legW;
-  const baseY = lL + 0.1;
-
-  // Body
-  add(new THREE.BoxGeometry(bW, bH, bL), 0, baseY + bH/2, 0);
-  // Neck
-  const neckGeo = new THREE.CylinderGeometry(cfg.headSc*0.22, cfg.headSc*0.28, cfg.neckL,Q(quality).cylinder);
-  add(neckGeo, 0, baseY+bH+cfg.neckL/2, bL/2-0.1, -0.3, 0, 0);
-  // Head
-  const headGeo = new THREE.BoxGeometry(cfg.headSc*0.7, cfg.headSc*0.6, cfg.headSc*0.85);
-  add(headGeo, 0, baseY+bH+cfg.neckL+cfg.headSc*0.25, bL/2+cfg.headSc*0.1);
-  // Snout
-  if (cfg.snoutL > 0.05) {
-    const snoutGeo = new THREE.BoxGeometry(cfg.headSc*0.4, cfg.headSc*0.28, cfg.snoutL);
-    add(snoutGeo, 0, baseY+bH+cfg.neckL+cfg.headSc*0.05, bL/2+cfg.headSc*0.85/2+cfg.snoutL/2+0.05);
-  }
-  // Ears
-  if (cfg.earSz > 0.05) {
-    [-1,1].forEach(s => {
-      const earGeo = new THREE.ConeGeometry(cfg.earSz*0.5, cfg.earSz,Q(quality).cone);
-      const ey = cfg.earUp ? baseY+bH+cfg.neckL+cfg.headSc*0.55 : baseY+bH+cfg.neckL+cfg.headSc*0.3;
-      const ez = cfg.earUp ? 0.1 : -0.1;
-      add(earGeo, s*cfg.headSc*0.3, ey, bL/2+0.05+ez, cfg.earUp?0:Math.PI/2, 0, s*0.3);
-    });
-  }
-  // 4 Legs
-  [[-1,1],[-1,-1],[1,1],[1,-1]].forEach(([sx,sz]) => {
-    const lgx = sx*bW/2*0.7, lgz = sz*bL/2*0.65;
-    // Upper leg
-    add(new THREE.CylinderGeometry(lW*0.9, lW*0.75, lL*0.55,Q(quality).cylinder), lgx, baseY-lL*0.55/2, lgz);
-    // Lower leg
-    add(new THREE.CylinderGeometry(lW*0.7, lW*0.55, lL*0.45,Q(quality).cylinder), lgx, baseY-lL*0.55-lL*0.45/2, lgz);
-    // Paw
-    add(new THREE.BoxGeometry(cfg.pawSz, cfg.pawSz*0.35, cfg.pawSz*1.1), lgx, 0.08, lgz+cfg.pawSz*0.1);
-  });
-  // Tail
-  if (cfg.tailL > 0.08) {
-    const tailSegs = 6;
-    let tx=0, ty=baseY+bH*0.5, tz=-bL/2-0.05;
-    for (let i=0; i<tailSegs; i++) {
-      const r = cfg.tailL/tailSegs * (1-i/tailSegs*0.4);
-      const tGeo = new THREE.SphereGeometry(Math.max(0.02, lW*0.5*(1-i/tailSegs*0.7)), 6, 4);
-      add(tGeo, tx, ty, tz - r/2);
-      tz -= r*0.9;
-      ty += cfg.tailCurve * r;
-    }
-  }
-  // Eyes
-  const eyeGeo = new THREE.SphereGeometry(cfg.headSc*0.06,Q(quality).sphere,Q(quality).sphereH);
-  const eyeMat = new THREE.MeshStandardMaterial({ color: 0x224488, roughness: 0.05 });
-  [-1,1].forEach(s => add(eyeGeo, s*cfg.headSc*0.22, baseY+bH+cfg.neckL+cfg.headSc*0.18, bL/2+cfg.headSc*0.75, 0,0,0, eyeMat));
-
-  // Ground + lights
-  const gnd = new THREE.Mesh(new THREE.PlaneGeometry(20,20), new THREE.MeshStandardMaterial({color:0x0a0a14}));
-  gnd.rotation.x=-Math.PI/2; scene.add(gnd); ms.push(gnd);
-  if (!scene.getObjectByName("quad_amb")) {
-    const a=new THREE.AmbientLight(0xffffff,.7);a.name="quad_amb";scene.add(a);ms.push(a);
-    const d=new THREE.DirectionalLight(0xffeedd,1.1);d.position.set(20,30,15);d.castShadow=true;scene.add(d);ms.push(d);
-  }
-  return ms;
+function Slider({label,value,min,max,step=0.01,onChange}){
+  return(
+    <div>
+      <label style={S.lbl}>{label}: <span style={{color:T.teal}}>{typeof value==="number"?value.toFixed(2):value}</span></label>
+      <input style={S.inp} type="range" min={min} max={max} step={step} value={value} onChange={e=>onChange(Number(e.target.value))}/>
+    </div>
+  );
 }
 
-const CTRL = [
-  {id:"bodyL",lbl:"Body Length",min:.3,max:4,step:.01},
-  {id:"bodyW",lbl:"Body Width",min:.1,max:2,step:.01},
-  {id:"bodyH",lbl:"Body Height",min:.1,max:2,step:.01},
-  {id:"neckL",lbl:"Neck Length",min:.05,max:1.5,step:.01},
-  {id:"headSc",lbl:"Head Scale",min:.2,max:1.5,step:.01},
-  {id:"legL",lbl:"Leg Length",min:.1,max:2,step:.01},
-  {id:"legW",lbl:"Leg Width",min:.04,max:.6,step:.01},
-  {id:"pawSz",lbl:"Paw Size",min:.04,max:.6,step:.01},
-  {id:"tailL",lbl:"Tail Length",min:0,max:2.5,step:.01},
-  {id:"tailCurve",lbl:"Tail Curve",min:0,max:1,step:.01},
-  {id:"earSz",lbl:"Ear Size",min:0,max:.8,step:.01},
-  {id:"snoutL",lbl:"Snout Length",min:0,max:.8,step:.01},
-];
+function buildQuadrupedMesh(params){
+  const {
+    species="Dog", bodyLength=1.2, bodyWidth=0.4, bodyHeight=0.45,
+    neckLength=0.35, headSize=0.28, headWidth=0.22,
+    legFrontLength=0.55, legBackLength=0.6, legRadius=0.055,
+    tailLength=0.5, tailCurve=0.3,
+    color="#a0785a", roughness=0.8,
+  } = params;
 
-export default function QuadrupedGeneratorPanel({ scene }) {
-  const [preset, setPreset] = useState("Dog/Wolf");
-  const [quality, setQuality] = useState('Mid');
-  const [cfg, setCfg]       = useState({ ...PRESETS["Dog/Wolf"] });
-  const [color, setColor]   = useState("#886644");
-  const [status, setStatus] = useState("");
-  const meshes = useRef([]);
+  const group = new THREE.Group();
+  group.name = species;
+  const mat  = new THREE.MeshStandardMaterial({color, roughness, metalness:0});
+  const mat2 = new THREE.MeshStandardMaterial({color, roughness:0.9});
 
-  function loadPreset(p) { setPreset(p); setCfg({...PRESETS[p]}); setColor(PRESETS[p].color); }
-  function clear() { meshes.current.forEach(m=>{scene.remove(m);m.geometry?.dispose();m.material?.dispose();}); meshes.current=[]; setStatus(""); }
-  function generate() {
-    if (!scene) { setStatus("No scene"); return; }
-    clear();
-    const ms = buildQuadruped(scene, { ...cfg, color });
-    meshes.current = ms;
-    setStatus(`✓ ${preset} built — ${ms.filter(m=>m.isMesh).length} parts`);
+  // Body
+  const body = new THREE.Mesh(new THREE.SphereGeometry(1,12,8), mat);
+  body.scale.set(bodyLength/2, bodyHeight/2, bodyWidth/2);
+  body.position.y = legFrontLength + bodyHeight/2;
+  body.castShadow = true;
+  group.add(body);
+
+  // Neck
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(headWidth*0.5, bodyHeight*0.3, neckLength, 8), mat);
+  neck.position.set(bodyLength*0.35, legFrontLength+bodyHeight*0.7, 0);
+  neck.rotation.z = -Math.PI*0.18;
+  group.add(neck);
+
+  // Head
+  const head = new THREE.Mesh(new THREE.SphereGeometry(1,10,8), mat);
+  head.scale.set(headSize, headSize*0.85, headWidth*0.8);
+  head.position.set(bodyLength*0.42+neckLength*0.5, legFrontLength+bodyHeight*0.85+neckLength*0.3, 0);
+  head.castShadow = true;
+  group.add(head);
+
+  // Snout
+  const snout = new THREE.Mesh(new THREE.BoxGeometry(headSize*0.6, headSize*0.35, headWidth*0.65), mat);
+  snout.position.set(head.position.x+headSize*0.55, head.position.y-headSize*0.1, 0);
+  group.add(snout);
+
+  // Ears
+  [-1,1].forEach(side=>{
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(headSize*0.22, headSize*0.45, 6), mat2);
+    ear.position.set(head.position.x-headSize*0.1, head.position.y+headSize*0.6, side*headWidth*0.45);
+    ear.rotation.z = side*0.15;
+    group.add(ear);
+  });
+
+  // Eyes
+  [-1,1].forEach(side=>{
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(headSize*0.08,8,6),
+      new THREE.MeshStandardMaterial({color:0x111111, roughness:0.1}));
+    eye.position.set(head.position.x+headSize*0.35, head.position.y+headSize*0.08, side*headWidth*0.38);
+    group.add(eye);
+  });
+
+  // Legs — 4 legs
+  const legDefs = [
+    [bodyLength*0.35, 0, bodyWidth*0.38, legFrontLength],
+    [bodyLength*0.35, 0, -bodyWidth*0.38, legFrontLength],
+    [-bodyLength*0.35, 0, bodyWidth*0.38, legBackLength],
+    [-bodyLength*0.35, 0, -bodyWidth*0.38, legBackLength],
+  ];
+  legDefs.forEach(([x,_,z,len])=>{
+    // Upper leg
+    const upper = new THREE.Mesh(new THREE.CylinderGeometry(legRadius*1.2, legRadius, len*0.55, 6), mat);
+    upper.position.set(x, len*0.72, z);
+    group.add(upper);
+    // Lower leg
+    const lower = new THREE.Mesh(new THREE.CylinderGeometry(legRadius, legRadius*0.8, len*0.45, 6), mat);
+    lower.position.set(x, len*0.22, z);
+    group.add(lower);
+    // Paw
+    const paw = new THREE.Mesh(new THREE.SphereGeometry(legRadius*1.5, 6, 4), mat2);
+    paw.scale.z = 1.6;
+    paw.position.set(x+legRadius*0.3, legRadius, z);
+    group.add(paw);
+  });
+
+  // Tail
+  if(tailLength > 0){
+    const tailSegments = 8;
+    for(let i=0;i<tailSegments;i++){
+      const t = i/tailSegments;
+      const tailSeg = new THREE.Mesh(
+        new THREE.SphereGeometry(legRadius*(1-t*0.7), 6, 4), mat);
+      const angle = t*tailCurve*Math.PI;
+      tailSeg.position.set(-bodyLength*0.5-Math.sin(angle)*tailLength*t, legFrontLength+bodyHeight*0.5+Math.cos(angle)*tailLength*t*0.3, 0);
+      group.add(tailSeg);
+    }
   }
 
-  return (
+  return group;
+}
+
+export default function QuadrupedGeneratorPanel({scene}){
+  const [species,   setSpecies]    = useState("Dog");
+  const [breed,     setBreed]      = useState("Generic");
+  const [bodyBuild, setBodyBuild]  = useState("Athletic");
+  const [coatType,  setCoatType]   = useState("Short Fur");
+  const [pose,      setPose]       = useState("Neutral");
+  const [size,      setSize]       = useState(1.0);
+  const [bodyLen,   setBodyLen]    = useState(1.2);
+  const [bodyW,     setBodyW]      = useState(0.4);
+  const [bodyH,     setBodyH]      = useState(0.45);
+  const [neckLen,   setNeckLen]    = useState(0.35);
+  const [headSz,    setHeadSz]     = useState(0.28);
+  const [legFront,  setLegFront]   = useState(0.55);
+  const [legBack,   setLegBack]    = useState(0.60);
+  const [legRad,    setLegRad]     = useState(0.055);
+  const [tailLen,   setTailLen]    = useState(0.5);
+  const [tailCurve, setTailCurve]  = useState(0.3);
+  const [primaryColor,setPrimary]  = useState("#a0785a");
+  const [secondColor, setSecond]   = useState("#7a5a3a");
+  const [eyeColor,    setEye]      = useState("#4a3000");
+  const [roughness,   setRoughness]= useState(0.8);
+  const [age,         setAge]      = useState(3);
+  const [furLength,   setFurLen]   = useState(0.5);
+  const [status,      setStatus]   = useState("");
+
+  function generate(){
+    if(!scene){ setStatus("No scene connected"); return; }
+    const group = buildQuadrupedMesh({
+      species, bodyLength:bodyLen*size, bodyWidth:bodyW*size, bodyHeight:bodyH*size,
+      neckLength:neckLen*size, headSize:headSz*size,
+      legFrontLength:legFront*size, legBackLength:legBack*size, legRadius:legRad*size,
+      tailLength:tailLen*size, tailCurve,
+      color:primaryColor, roughness,
+    });
+    group.name = `${species}_${breed}_${Date.now()}`;
+    scene.add(group);
+    setStatus(`✓ Generated ${group.name}`);
+  }
+
+  function randomize(){
+    const s = SPECIES[Math.floor(Math.random()*SPECIES.length)];
+    setSpecies(s);
+    setSize(0.5+Math.random()*3);
+    setBodyLen(0.8+Math.random()*1.5);
+    setBodyW(0.3+Math.random()*0.5);
+    setBodyH(0.3+Math.random()*0.5);
+    setLegFront(0.3+Math.random()*0.8);
+    setLegBack(0.3+Math.random()*0.9);
+    setTailLen(Math.random()*1.2);
+    setPrimary(`#${Math.floor(Math.random()*16777215).toString(16).padStart(6,"0")}`);
+  }
+
+  return(
     <div style={S.root}>
       <div style={S.h2}>🐾 QUADRUPED GENERATOR</div>
-      
-      <PolyQualityBar quality={quality} onChange={setQuality}/>
-<div style={S.sec}>
-        <label style={S.lbl}>Animal Preset</label>
-        <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
-          {Object.keys(PRESETS).map(p=><button key={p} style={{...S.btnSm,background:preset===p?T.teal:T.panel,color:preset===p?T.bg:T.teal}} onClick={()=>loadPreset(p)}>{p}</button>)}
-        </div>
-        <label style={S.lbl}>Base Color</label>
-        <input style={{...S.inp,padding:2,height:32}} type="color" value={color} onChange={e=>setColor(e.target.value)}/>
-      </div>
+
       <div style={S.sec}>
-        {CTRL.map(c=>(
-          <div key={c.id}>
-            <label style={S.lbl}>{c.lbl}: {cfg[c.id]?.toFixed(2)}</label>
-            <input style={S.inp} type="range" min={c.min} max={c.max} step={c.step} value={cfg[c.id]||0} onChange={e=>setCfg(p=>({...p,[c.id]:+e.target.value}))}/>
+        <div style={S.h3}>Species & Breed</div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
+          {SPECIES.map(s=><span key={s} style={species===s?S.tagOn:S.tag} onClick={()=>{setSpecies(s);setBreed("Generic");}}>{s}</span>)}
+        </div>
+        <div style={S.row}>
+          <div>
+            <label style={S.lbl}>Breed</label>
+            <select style={S.sel} value={breed} onChange={e=>setBreed(e.target.value)}>
+              {(BREEDS[species]||["Generic"]).map(b=><option key={b}>{b}</option>)}
+            </select>
           </div>
-        ))}
+          <div>
+            <label style={S.lbl}>Body Build</label>
+            <select style={S.sel} value={bodyBuild} onChange={e=>setBodyBuild(e.target.value)}>
+              {BODY_BUILDS.map(b=><option key={b}>{b}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={S.row}>
+          <div>
+            <label style={S.lbl}>Coat Type</label>
+            <select style={S.sel} value={coatType} onChange={e=>setCoatType(e.target.value)}>
+              {COAT_TYPES.map(c=><option key={c}>{c}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={S.lbl}>Pose</label>
+            <select style={S.sel} value={pose} onChange={e=>setPose(e.target.value)}>
+              {POSES.map(p=><option key={p}>{p}</option>)}
+            </select>
+          </div>
+        </div>
+        <Slider label="Age (years)" value={age} min={0} max={20} step={0.5} onChange={setAge}/>
+        <Slider label="Overall Size" value={size} min={0.1} max={5} onChange={setSize}/>
       </div>
-      <button style={S.btn} onClick={generate}>⚡ Generate</button>
-      <button style={S.btnO} onClick={clear}>🗑 Clear</button>
+
+      <div style={S.sec}>
+        <div style={S.h3}>Body Proportions</div>
+        <Slider label="Body Length"  value={bodyLen}  min={0.5} max={3}   onChange={setBodyLen}/>
+        <Slider label="Body Width"   value={bodyW}    min={0.2} max={1.5} onChange={setBodyW}/>
+        <Slider label="Body Height"  value={bodyH}    min={0.2} max={1.5} onChange={setBodyH}/>
+        <Slider label="Neck Length"  value={neckLen}  min={0.1} max={1.5} onChange={setNeckLen}/>
+        <Slider label="Head Size"    value={headSz}   min={0.1} max={0.8} onChange={setHeadSz}/>
+      </div>
+
+      <div style={S.sec}>
+        <div style={S.h3}>Legs & Tail</div>
+        <Slider label="Front Leg Length" value={legFront} min={0.2} max={2} onChange={setLegFront}/>
+        <Slider label="Back Leg Length"  value={legBack}  min={0.2} max={2} onChange={setLegBack}/>
+        <Slider label="Leg Radius"       value={legRad}   min={0.02} max={0.2} onChange={setLegRad}/>
+        <Slider label="Tail Length"      value={tailLen}  min={0} max={2}   onChange={setTailLen}/>
+        <Slider label="Tail Curve"       value={tailCurve}min={0} max={1}   onChange={setTailCurve}/>
+      </div>
+
+      <div style={S.sec}>
+        <div style={S.h3}>Coat & Colors</div>
+        <Slider label="Fur Length"   value={furLength} min={0} max={1} onChange={setFurLen}/>
+        <Slider label="Roughness"    value={roughness} min={0} max={1} onChange={setRoughness}/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginTop:8}}>
+          {[["Primary",primaryColor,setPrimary],["Secondary",secondColor,setSecond],["Eyes",eyeColor,setEye]].map(([lbl,val,setter])=>(
+            <div key={lbl}>
+              <label style={S.lbl}>{lbl}</label>
+              <input type="color" value={val} onChange={e=>setter(e.target.value)} style={{width:"100%",height:28,borderRadius:4,border:"none",cursor:"pointer"}}/>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <button style={S.btn} onClick={generate}>⚡ Generate {species}</button>
+      <button style={S.btnO} onClick={randomize}>🎲 Randomize</button>
       {status&&<div style={{...S.stat,marginTop:8}}>{status}</div>}
     </div>
   );
