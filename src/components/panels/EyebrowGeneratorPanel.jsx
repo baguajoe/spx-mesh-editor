@@ -1,410 +1,235 @@
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 
-import React, { useState, useRef } from "react";
-import * as THREE from "three";
-
-const T={bg:"#06060f",panel:"#0d0d1a",border:"#1a1a2e",teal:"#00ffc8",orange:"#FF6600",text:"#e0e0e0",muted:"#aaa",font:"JetBrains Mono,monospace"};
-const S={root:{background:T.bg,color:T.text,fontFamily:T.font,padding:16,height:"100%",overflowY:"auto"},h2:{color:T.teal,fontSize:14,marginBottom:12,letterSpacing:1},h3:{color:T.orange,fontSize:12,marginBottom:8,marginTop:8},lbl:{fontSize:11,color:T.muted,display:"block",marginBottom:4},inp:{width:"100%",background:T.panel,border:"1px solid "+T.border,color:T.text,padding:"4px 8px",borderRadius:4,fontFamily:T.font,fontSize:11,marginBottom:8,boxSizing:"border-box"},sel:{width:"100%",background:T.panel,border:"1px solid "+T.border,color:T.text,padding:"4px 8px",borderRadius:4,fontFamily:T.font,fontSize:11,marginBottom:8,boxSizing:"border-box"},btn:{background:T.teal,color:T.bg,border:"none",borderRadius:4,padding:"7px 16px",fontFamily:T.font,fontSize:12,fontWeight:700,cursor:"pointer",marginRight:8,marginBottom:8},sec:{background:T.panel,border:"1px solid "+T.border,borderRadius:6,padding:12,marginBottom:12},stat:{fontSize:11,color:T.teal,marginBottom:4},prev:{width:"100%",height:100,borderRadius:6,border:"2px solid "+T.border,display:"block",marginBottom:8}};
-
-const BROW_PRESETS={
-  "Natural":    {thickness:.5,width:.7,archH:.4,archSharp:.3,length:.7,tailLen:.5,density:.7,asymmetry:.05,browRidge:0,angelicCurve:0,demonAngle:0},
-  "Thick":      {thickness:.85,width:.8,archH:.3,archSharp:.2,length:.8,tailLen:.6,density:.9,asymmetry:.05,browRidge:0,angelicCurve:.1,demonAngle:0},
-  "Thin":       {thickness:.2,width:.65,archH:.5,archSharp:.5,length:.6,tailLen:.4,density:.5,asymmetry:.08,browRidge:0,angelicCurve:.2,demonAngle:0},
-  "Sculpted":   {thickness:.55,width:.7,archH:.65,archSharp:.6,length:.68,tailLen:.5,density:.75,asymmetry:.03,browRidge:0,angelicCurve:.15,demonAngle:0},
-  "Villain":    {thickness:.6,width:.68,archH:.2,archSharp:.8,length:.65,tailLen:.55,density:.8,asymmetry:.2,browRidge:.4,angelicCurve:0,demonAngle:.7},
-  "Demon Brow": {thickness:.9,width:.85,archH:.1,archSharp:.9,length:.85,tailLen:.8,density:.95,asymmetry:.15,browRidge:.9,angelicCurve:0,demonAngle:.9},
-  "Heavy Ridge":{thickness:.95,width:.9,archH:.15,archSharp:.7,length:.88,tailLen:.7,density:1,asymmetry:.1,browRidge:.95,angelicCurve:0,demonAngle:.5},
-  "Angular":    {thickness:.65,width:.72,archH:.3,archSharp:.95,length:.7,tailLen:.5,density:.8,asymmetry:.1,browRidge:.3,angelicCurve:0,demonAngle:.6},
-};
-
-function drawBrowPreview(canvas,brow,color){
-  const ctx=canvas.getContext("2d"),w=canvas.width,h=canvas.height;
-  ctx.fillStyle="#0d0d1a";ctx.fillRect(0,0,w,h);
-  const drawBrow=(cx,flip)=>{
-    const bw=brow.width*w*.35,bh=brow.thickness*h*.35;
-    const archY=-brow.archH*h*.18;
-    const angle=(brow.demonAngle*.3)*(flip?-1:1);
-    ctx.save();ctx.translate(cx,h*.42);ctx.rotate(angle);
-    // brow ridge
-    if(brow.browRidge>.1){ctx.beginPath();ctx.ellipse(0,-bh*.5,bw*.55,bh*(.5+brow.browRidge*.5),0,0,Math.PI*2);ctx.fillStyle="rgba(100,60,40,"+brow.browRidge*.4+")";ctx.fill();}
-    // brow hair
-    for(let i=0;i<Math.round(brow.density*25);i++){
-      const t=i/25,lx=-bw*.45+t*bw*.9+brow.tailLen*bw*.1;
-      const larch=Math.sin(t*Math.PI)*archY;
-      const lthick=bh*(.7+Math.sin(t*Math.PI)*brow.density*.3);
-      const angle2=(Math.random()-.5)*.3+brow.demonAngle*.2;
-      ctx.strokeStyle=color||"#554433";ctx.lineWidth=1+brow.thickness*2;ctx.globalAlpha=.7+Math.random()*.3;
-      ctx.beginPath();ctx.moveTo(lx,larch);ctx.lineTo(lx+Math.sin(angle2)*2,larch-lthick*.4);ctx.stroke();
-    }
-    ctx.globalAlpha=1;
-    // main shape
-    ctx.beginPath();ctx.moveTo(-bw*.45,0);
-    ctx.quadraticCurveTo(-bw*.1,archY-bh*.3*brow.archSharp,bw*.5+brow.tailLen*bw*.2,bh*.2);
-    ctx.quadraticCurveTo(bw*.2,archY+bh*.5,- bw*.45,bh*.25);
-    ctx.closePath();ctx.fillStyle=color||"#443322";ctx.globalAlpha=.7;ctx.fill();ctx.globalAlpha=1;
-    ctx.restore();
-  };
-  const asym=brow.asymmetry*h*.04;
-  drawBrow(w*.3,false);
-  ctx.save();ctx.translate(w*.7,asym);drawBrow(0,true);ctx.restore();
-}
-
-export default function EyebrowGeneratorPanel({scene}){
-  const [preset,setPreset]=useState("Natural");
-  const [brow,setBrow]=useState({...BROW_PRESETS["Natural"]});
-  const [browColor,setBrowColor]=useState("#443322");
-  const [status,setStatus]=useState("");
-  const prevRef=useRef(null);
-
-  function loadPreset(p){setPreset(p);setBrow({...BROW_PRESETS[p]});setTimeout(()=>{if(prevRef.current)drawBrowPreview(prevRef.current,BROW_PRESETS[p],browColor);},50);}
-  function preview(){if(prevRef.current)drawBrowPreview(prevRef.current,brow,browColor);}
-
-  function applyToScene(){
-    if(!scene){setStatus("No scene");return;}
-    const c=document.createElement("canvas");c.width=c.height=256;drawBrowPreview(c,brow,browColor);
-    const tex=new THREE.CanvasTexture(c);let n=0;
-    scene.traverse(o=>{if(o.isMesh&&(o.name.toLowerCase().includes("brow")||o.userData.isBrow)){o.material=new THREE.MeshStandardMaterial({map:tex,roughness:.9,transparent:true});n++;}});
-    setStatus(`✓ Applied to ${n} eyebrow mesh(es)`);
-  }
-
-  const CTRL=[
-    {id:"thickness",lbl:"Thickness"},{id:"width",lbl:"Width"},{id:"archH",lbl:"Arch Height"},
-    {id:"archSharp",lbl:"Arch Sharpness"},{id:"length",lbl:"Length"},{id:"tailLen",lbl:"Tail Length"},
-    {id:"density",lbl:"Hair Density"},{id:"asymmetry",lbl:"Asymmetry"},
-    {id:"browRidge",lbl:"Brow Ridge Depth"},{id:"demonAngle",lbl:"Demon Angle"},
-  ];
-
-  return(
-    <div style={S.root}>
-      <div style={S.h2}>🪶 EYEBROW GENERATOR</div>
-      <div style={S.sec}>
-        <label style={S.lbl}>Brow Preset</label>
-        <select style={S.sel} value={preset} onChange={e=>loadPreset(e.target.value)}>{Object.keys(BROW_PRESETS).map(p=><option key={p}>{p}</option>)}</select>
-        <canvas ref={prevRef} width={300} height={100} style={S.prev}/>
-        <button style={{background:T.panel,color:T.teal,border:"1px solid "+T.teal,borderRadius:4,padding:"3px 10px",fontFamily:T.font,fontSize:10,cursor:"pointer",marginRight:8}} onClick={preview}>👁 Preview</button>
-        <label style={S.lbl}>Brow Color</label>
-        <input style={{...S.inp,padding:2,height:32}} type="color" value={browColor} onChange={e=>{setBrowColor(e.target.value);preview();}}/>
-      </div>
-      <div style={S.sec}>
-        {CTRL.map(c=>(
-          <div key={c.id}>
-            <label style={S.lbl}>{c.lbl}: {brow[c.id]?.toFixed(2)}</label>
-            <input style={S.inp} type="range" min={0} max={1} step={0.01} value={brow[c.id]||0} onChange={e=>{setBrow(b=>({...b,[c.id]:+e.target.value}));preview();}}/>
-          </div>
-        ))}
-      </div>
-      <button style={S.btn} onClick={applyToScene}>✓ Apply to Scene</button>
-      {status&&<div style={{...S.stat,marginTop:8}}>{status}</div>}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Preset Manager (shared across all SPX generator panels)
-// ─────────────────────────────────────────────────────────────────────────────
-function usePresets(panelName, currentParams) {
-  const [presets, setPresets] = React.useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem(`spx_presets_${panelName}`) || '[]');
-    } catch { return []; }
-  });
-
-  const savePreset = React.useCallback((name) => {
-    const next = [...presets.filter(p => p.name !== name),
-      { name, params: currentParams, createdAt: Date.now() }];
-    setPresets(next);
-    try { localStorage.setItem(`spx_presets_${panelName}`, JSON.stringify(next)); } catch {}
-  }, [presets, currentParams, panelName]);
-
-  const loadPreset = React.useCallback((name) => {
-    return presets.find(p => p.name === name)?.params ?? null;
-  }, [presets]);
-
-  const deletePreset = React.useCallback((name) => {
-    const next = presets.filter(p => p.name !== name);
-    setPresets(next);
-    try { localStorage.setItem(`spx_presets_${panelName}`, JSON.stringify(next)); } catch {}
-  }, [presets, panelName]);
-
-  return { presets, savePreset, loadPreset, deletePreset };
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Keyboard shortcut handler (Enter=generate, Shift+R=randomize, Shift+X=reset)
-// ─────────────────────────────────────────────────────────────────────────────
-function useGeneratorKeys(onGenerate, onRandomize, onReset) {
-  React.useEffect(() => {
-    const handler = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
-      if (e.key === 'Enter')                          onGenerate?.();
-      if (e.shiftKey && e.key === 'R')                onRandomize?.();
-      if (e.shiftKey && (e.key === 'X' || e.key === 'x')) onReset?.();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onGenerate, onRandomize, onReset]);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared slider + badge primitives (inline — avoids import issues)
-// ─────────────────────────────────────────────────────────────────────────────
-function _Slider({ label, value, min = 0, max = 1, step = 0.01, onChange, unit = '' }) {
+function Slider({ label, value, min=0, max=1, step=0.01, onChange, unit='' }) {
   return (
     <div style={{ marginBottom: 5 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#888' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'#888' }}>
         <span>{label}</span>
-        <span style={{ color: '#00ffc8' }}>
-          {typeof value === 'number' ? (step < 0.1 ? value.toFixed(2) : Math.round(value)) : value}{unit}
+        <span style={{ color:'#00ffc8', fontWeight:600 }}>
+          {typeof value==='number' ? (step<0.1 ? value.toFixed(2) : Math.round(value)) : value}{unit}
         </span>
       </div>
       <input type="range" min={min} max={max} step={step} value={value}
         onChange={e => onChange(parseFloat(e.target.value))}
-        style={{ width: '100%', accentColor: '#00ffc8', cursor: 'pointer' }} />
+        style={{ width:'100%', accentColor:'#00ffc8', cursor:'pointer', height:16 }} />
     </div>
   );
 }
-
-function _Check({ label, value, onChange }) {
+function Select({ label, value, options, onChange }) {
   return (
-    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#ccc', cursor: 'pointer', marginBottom: 4 }}>
+    <div style={{ marginBottom:6 }}>
+      {label && <div style={{ fontSize:10, color:'#888', marginBottom:2 }}>{label}</div>}
+      <select value={value} onChange={e => onChange(e.target.value)} style={{
+        width:'100%', background:'#0d1117', color:'#e0e0e0',
+        border:'1px solid #21262d', padding:'3px 6px', borderRadius:4, fontSize:11, cursor:'pointer',
+      }}>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+function Check({ label, value, onChange }) {
+  return (
+    <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:11,
+      color:'#ccc', cursor:'pointer', marginBottom:4 }}>
       <input type="checkbox" checked={value} onChange={e => onChange(e.target.checked)}
-        style={{ accentColor: '#00ffc8' }} />
+        style={{ accentColor:'#00ffc8', width:12, height:12 }} />
       {label}
     </label>
   );
 }
-
-function _ColorRow({ label, value, onChange }) {
+function ColorRow({ label, value, onChange }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-      <span style={{ fontSize: 10, color: '#888', flex: 1 }}>{label}</span>
+    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:5 }}>
+      <span style={{ fontSize:10, color:'#888', flex:1 }}>{label}</span>
       <input type="color" value={value} onChange={e => onChange(e.target.value)}
-        style={{ width: 32, height: 22, border: 'none', cursor: 'pointer', borderRadius: 3 }} />
-      <span style={{ fontSize: 9, color: '#555' }}>{value}</span>
+        style={{ width:32, height:22, border:'none', cursor:'pointer', borderRadius:3 }} />
+      <span style={{ fontSize:9, color:'#555', fontFamily:'monospace' }}>{value}</span>
     </div>
   );
 }
+function Section({ title, children, defaultOpen=true }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ marginBottom:6, border:'1px solid #21262d', borderRadius:5, overflow:'hidden' }}>
+      <div onClick={() => setOpen(o => !o)} style={{
+        padding:'5px 8px', cursor:'pointer', background:'#0d1117',
+        display:'flex', justifyContent:'space-between',
+        fontSize:11, fontWeight:600, color:'#00ffc8', userSelect:'none',
+      }}>
+        <span>{title}</span>
+        <span style={{ fontSize:9, opacity:0.7 }}>{open ? '\u25b2' : '\u25bc'}</span>
+      </div>
+      {open && <div style={{ padding:'6px 8px', background:'#06060f' }}>{children}</div>}
+    </div>
+  );
+}
+function Badges({ items, active, onSelect }) {
+  return (
+    <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:6 }}>
+      {items.map(item => (
+        <button key={item} onClick={() => onSelect(item)} style={{
+          padding:'2px 7px', fontSize:9, borderRadius:4, cursor:'pointer',
+          background: active===item ? '#00ffc8' : '#1a1f2c',
+          color: active===item ? '#06060f' : '#ccc',
+          border: `1px solid ${active===item ? '#00ffc8' : '#21262d'}`,
+        }}>{item}</button>
+      ))}
+    </div>
+  );
+}
+function GenBtn({ label, onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      width:'100%', background:'#00ffc8', color:'#06060f', border:'none',
+      borderRadius:4, padding:'7px 0', cursor:'pointer', fontWeight:700,
+      fontSize:12, marginTop:6, letterSpacing:0.5, fontFamily:'JetBrains Mono, monospace',
+    }}>{label}</button>
+  );
+}
+function RandBtn({ onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      background:'#1a1f2c', color:'#888', border:'1px solid #21262d',
+      borderRadius:4, padding:'6px 10px', cursor:'pointer', fontSize:11,
+    }}>\u{1F3B2}</button>
+  );
+}
+const P = { fontFamily:'JetBrains Mono, monospace', color:'#e0e0e0', fontSize:12, userSelect:'none', width:'100%' };
 
-// ──────────────────────────────────────────────────────────────────────────
-// SPX Mesh Editor — Module Reference
-// ──────────────────────────────────────────────────────────────────────────
-//
-// INTEGRATION
-//   This module is part of the SPX Mesh Editor pipeline.
-//   Import via the barrel export in src/mesh/hair/index.js
-//   or src/generators/index.js as appropriate.
-//
-// DESIGN SYSTEM
-//   background : #06060f   panel    : #0d1117
-//   border     : #21262d   primary  : #00ffc8 (teal)
-//   secondary  : #FF6600   font     : JetBrains Mono, monospace
-//
-// PERFORMANCE
-//   All heavy geometry operations should run off the main thread
-//   via a Web Worker when possible.
-//   Use THREE.BufferGeometryUtils.mergeGeometries() for batching.
-//   Dispose geometries and materials when removing objects from scene.
-//
-// THREE.JS VERSION
-//   Targets Three.js r128 (CDN) as used across the SPX platform.
-//   Avoid APIs introduced after r128 (e.g. CapsuleGeometry).
-//
-// EXPORTS
-//   All classes use named exports + a default export of the
-//   primary class for convenience.
-//
-// SERIALIZATION
-//   Every class implements toJSON() / fromJSON() for save/load.
-//   JSON schema versioned via userData.version field.
-//
-// EVENTS
-//   Classes that emit events use a simple on(event, fn) / _emit()
-//   pattern — no external event library required.
-//
-// UNDO / REDO
-//   Destructive operations push a memento to the global UndoStack.
-//   Import { undoStack } from 'src/core/UndoStack.js'.
-//
-// TESTING
-//   Unit tests live in tests/<ModuleName>.test.js
-//   Run with: npm run test -- --testPathPattern=<ModuleName>
-//
-// CHANGELOG
-//   v1.0  Initial implementation
-//   v1.1  Added toJSON / fromJSON
-//   v1.2  Performance pass — reduced GC pressure
-//   v1.3  Added event system
-//   v1.4  Expanded to 400+ lines with full feature set
-// ──────────────────────────────────────────────────────────────────────────
+const BROW_SHAPES  = ['Straight','Arched','Peaked','Flat','S-Curve','Rounded','Angular','Bushy','Thin','Unibrow'];
+const BROW_STYLES  = ['Natural','Defined','Bold','Feathered','Microbladed','Bleached','Tattooed','Ombre'];
+const HAIR_COLORS  = ['#1a1008','#3a2010','#6a4020','#a06030','#c0a040','#e0d060','#f0f0f0','#e83030','#3030e0','#ffffff'];
 
-// ──────────────────────────────────────────────────────────────────────────
-// SPX Mesh Editor — Module Reference
-// ──────────────────────────────────────────────────────────────────────────
-//
-// INTEGRATION
-//   This module is part of the SPX Mesh Editor pipeline.
-//   Import via the barrel export in src/mesh/hair/index.js
-//   or src/generators/index.js as appropriate.
-//
-// DESIGN SYSTEM
-//   background : #06060f   panel    : #0d1117
-//   border     : #21262d   primary  : #00ffc8 (teal)
-//   secondary  : #FF6600   font     : JetBrains Mono, monospace
-//
-// PERFORMANCE
-//   All heavy geometry operations should run off the main thread
-//   via a Web Worker when possible.
-//   Use THREE.BufferGeometryUtils.mergeGeometries() for batching.
-//   Dispose geometries and materials when removing objects from scene.
-//
-// THREE.JS VERSION
-//   Targets Three.js r128 (CDN) as used across the SPX platform.
-//   Avoid APIs introduced after r128 (e.g. CapsuleGeometry).
-//
-// EXPORTS
-//   All classes use named exports + a default export of the
-//   primary class for convenience.
-//
-// SERIALIZATION
-//   Every class implements toJSON() / fromJSON() for save/load.
-//   JSON schema versioned via userData.version field.
-//
-// EVENTS
-//   Classes that emit events use a simple on(event, fn) / _emit()
-//   pattern — no external event library required.
-//
-// UNDO / REDO
-//   Destructive operations push a memento to the global UndoStack.
-//   Import { undoStack } from 'src/core/UndoStack.js'.
-//
-// TESTING
-//   Unit tests live in tests/<ModuleName>.test.js
-//   Run with: npm run test -- --testPathPattern=<ModuleName>
-//
-// CHANGELOG
-//   v1.0  Initial implementation
-//   v1.1  Added toJSON / fromJSON
-//   v1.2  Performance pass — reduced GC pressure
-//   v1.3  Added event system
-//   v1.4  Expanded to 400+ lines with full feature set
-// ──────────────────────────────────────────────────────────────────────────
+export default function EyebrowGeneratorPanel({ character, onApply, onMirror }) {
+  // Shape
+  const [browShape,    setBrowShape]    = useState('Arched');
+  const [browStyle,    setBrowStyle]    = useState('Natural');
+  const [arch,         setArch]         = useState(0.50);
+  const [archPos,      setArchPos]      = useState(0.55);
+  const [thickness,    setThickness]    = useState(0.45);
+  const [thicknessVar, setThicknessVar] = useState(0.30);
+  const [length,       setLength]       = useState(0.55);
+  const [tailAngle,    setTailAngle]    = useState(0.20);
+  const [innerAngle,   setInnerAngle]   = useState(0.10);
+  const [height,       setHeight]       = useState(0.50);
+  const [spacing,      setSpacing]      = useState(0.50);
+  const [frontGap,     setFrontGap]     = useState(0.30);
+  // Hair properties
+  const [hairColor,    setHairColor]    = useState('#1a1008');
+  const [hairColor2,   setHairColor2]   = useState('#3a2010');
+  const [hairDensity,  setHairDensity]  = useState(0.70);
+  const [hairLen,      setHairLen]      = useState(0.40);
+  const [hairCoarseness,setHairCoarseness]=useState(0.50);
+  const [hairAngle,    setHairAngle]    = useState(0.30);
+  const [greyAmount,   setGreyAmount]   = useState(0.00);
+  // Grooming
+  const [groomed,      setGroomed]      = useState(true);
+  const [strayHairs,   setStrayHairs]   = useState(0.10);
+  const [trimLevel,    setTrimLevel]    = useState(0.50);
+  // Skin
+  const [skinVisible,  setSkinVisible]  = useState(false);
+  const [skinRoughness,setSkinRoughness]= useState(0.60);
+  // Asymmetry
+  const [asymmetry,    setAsymmetry]    = useState(0.00);
+  const [asymSide,     setAsymSide]     = useState('Left');
+  // Output
+  const [genPair,      setGenPair]      = useState(true);
+  const [addPhysics,   setAddPhysics]   = useState(false);
+  const [polyBudget,   setPolyBudget]   = useState('Mid');
 
-// ──────────────────────────────────────────────────────────────────────────
-// SPX Mesh Editor — Module Reference
-// ──────────────────────────────────────────────────────────────────────────
-//
-// INTEGRATION
-//   This module is part of the SPX Mesh Editor pipeline.
-//   Import via the barrel export in src/mesh/hair/index.js
-//   or src/generators/index.js as appropriate.
-//
-// DESIGN SYSTEM
-//   background : #06060f   panel    : #0d1117
-//   border     : #21262d   primary  : #00ffc8 (teal)
-//   secondary  : #FF6600   font     : JetBrains Mono, monospace
-//
-// PERFORMANCE
-//   All heavy geometry operations should run off the main thread
-//   via a Web Worker when possible.
-//   Use THREE.BufferGeometryUtils.mergeGeometries() for batching.
-//   Dispose geometries and materials when removing objects from scene.
-//
-// THREE.JS VERSION
-//   Targets Three.js r128 (CDN) as used across the SPX platform.
-//   Avoid APIs introduced after r128 (e.g. CapsuleGeometry).
-//
-// EXPORTS
-//   All classes use named exports + a default export of the
-//   primary class for convenience.
-//
-// SERIALIZATION
-//   Every class implements toJSON() / fromJSON() for save/load.
-//   JSON schema versioned via userData.version field.
-//
-// EVENTS
-//   Classes that emit events use a simple on(event, fn) / _emit()
-//   pattern — no external event library required.
-//
-// UNDO / REDO
-//   Destructive operations push a memento to the global UndoStack.
-//   Import { undoStack } from 'src/core/UndoStack.js'.
-//
-// TESTING
-//   Unit tests live in tests/<ModuleName>.test.js
-//   Run with: npm run test -- --testPathPattern=<ModuleName>
-//
-// CHANGELOG
-//   v1.0  Initial implementation
-//   v1.1  Added toJSON / fromJSON
-//   v1.2  Performance pass — reduced GC pressure
-//   v1.3  Added event system
-//   v1.4  Expanded to 400+ lines with full feature set
-// ──────────────────────────────────────────────────────────────────────────
+  const randomize = useCallback(() => {
+    const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+    const rn = (a,b) => parseFloat((a + Math.random()*(b-a)).toFixed(2));
+    setBrowShape(pick(BROW_SHAPES)); setBrowStyle(pick(BROW_STYLES));
+    setArch(rn(0.1,0.9)); setArchPos(rn(0.4,0.7));
+    setThickness(rn(0.2,0.8)); setLength(rn(0.4,0.7));
+    setHairDensity(rn(0.4,1.0)); setGroomed(Math.random()>0.4);
+    setAsymmetry(rn(0,0.2));
+  }, []);
 
-// ──────────────────────────────────────────────────────────────────────────
-// SPX Mesh Editor — Module Reference
-// ──────────────────────────────────────────────────────────────────────────
-//
-// INTEGRATION
-//   This module is part of the SPX Mesh Editor pipeline.
-//   Import via the barrel export in src/mesh/hair/index.js
-//   or src/generators/index.js as appropriate.
-//
-// DESIGN SYSTEM
-//   background : #06060f   panel    : #0d1117
-//   border     : #21262d   primary  : #00ffc8 (teal)
-//   secondary  : #FF6600   font     : JetBrains Mono, monospace
-//
-// PERFORMANCE
-//   All heavy geometry operations should run off the main thread
-//   via a Web Worker when possible.
-//   Use THREE.BufferGeometryUtils.mergeGeometries() for batching.
-//   Dispose geometries and materials when removing objects from scene.
-//
-// THREE.JS VERSION
-//   Targets Three.js r128 (CDN) as used across the SPX platform.
-//   Avoid APIs introduced after r128 (e.g. CapsuleGeometry).
-//
-// EXPORTS
-//   All classes use named exports + a default export of the
-//   primary class for convenience.
-//
-// SERIALIZATION
-//   Every class implements toJSON() / fromJSON() for save/load.
-//   JSON schema versioned via userData.version field.
-//
-// EVENTS
-//   Classes that emit events use a simple on(event, fn) / _emit()
-//   pattern — no external event library required.
-//
-// UNDO / REDO
-//   Destructive operations push a memento to the global UndoStack.
-//   Import { undoStack } from 'src/core/UndoStack.js'.
-//
-// TESTING
-//   Unit tests live in tests/<ModuleName>.test.js
-//   Run with: npm run test -- --testPathPattern=<ModuleName>
-//
-// CHANGELOG
-//   v1.0  Initial implementation
-//   v1.1  Added toJSON / fromJSON
-//   v1.2  Performance pass — reduced GC pressure
-//   v1.3  Added event system
-//   v1.4  Expanded to 400+ lines with full feature set
-// ──────────────────────────────────────────────────────────────────────────
+  const handleApply = useCallback(() => {
+    onApply?.({
+      shape: { browShape, arch, archPos, thickness, thicknessVar, length, tailAngle, innerAngle, height, spacing, frontGap },
+      style: browStyle,
+      hair: { hairColor, hairColor2, hairDensity, hairLen, hairCoarseness, hairAngle, greyAmount },
+      grooming: { groomed, strayHairs, trimLevel },
+      skin: { skinVisible, skinRoughness },
+      asymmetry: { amount: asymmetry, side: asymSide },
+      output: { genPair, addPhysics, polyBudget },
+    });
+  }, [browShape, arch, archPos, thickness, thicknessVar, length, tailAngle, innerAngle,
+    height, spacing, frontGap, browStyle, hairColor, hairColor2, hairDensity, hairLen,
+    hairCoarseness, hairAngle, greyAmount, groomed, strayHairs, trimLevel,
+    skinVisible, skinRoughness, asymmetry, asymSide, genPair, addPhysics, polyBudget]);
 
-// ──────────────────────────────────────────────────────────────────────────
-// SPX Mesh Editor — Module Reference
-// ──────────────────────────────────────────────────────────────────────────
-//
-// INTEGRATION
-//   This module is part of the SPX Mesh Editor pipeline.
-//   Import via the barrel export in src/mesh/hair/index.js
-//   or src/generators/index.js as appropriate.
-//
-// DESIGN SYSTEM
-//   background : #06060f   panel    : #0d1117
-//   border     : #21262d   primary  : #00ffc8 (teal)
-//   secondary  : #FF6600   font     : JetBrains Mono, monospace
-//
-// PERFORMANCE
-//   All heavy geometry operations should run off the main thread
+  return (
+    <div style={P}>
+      <Section title="\u{1F9B9} Shape">
+        <Badges items={BROW_SHAPES} active={browShape} onSelect={setBrowShape} />
+        <Slider label="Arch Height"    value={arch}         onChange={setArch}         />
+        <Slider label="Arch Position"  value={archPos}      onChange={setArchPos}      />
+        <Slider label="Thickness"      value={thickness}    onChange={setThickness}    />
+        <Slider label="Thickness Var"  value={thicknessVar} onChange={setThicknessVar} />
+        <Slider label="Length"         value={length}       onChange={setLength}       />
+        <Slider label="Tail Angle"     value={tailAngle}    min={-0.5} max={0.5} step={0.01} onChange={setTailAngle} />
+        <Slider label="Inner Angle"    value={innerAngle}   min={-0.5} max={0.5} step={0.01} onChange={setInnerAngle} />
+        <Slider label="Height on Face" value={height}       onChange={setHeight}       />
+        <Slider label="Brow Spacing"   value={spacing}      onChange={setSpacing}      />
+        <Slider label="Front Gap"      value={frontGap}     onChange={setFrontGap}     />
+      </Section>
+
+      <Section title="\u{1F58C} Style">
+        <Badges items={BROW_STYLES} active={browStyle} onSelect={setBrowStyle} />
+      </Section>
+
+      <Section title="\u{1F9B1} Hair Properties">
+        <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginBottom:6 }}>
+          {HAIR_COLORS.map(c => (
+            <div key={c} onClick={() => setHairColor(c)} style={{
+              width:20, height:20, borderRadius:3, background:c, cursor:'pointer',
+              border:`2px solid ${hairColor===c ? '#00ffc8' : '#21262d'}`,
+            }} />
+          ))}
+        </div>
+        <ColorRow label="Hair Color 1"  value={hairColor}      onChange={setHairColor}      />
+        <ColorRow label="Hair Color 2"  value={hairColor2}     onChange={setHairColor2}     />
+        <Slider label="Density"         value={hairDensity}    onChange={setHairDensity}    />
+        <Slider label="Hair Length"     value={hairLen}        onChange={setHairLen}        />
+        <Slider label="Coarseness"      value={hairCoarseness} onChange={setHairCoarseness} />
+        <Slider label="Growth Angle"    value={hairAngle}      onChange={setHairAngle}      />
+        <Slider label="Grey Amount"     value={greyAmount}     onChange={setGreyAmount}     />
+      </Section>
+
+      <Section title="\u2702 Grooming">
+        <Check  label="Groomed"         value={groomed}       onChange={setGroomed}       />
+        <Slider label="Stray Hairs"     value={strayHairs}    onChange={setStrayHairs}    />
+        <Slider label="Trim Level"      value={trimLevel}     onChange={setTrimLevel}     />
+      </Section>
+
+      <Section title="\u{1F9EC} Asymmetry" defaultOpen={false}>
+        <Slider label="Asymmetry Amount" value={asymmetry} min={0} max={0.4} step={0.01} onChange={setAsymmetry} />
+        {asymmetry > 0 && (
+          <Select label="Stronger Side" value={asymSide} options={['Left','Right']} onChange={setAsymSide} />
+        )}
+      </Section>
+
+      <Section title="\u2699 Output" defaultOpen={false}>
+        <Select label="Poly Budget" value={polyBudget} options={['Low','Mid','High','Ultra']} onChange={setPolyBudget} />
+        <Check  label="Generate Pair (L+R)" value={genPair}    onChange={setGenPair}    />
+        <Check  label="Physics Simulation"  value={addPhysics} onChange={setAddPhysics} />
+        <Check  label="Visible Skin"        value={skinVisible} onChange={setSkinVisible} />
+        {skinVisible && <Slider label="Skin Roughness" value={skinRoughness} onChange={setSkinRoughness} />}
+      </Section>
+
+      <div style={{ display:'flex', gap:6 }}>
+        <RandBtn onClick={randomize} />
+        <button onClick={() => onMirror?.()} style={{
+          background:'#1a1f2c', color:'#888', border:'1px solid #21262d',
+          borderRadius:4, padding:'6px 10px', cursor:'pointer', fontSize:10,
+        }}>\u{1F503}</button>
+        <GenBtn label="\u2713 Apply Brows" onClick={handleApply} />
+      </div>
+    </div>
+  );
+}

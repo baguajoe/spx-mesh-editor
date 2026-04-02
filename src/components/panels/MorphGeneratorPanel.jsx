@@ -1,410 +1,264 @@
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 
-import React, { useState, useRef } from "react";
-import * as THREE from "three";
-
-const T={bg:"#06060f",panel:"#0d0d1a",border:"#1a1a2e",teal:"#00ffc8",orange:"#FF6600",text:"#e0e0e0",muted:"#aaa",font:"JetBrains Mono,monospace"};
-const S={root:{background:T.bg,color:T.text,fontFamily:T.font,padding:16,height:"100%",overflowY:"auto"},h2:{color:T.teal,fontSize:14,marginBottom:12,letterSpacing:1},h3:{color:T.orange,fontSize:12,marginBottom:8,marginTop:8},lbl:{fontSize:11,color:T.muted,display:"block",marginBottom:4},inp:{width:"100%",background:T.panel,border:"1px solid "+T.border,color:T.text,padding:"4px 8px",borderRadius:4,fontFamily:T.font,fontSize:11,marginBottom:8,boxSizing:"border-box"},btn:{background:T.teal,color:T.bg,border:"none",borderRadius:4,padding:"7px 16px",fontFamily:T.font,fontSize:12,fontWeight:700,cursor:"pointer",marginRight:8,marginBottom:8},btnO:{background:T.orange,color:"#fff",border:"none",borderRadius:4,padding:"7px 16px",fontFamily:T.font,fontSize:12,fontWeight:700,cursor:"pointer",marginRight:8,marginBottom:8},btnSm:{background:T.panel,color:T.teal,border:"1px solid "+T.teal,borderRadius:4,padding:"3px 10px",fontFamily:T.font,fontSize:10,cursor:"pointer",marginRight:6,marginBottom:6},sec:{background:T.panel,border:"1px solid "+T.border,borderRadius:6,padding:12,marginBottom:12},stat:{fontSize:11,color:T.teal,marginBottom:4}};
-
-const MORPH_PRESETS={
-  "Realistic Human":   {jawW:.45,jawLen:.4,chinSz:.35,cheekH:.5,cheekFull:.5,browDepth:.3,foreheadSlope:.3,skullW:.5,realismBal:.9,heroicExag:0,ageMorph:.2,wrinkle:.1,creatureAmt:0,demonAmt:0,dragonAmt:0,monsterAmt:0,kaijuAmt:0,asymmetry:.05},
-  "Stylized Hero":     {jawW:.6,jawLen:.5,chinSz:.45,cheekH:.65,cheekFull:.4,browDepth:.5,foreheadSlope:.2,skullW:.55,realismBal:.6,heroicExag:.6,ageMorph:.1,wrinkle:0,creatureAmt:0,demonAmt:0,dragonAmt:0,monsterAmt:0,kaijuAmt:0,asymmetry:.03},
-  "Demon":             {jawW:.7,jawLen:.6,chinSz:.55,cheekH:.8,cheekFull:.2,browDepth:.9,foreheadSlope:.6,skullW:.6,realismBal:.4,heroicExag:.3,ageMorph:0,wrinkle:.3,creatureAmt:.2,demonAmt:.85,dragonAmt:0,monsterAmt:.2,kaijuAmt:0,asymmetry:.15},
-  "Dragon Humanoid":   {jawW:.75,jawLen:.85,chinSz:.4,cheekH:.6,cheekFull:.15,browDepth:.7,foreheadSlope:.8,skullW:.7,realismBal:.2,heroicExag:.4,ageMorph:0,wrinkle:0,creatureAmt:.5,demonAmt:.1,dragonAmt:.9,monsterAmt:.1,kaijuAmt:0,asymmetry:.05},
-  "Monster Hybrid":    {jawW:.8,jawLen:.7,chinSz:.3,cheekH:.5,cheekFull:.6,browDepth:.75,foreheadSlope:.5,skullW:.75,realismBal:.15,heroicExag:.2,ageMorph:0,wrinkle:.2,creatureAmt:.6,demonAmt:.2,dragonAmt:.1,monsterAmt:.9,kaijuAmt:.1,asymmetry:.2},
-  "Kaiju Humanoid":    {jawW:.95,jawLen:.9,chinSz:.5,cheekH:.7,cheekFull:.5,browDepth:.95,foreheadSlope:.7,skullW:.95,realismBal:.05,heroicExag:.5,ageMorph:0,wrinkle:.4,creatureAmt:.8,demonAmt:.1,dragonAmt:.2,monsterAmt:.5,kaijuAmt:.95,asymmetry:.1},
-  "Elderly":           {jawW:.35,jawLen:.38,chinSz:.3,cheekH:.3,cheekFull:.25,browDepth:.4,foreheadSlope:.35,skullW:.45,realismBal:.95,heroicExag:0,ageMorph:.9,wrinkle:.85,creatureAmt:0,demonAmt:0,dragonAmt:0,monsterAmt:0,kaijuAmt:0,asymmetry:.12},
-};
-
-const FACIAL_CTRL=[
-  {id:"jawW",lbl:"Jaw Width"},{id:"jawLen",lbl:"Jaw Length"},{id:"chinSz",lbl:"Chin Size"},
-  {id:"cheekH",lbl:"Cheekbone Height"},{id:"cheekFull",lbl:"Cheek Fullness"},
-  {id:"browDepth",lbl:"Brow Depth"},{id:"foreheadSlope",lbl:"Forehead Slope"},
-  {id:"skullW",lbl:"Skull Width"},
-];
-const STYLE_CTRL=[
-  {id:"realismBal",lbl:"Realism Balance"},{id:"heroicExag",lbl:"Heroic Exaggeration"},
-  {id:"ageMorph",lbl:"Age Morph"},{id:"wrinkle",lbl:"Wrinkle Intensity"},{id:"asymmetry",lbl:"Facial Asymmetry"},
-];
-const CREATURE_CTRL=[
-  {id:"creatureAmt",lbl:"Creature Morph"},{id:"demonAmt",lbl:"Demon Morph"},
-  {id:"dragonAmt",lbl:"Dragon Morph"},{id:"monsterAmt",lbl:"Monster Morph"},{id:"kaijuAmt",lbl:"Kaiju Morph"},
-];
-
-export default function MorphGeneratorPanel({scene,targetMesh}){
-  const [preset,setPreset]=useState("Realistic Human");
-  const [morph,setMorph]=useState({...MORPH_PRESETS["Realistic Human"]});
-  const [blendPresetA,setBlendPA]=useState("Realistic Human");
-  const [blendPresetB,setBlendPB]=useState("Demon");
-  const [blendAmt,setBlendAmt]=useState(0.5);
-  const [status,setStatus]=useState("");
-
-  function loadPreset(p){setPreset(p);setMorph({...MORPH_PRESETS[p]});}
-
-  function blendPresets(){
-    const a=MORPH_PRESETS[blendPresetA],b=MORPH_PRESETS[blendPresetB];
-    if(!a||!b)return;
-    const blended={};
-    Object.keys(a).forEach(k=>{blended[k]=a[k]+(b[k]-a[k])*blendAmt;});
-    setMorph(blended);setPreset("Custom Blend");
-    setStatus(`Blend: ${blendPresetA} + ${blendPresetB} @ ${(blendAmt*100).toFixed(0)}%`);
-  }
-
-  function applyToMesh(){
-    if(!scene){setStatus("No scene");return;}
-    let n=0;
-    scene.traverse(o=>{
-      if(!o.isMesh||!o.morphTargetInfluences)return;
-      const dict=o.morphTargetDictionary||{};
-      Object.entries(morph).forEach(([k,v])=>{if(dict[k]!==undefined)o.morphTargetInfluences[dict[k]]=v;});
-      n++;
-    });
-    setStatus(n>0?`✓ Morphs applied to ${n} mesh(es)`:"No morph target meshes found");
-  }
-
-  function exportMorphs(){
-    const b=new Blob([JSON.stringify(morph,null,2)],{type:"application/json"});
-    const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="morph_data.json";a.click();
-  }
-
-  const renderCtrl=(ctrls)=>ctrls.map(c=>(
-    <div key={c.id}>
-      <label style={S.lbl}>{c.lbl}: {morph[c.id]?.toFixed(2)}</label>
-      <input style={S.inp} type="range" min={0} max={1} step={0.01} value={morph[c.id]||0} onChange={e=>setMorph(m=>({...m,[c.id]:+e.target.value}))}/>
-    </div>
-  ));
-
-  return(
-    <div style={S.root}>
-      <div style={S.h2}>🧬 MORPH GENERATOR</div>
-      <div style={S.sec}>
-        <label style={S.lbl}>Morph Preset</label>
-        <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
-          {Object.keys(MORPH_PRESETS).map(p=><button key={p} style={{...S.btnSm,background:preset===p?T.teal:T.panel,color:preset===p?T.bg:T.teal}} onClick={()=>loadPreset(p)}>{p}</button>)}
-        </div>
-      </div>
-      <div style={S.sec}>
-        <div style={S.h3}>Blend Presets</div>
-        <div style={{display:"flex",gap:8,marginBottom:8}}>
-          <select style={{...S.inp,marginBottom:0}} value={blendPresetA} onChange={e=>setBlendPA(e.target.value)}>{Object.keys(MORPH_PRESETS).map(p=><option key={p}>{p}</option>)}</select>
-          <select style={{...S.inp,marginBottom:0}} value={blendPresetB} onChange={e=>setBlendPB(e.target.value)}>{Object.keys(MORPH_PRESETS).map(p=><option key={p}>{p}</option>)}</select>
-        </div>
-        <label style={S.lbl}>Blend: {(blendAmt*100).toFixed(0)}% B</label>
-        <input style={S.inp} type="range" min={0} max={1} step={0.01} value={blendAmt} onChange={e=>setBlendAmt(+e.target.value)}/>
-        <button style={S.btnSm} onClick={blendPresets}>⚡ Blend</button>
-      </div>
-      <div style={S.sec}><div style={S.h3}>Facial Structure</div>{renderCtrl(FACIAL_CTRL)}</div>
-      <div style={S.sec}><div style={S.h3}>Stylization</div>{renderCtrl(STYLE_CTRL)}</div>
-      <div style={S.sec}><div style={S.h3}>Creature Morphs</div>{renderCtrl(CREATURE_CTRL)}</div>
-      <button style={S.btn} onClick={applyToMesh}>✓ Apply Morphs</button>
-      <button style={S.btnO} onClick={exportMorphs}>💾 Export JSON</button>
-      {status&&<div style={{...S.stat,marginTop:8}}>{status}</div>}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Preset Manager (shared across all SPX generator panels)
-// ─────────────────────────────────────────────────────────────────────────────
-function usePresets(panelName, currentParams) {
-  const [presets, setPresets] = React.useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem(`spx_presets_${panelName}`) || '[]');
-    } catch { return []; }
-  });
-
-  const savePreset = React.useCallback((name) => {
-    const next = [...presets.filter(p => p.name !== name),
-      { name, params: currentParams, createdAt: Date.now() }];
-    setPresets(next);
-    try { localStorage.setItem(`spx_presets_${panelName}`, JSON.stringify(next)); } catch {}
-  }, [presets, currentParams, panelName]);
-
-  const loadPreset = React.useCallback((name) => {
-    return presets.find(p => p.name === name)?.params ?? null;
-  }, [presets]);
-
-  const deletePreset = React.useCallback((name) => {
-    const next = presets.filter(p => p.name !== name);
-    setPresets(next);
-    try { localStorage.setItem(`spx_presets_${panelName}`, JSON.stringify(next)); } catch {}
-  }, [presets, panelName]);
-
-  return { presets, savePreset, loadPreset, deletePreset };
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Keyboard shortcut handler (Enter=generate, Shift+R=randomize, Shift+X=reset)
-// ─────────────────────────────────────────────────────────────────────────────
-function useGeneratorKeys(onGenerate, onRandomize, onReset) {
-  React.useEffect(() => {
-    const handler = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
-      if (e.key === 'Enter')                          onGenerate?.();
-      if (e.shiftKey && e.key === 'R')                onRandomize?.();
-      if (e.shiftKey && (e.key === 'X' || e.key === 'x')) onReset?.();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onGenerate, onRandomize, onReset]);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Shared slider + badge primitives (inline — avoids import issues)
-// ─────────────────────────────────────────────────────────────────────────────
-function _Slider({ label, value, min = 0, max = 1, step = 0.01, onChange, unit = '' }) {
+function Slider({ label, value, min=0, max=1, step=0.01, onChange, unit='' }) {
   return (
     <div style={{ marginBottom: 5 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#888' }}>
+      <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'#888' }}>
         <span>{label}</span>
-        <span style={{ color: '#00ffc8' }}>
-          {typeof value === 'number' ? (step < 0.1 ? value.toFixed(2) : Math.round(value)) : value}{unit}
+        <span style={{ color:'#00ffc8', fontWeight:600 }}>
+          {typeof value==='number' ? (step<0.1 ? value.toFixed(2) : Math.round(value)) : value}{unit}
         </span>
       </div>
       <input type="range" min={min} max={max} step={step} value={value}
         onChange={e => onChange(parseFloat(e.target.value))}
-        style={{ width: '100%', accentColor: '#00ffc8', cursor: 'pointer' }} />
+        style={{ width:'100%', accentColor:'#00ffc8', cursor:'pointer', height:16 }} />
     </div>
   );
 }
-
-function _Check({ label, value, onChange }) {
+function Select({ label, value, options, onChange }) {
   return (
-    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#ccc', cursor: 'pointer', marginBottom: 4 }}>
+    <div style={{ marginBottom:6 }}>
+      {label && <div style={{ fontSize:10, color:'#888', marginBottom:2 }}>{label}</div>}
+      <select value={value} onChange={e => onChange(e.target.value)} style={{
+        width:'100%', background:'#0d1117', color:'#e0e0e0',
+        border:'1px solid #21262d', padding:'3px 6px', borderRadius:4, fontSize:11, cursor:'pointer',
+      }}>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+function Check({ label, value, onChange }) {
+  return (
+    <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:11,
+      color:'#ccc', cursor:'pointer', marginBottom:4 }}>
       <input type="checkbox" checked={value} onChange={e => onChange(e.target.checked)}
-        style={{ accentColor: '#00ffc8' }} />
+        style={{ accentColor:'#00ffc8', width:12, height:12 }} />
       {label}
     </label>
   );
 }
-
-function _ColorRow({ label, value, onChange }) {
+function ColorRow({ label, value, onChange }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-      <span style={{ fontSize: 10, color: '#888', flex: 1 }}>{label}</span>
+    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:5 }}>
+      <span style={{ fontSize:10, color:'#888', flex:1 }}>{label}</span>
       <input type="color" value={value} onChange={e => onChange(e.target.value)}
-        style={{ width: 32, height: 22, border: 'none', cursor: 'pointer', borderRadius: 3 }} />
-      <span style={{ fontSize: 9, color: '#555' }}>{value}</span>
+        style={{ width:32, height:22, border:'none', cursor:'pointer', borderRadius:3 }} />
+      <span style={{ fontSize:9, color:'#555', fontFamily:'monospace' }}>{value}</span>
     </div>
   );
 }
+function Section({ title, children, defaultOpen=true }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ marginBottom:6, border:'1px solid #21262d', borderRadius:5, overflow:'hidden' }}>
+      <div onClick={() => setOpen(o => !o)} style={{
+        padding:'5px 8px', cursor:'pointer', background:'#0d1117',
+        display:'flex', justifyContent:'space-between',
+        fontSize:11, fontWeight:600, color:'#00ffc8', userSelect:'none',
+      }}>
+        <span>{title}</span>
+        <span style={{ fontSize:9, opacity:0.7 }}>{open ? '\u25b2' : '\u25bc'}</span>
+      </div>
+      {open && <div style={{ padding:'6px 8px', background:'#06060f' }}>{children}</div>}
+    </div>
+  );
+}
+function Badges({ items, active, onSelect }) {
+  return (
+    <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:6 }}>
+      {items.map(item => (
+        <button key={item} onClick={() => onSelect(item)} style={{
+          padding:'2px 7px', fontSize:9, borderRadius:4, cursor:'pointer',
+          background: active===item ? '#00ffc8' : '#1a1f2c',
+          color: active===item ? '#06060f' : '#ccc',
+          border: `1px solid ${active===item ? '#00ffc8' : '#21262d'}`,
+        }}>{item}</button>
+      ))}
+    </div>
+  );
+}
+function GenBtn({ label, onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      width:'100%', background:'#00ffc8', color:'#06060f', border:'none',
+      borderRadius:4, padding:'7px 0', cursor:'pointer', fontWeight:700,
+      fontSize:12, marginTop:6, letterSpacing:0.5, fontFamily:'JetBrains Mono, monospace',
+    }}>{label}</button>
+  );
+}
+function RandBtn({ onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      background:'#1a1f2c', color:'#888', border:'1px solid #21262d',
+      borderRadius:4, padding:'6px 10px', cursor:'pointer', fontSize:11,
+    }}>\u{1F3B2}</button>
+  );
+}
+const P = { fontFamily:'JetBrains Mono, monospace', color:'#e0e0e0', fontSize:12, userSelect:'none', width:'100%' };
 
-// ──────────────────────────────────────────────────────────────────────────
-// SPX Mesh Editor — Module Reference
-// ──────────────────────────────────────────────────────────────────────────
-//
-// INTEGRATION
-//   This module is part of the SPX Mesh Editor pipeline.
-//   Import via the barrel export in src/mesh/hair/index.js
-//   or src/generators/index.js as appropriate.
-//
-// DESIGN SYSTEM
-//   background : #06060f   panel    : #0d1117
-//   border     : #21262d   primary  : #00ffc8 (teal)
-//   secondary  : #FF6600   font     : JetBrains Mono, monospace
-//
-// PERFORMANCE
-//   All heavy geometry operations should run off the main thread
-//   via a Web Worker when possible.
-//   Use THREE.BufferGeometryUtils.mergeGeometries() for batching.
-//   Dispose geometries and materials when removing objects from scene.
-//
-// THREE.JS VERSION
-//   Targets Three.js r128 (CDN) as used across the SPX platform.
-//   Avoid APIs introduced after r128 (e.g. CapsuleGeometry).
-//
-// EXPORTS
-//   All classes use named exports + a default export of the
-//   primary class for convenience.
-//
-// SERIALIZATION
-//   Every class implements toJSON() / fromJSON() for save/load.
-//   JSON schema versioned via userData.version field.
-//
-// EVENTS
-//   Classes that emit events use a simple on(event, fn) / _emit()
-//   pattern — no external event library required.
-//
-// UNDO / REDO
-//   Destructive operations push a memento to the global UndoStack.
-//   Import { undoStack } from 'src/core/UndoStack.js'.
-//
-// TESTING
-//   Unit tests live in tests/<ModuleName>.test.js
-//   Run with: npm run test -- --testPathPattern=<ModuleName>
-//
-// CHANGELOG
-//   v1.0  Initial implementation
-//   v1.1  Added toJSON / fromJSON
-//   v1.2  Performance pass — reduced GC pressure
-//   v1.3  Added event system
-//   v1.4  Expanded to 400+ lines with full feature set
-// ──────────────────────────────────────────────────────────────────────────
+const MORPH_CATEGORIES = {
+  'Face Shape': ['headScale','faceWidth','faceLength','chinProtrusion','chinWidth',
+    'jawWidth','jawHeight','cheekboneWidth','cheekboneHeight','foreheadWidth','foreheadHeight'],
+  'Eyes':       ['eyeSize','eyeSpacing','eyeDepth','eyeAngle','eyeHeight','eyelidHeavy','epicanthicFold'],
+  'Nose':       ['noseSize','noseBridgeHeight','noseBridgeWidth','noseTipUp','noseTipRound',
+    'nostrils','noseLength'],
+  'Mouth':      ['lipThickness','lipWidth','cupidBow','mouthCorners','mouthDepth','philtrum'],
+  'Ears':       ['earSize','earAngle','earProtrusion','lobSize'],
+  'Body':       ['bodyHeight','shoulderWidth','chestSize','waistSize','hipSize',
+    'armLength','legLength','neckThickness'],
+};
 
-// ──────────────────────────────────────────────────────────────────────────
-// SPX Mesh Editor — Module Reference
-// ──────────────────────────────────────────────────────────────────────────
-//
-// INTEGRATION
-//   This module is part of the SPX Mesh Editor pipeline.
-//   Import via the barrel export in src/mesh/hair/index.js
-//   or src/generators/index.js as appropriate.
-//
-// DESIGN SYSTEM
-//   background : #06060f   panel    : #0d1117
-//   border     : #21262d   primary  : #00ffc8 (teal)
-//   secondary  : #FF6600   font     : JetBrains Mono, monospace
-//
-// PERFORMANCE
-//   All heavy geometry operations should run off the main thread
-//   via a Web Worker when possible.
-//   Use THREE.BufferGeometryUtils.mergeGeometries() for batching.
-//   Dispose geometries and materials when removing objects from scene.
-//
-// THREE.JS VERSION
-//   Targets Three.js r128 (CDN) as used across the SPX platform.
-//   Avoid APIs introduced after r128 (e.g. CapsuleGeometry).
-//
-// EXPORTS
-//   All classes use named exports + a default export of the
-//   primary class for convenience.
-//
-// SERIALIZATION
-//   Every class implements toJSON() / fromJSON() for save/load.
-//   JSON schema versioned via userData.version field.
-//
-// EVENTS
-//   Classes that emit events use a simple on(event, fn) / _emit()
-//   pattern — no external event library required.
-//
-// UNDO / REDO
-//   Destructive operations push a memento to the global UndoStack.
-//   Import { undoStack } from 'src/core/UndoStack.js'.
-//
-// TESTING
-//   Unit tests live in tests/<ModuleName>.test.js
-//   Run with: npm run test -- --testPathPattern=<ModuleName>
-//
-// CHANGELOG
-//   v1.0  Initial implementation
-//   v1.1  Added toJSON / fromJSON
-//   v1.2  Performance pass — reduced GC pressure
-//   v1.3  Added event system
-//   v1.4  Expanded to 400+ lines with full feature set
-// ──────────────────────────────────────────────────────────────────────────
+export default function MorphGeneratorPanel({ character, onApply, onReset }) {
+  const [category,    setCategory]    = useState('Face Shape');
+  const [morphValues, setMorphValues] = useState({});
+  const [presets,     setPresets]     = useState({});
+  const [presetName,  setPresetName]  = useState('');
+  const [symmetry,    setSymmetry]    = useState(true);
+  const [strength,    setStrength]    = useState(1.0);
+  const [smoothing,   setSmoothing]   = useState(0.5);
+  const [history,     setHistory]     = useState([]);
+  const [histIdx,     setHistIdx]     = useState(-1);
 
-// ──────────────────────────────────────────────────────────────────────────
-// SPX Mesh Editor — Module Reference
-// ──────────────────────────────────────────────────────────────────────────
-//
-// INTEGRATION
-//   This module is part of the SPX Mesh Editor pipeline.
-//   Import via the barrel export in src/mesh/hair/index.js
-//   or src/generators/index.js as appropriate.
-//
-// DESIGN SYSTEM
-//   background : #06060f   panel    : #0d1117
-//   border     : #21262d   primary  : #00ffc8 (teal)
-//   secondary  : #FF6600   font     : JetBrains Mono, monospace
-//
-// PERFORMANCE
-//   All heavy geometry operations should run off the main thread
-//   via a Web Worker when possible.
-//   Use THREE.BufferGeometryUtils.mergeGeometries() for batching.
-//   Dispose geometries and materials when removing objects from scene.
-//
-// THREE.JS VERSION
-//   Targets Three.js r128 (CDN) as used across the SPX platform.
-//   Avoid APIs introduced after r128 (e.g. CapsuleGeometry).
-//
-// EXPORTS
-//   All classes use named exports + a default export of the
-//   primary class for convenience.
-//
-// SERIALIZATION
-//   Every class implements toJSON() / fromJSON() for save/load.
-//   JSON schema versioned via userData.version field.
-//
-// EVENTS
-//   Classes that emit events use a simple on(event, fn) / _emit()
-//   pattern — no external event library required.
-//
-// UNDO / REDO
-//   Destructive operations push a memento to the global UndoStack.
-//   Import { undoStack } from 'src/core/UndoStack.js'.
-//
-// TESTING
-//   Unit tests live in tests/<ModuleName>.test.js
-//   Run with: npm run test -- --testPathPattern=<ModuleName>
-//
-// CHANGELOG
-//   v1.0  Initial implementation
-//   v1.1  Added toJSON / fromJSON
-//   v1.2  Performance pass — reduced GC pressure
-//   v1.3  Added event system
-//   v1.4  Expanded to 400+ lines with full feature set
-// ──────────────────────────────────────────────────────────────────────────
+  const setMorph = useCallback((key, value) => {
+    setMorphValues(prev => {
+      const next = { ...prev, [key]: value };
+      // Push to undo history
+      setHistory(h => [...h.slice(0, histIdx + 1), prev].slice(-20));
+      setHistIdx(i => Math.min(i + 1, 19));
+      return next;
+    });
+  }, [histIdx]);
 
-// ──────────────────────────────────────────────────────────────────────────
-// SPX Mesh Editor — Module Reference
-// ──────────────────────────────────────────────────────────────────────────
-//
-// INTEGRATION
-//   This module is part of the SPX Mesh Editor pipeline.
-//   Import via the barrel export in src/mesh/hair/index.js
-//   or src/generators/index.js as appropriate.
-//
-// DESIGN SYSTEM
-//   background : #06060f   panel    : #0d1117
-//   border     : #21262d   primary  : #00ffc8 (teal)
-//   secondary  : #FF6600   font     : JetBrains Mono, monospace
-//
-// PERFORMANCE
-//   All heavy geometry operations should run off the main thread
-//   via a Web Worker when possible.
-//   Use THREE.BufferGeometryUtils.mergeGeometries() for batching.
-//   Dispose geometries and materials when removing objects from scene.
-//
-// THREE.JS VERSION
-//   Targets Three.js r128 (CDN) as used across the SPX platform.
-//   Avoid APIs introduced after r128 (e.g. CapsuleGeometry).
-//
-// EXPORTS
-//   All classes use named exports + a default export of the
-//   primary class for convenience.
-//
-// SERIALIZATION
-//   Every class implements toJSON() / fromJSON() for save/load.
-//   JSON schema versioned via userData.version field.
-//
-// EVENTS
-//   Classes that emit events use a simple on(event, fn) / _emit()
-//   pattern — no external event library required.
-//
-// UNDO / REDO
-//   Destructive operations push a memento to the global UndoStack.
-//   Import { undoStack } from 'src/core/UndoStack.js'.
-//
-// TESTING
-//   Unit tests live in tests/<ModuleName>.test.js
-//   Run with: npm run test -- --testPathPattern=<ModuleName>
-//
-// CHANGELOG
-//   v1.0  Initial implementation
-//   v1.1  Added toJSON / fromJSON
-//   v1.2  Performance pass — reduced GC pressure
-//   v1.3  Added event system
-//   v1.4  Expanded to 400+ lines with full feature set
-// ──────────────────────────────────────────────────────────────────────────
+  const undo = useCallback(() => {
+    if (histIdx < 0) return;
+    setMorphValues(history[histIdx]);
+    setHistIdx(i => i - 1);
+  }, [history, histIdx]);
 
-// ──────────────────────────────────────────────────────────────────────────
-// SPX Mesh Editor — Module Reference
-// ──────────────────────────────────────────────────────────────────────────
-//
-// INTEGRATION
-//   This module is part of the SPX Mesh Editor pipeline.
-//   Import via the barrel export in src/mesh/hair/index.js
-//   or src/generators/index.js as appropriate.
-//
-// DESIGN SYSTEM
-//   background : #06060f   panel    : #0d1117
-//   border     : #21262d   primary  : #00ffc8 (teal)
+  const redo = useCallback(() => {
+    if (histIdx >= history.length - 1) return;
+    setHistIdx(i => i + 1);
+    setMorphValues(history[histIdx + 1]);
+  }, [history, histIdx]);
+
+  const randomize = useCallback(() => {
+    const rn = () => parseFloat((Math.random() * 0.6 - 0.3).toFixed(2));
+    const next = {};
+    Object.values(MORPH_CATEGORIES).flat().forEach(k => { next[k] = rn(); });
+    setMorphValues(next);
+  }, []);
+
+  const reset = useCallback(() => {
+    setMorphValues({});
+    onReset?.();
+  }, [onReset]);
+
+  const savePreset = useCallback(() => {
+    if (!presetName.trim()) return;
+    setPresets(p => ({ ...p, [presetName]: { ...morphValues } }));
+    setPresetName('');
+  }, [presetName, morphValues]);
+
+  const loadPreset = useCallback((name) => {
+    const p = presets[name];
+    if (p) setMorphValues({ ...p });
+  }, [presets]);
+
+  const handleApply = useCallback(() => {
+    const scaled = {};
+    Object.entries(morphValues).forEach(([k, v]) => { scaled[k] = v * strength; });
+    onApply?.({ morphs: scaled, smoothing });
+  }, [morphValues, strength, smoothing, onApply]);
+
+  const activeTargets = MORPH_CATEGORIES[category] ?? [];
+  const nonZero = Object.entries(morphValues).filter(([,v]) => Math.abs(v) > 0.001);
+
+  return (
+    <div style={P}>
+      <Section title="\u{1F9EC} Category">
+        <div style={{ display:'flex', flexWrap:'wrap', gap:3, marginBottom:6 }}>
+          {Object.keys(MORPH_CATEGORIES).map(cat => (
+            <button key={cat} onClick={() => setCategory(cat)} style={{
+              padding:'3px 8px', fontSize:9, borderRadius:4, cursor:'pointer',
+              background: category===cat ? '#00ffc8' : '#1a1f2c',
+              color: category===cat ? '#06060f' : '#ccc',
+              border: `1px solid ${category===cat ? '#00ffc8' : '#21262d'}`,
+            }}>{cat}</button>
+          ))}
+        </div>
+      </Section>
+
+      <Section title={`\u{1F3A8} ${category} Morphs`}>
+        {activeTargets.map(key => (
+          <Slider key={key} label={key}
+            value={morphValues[key] ?? 0}
+            min={-1} max={1} step={0.01}
+            onChange={v => setMorph(key, v)} />
+        ))}
+      </Section>
+
+      <Section title="\u2699 Controls">
+        <Slider label="Overall Strength" value={strength}  onChange={setStrength}  />
+        <Slider label="Smoothing"        value={smoothing} onChange={setSmoothing} />
+        <Check  label="Symmetry"         value={symmetry}  onChange={setSymmetry}  />
+      </Section>
+
+      <Section title="\u{1F4CB} Active Morphs" defaultOpen={false}>
+        {nonZero.length === 0 && <div style={{ fontSize:10, color:'#555' }}>No active morphs</div>}
+        {nonZero.map(([k,v]) => (
+          <div key={k} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:3 }}>
+            <span style={{ fontSize:10, color:'#888', flex:1 }}>{k}</span>
+            <span style={{ fontSize:10, color: v>0 ? '#00ffc8' : '#FF6600', width:50, textAlign:'right' }}>
+              {v > 0 ? '+' : ''}{v.toFixed(3)}
+            </span>
+            <button onClick={() => setMorph(k, 0)} style={{
+              marginLeft:6, background:'none', border:'none', color:'#555', cursor:'pointer', fontSize:11,
+            }}>×</button>
+          </div>
+        ))}
+      </Section>
+
+      <Section title="\u{1F4BE} Presets" defaultOpen={false}>
+        <div style={{ display:'flex', gap:4, marginBottom:6 }}>
+          <input value={presetName} onChange={e => setPresetName(e.target.value)}
+            placeholder="Preset name..." style={{
+              flex:1, background:'#0d1117', color:'#e0e0e0', border:'1px solid #21262d',
+              borderRadius:3, padding:'3px 6px', fontSize:10,
+            }} />
+          <button onClick={savePreset} style={{
+            background:'#00ffc8', color:'#06060f', border:'none', borderRadius:3,
+            padding:'3px 8px', cursor:'pointer', fontSize:10, fontWeight:700,
+          }}>Save</button>
+        </div>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:3 }}>
+          {Object.keys(presets).map(name => (
+            <button key={name} onClick={() => loadPreset(name)} style={{
+              padding:'2px 8px', fontSize:9, borderRadius:4, cursor:'pointer',
+              background:'#1a1f2c', color:'#ccc', border:'1px solid #21262d',
+            }}>{name}</button>
+          ))}
+        </div>
+      </Section>
+
+      <div style={{ display:'flex', gap:4, marginBottom:6 }}>
+        <button onClick={undo} disabled={histIdx < 0} style={{
+          flex:1, background:'#1a1f2c', color: histIdx>=0 ? '#ccc' : '#444',
+          border:'1px solid #21262d', borderRadius:4, padding:'5px 0', cursor:'pointer', fontSize:10,
+        }}>↩ Undo</button>
+        <button onClick={redo} disabled={histIdx >= history.length-1} style={{
+          flex:1, background:'#1a1f2c', color: histIdx<history.length-1 ? '#ccc' : '#444',
+          border:'1px solid #21262d', borderRadius:4, padding:'5px 0', cursor:'pointer', fontSize:10,
+        }}>↪ Redo</button>
+        <button onClick={reset} style={{
+          flex:1, background:'#1a1f2c', color:'#888', border:'1px solid #21262d',
+          borderRadius:4, padding:'5px 0', cursor:'pointer', fontSize:10,
+        }}>Reset</button>
+      </div>
+      <div style={{ display:'flex', gap:6 }}>
+        <RandBtn onClick={randomize} />
+        <GenBtn label="\u2713 Apply Morphs" onClick={handleApply} />
+      </div>
+    </div>
+  );
+}
