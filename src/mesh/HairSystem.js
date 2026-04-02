@@ -331,3 +331,109 @@ export class HairSystem extends EventEmitter {
 }
 
 export default HairSystem;
+
+export class HairSystemPreset {
+  static apply(hairSystem, name) {
+    const presets = {
+      Realistic: { cardCount:500, density:0.80, stiffness:0.68, damping:0.85, windStr:0.35, gravity:0.50 },
+      Stylized:  { cardCount:200, density:0.90, stiffness:0.90, damping:0.92, windStr:0.10, gravity:0.15 },
+      GameReady: { cardCount:150, density:0.85, stiffness:0.80, damping:0.90, windStr:0.20, gravity:0.30 },
+      Simulation:{ cardCount:600, density:0.70, stiffness:0.50, damping:0.75, windStr:0.60, gravity:0.65 },
+    };
+    const p = presets[name] ?? presets.Realistic;
+    hairSystem.setConfig(p);
+    return p;
+  }
+}
+
+export function buildHairSystemFromConfig(config, scene, scalp) {
+  const hs = new HairSystem({ config: new HairSystemConfig(config), scene, scalp });
+  return hs.build();
+}
+
+export function estimateHairSystemCost(config) {
+  const cards = Math.round((config.cardCount ?? 300) * (config.density ?? 0.75));
+  const tris  = cards * (config.segments ?? 8) * 2;
+  const physMs = config.enablePhysics ? cards * 0.002 : 0;
+  return { cards, tris, estimatedPhysicsMs: physMs.toFixed(2),
+    tier: tris < 50000 ? 'Fast' : tris < 150000 ? 'Medium' : 'Heavy' };
+}
+
+export function serializeHairSystem(hairSystem) {
+  return JSON.stringify({ version: 1, config: hairSystem.config.toJSON(),
+    stats: hairSystem.getStats(), exportedAt: new Date().toISOString() });
+}
+
+export async function deserializeHairSystem(json, scene, scalp) {
+  const data   = JSON.parse(json);
+  const config = HairSystemConfig.fromJSON(data.config ?? data);
+  const hs     = new HairSystem({ config, scene, scalp });
+  await hs.build();
+  return hs;
+}
+
+export function createHairSystemLODChain(baseConfig, levels = 4) {
+  return Array.from({ length: levels }, (_, i) => {
+    const factor = Math.pow(0.5, i);
+    return new HairSystemConfig({
+      ...baseConfig,
+      cardCount: Math.round(baseConfig.cardCount * factor),
+      segments:  Math.max(2, (baseConfig.segments ?? 8) - i * 2),
+    });
+  });
+}
+
+export function computeHairDensityMap(scalp, targetDensity, seed = 42) {
+  let s = seed;
+  const rng = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+  const map = new Map();
+  const pos = scalp?.geometry?.attributes?.position;
+  if (!pos) return map;
+  for (let i = 0; i < pos.count; i++) {
+    map.set(i, rng() < targetDensity ? 1.0 : 0.0);
+  }
+  return map;
+}
+
+export function createHairSystemFromTemplate(templateName, scene, scalp) {
+  const TEMPLATES = {
+    Realistic: { cardCount:500, density:0.80, stiffness:0.68, damping:0.85, windStr:0.35, gravity:0.50, rootColor:'#2a1808', tipColor:'#8a5020' },
+    Stylized:  { cardCount:200, density:0.90, stiffness:0.90, damping:0.92, windStr:0.10, gravity:0.15, rootColor:'#1a1008', tipColor:'#4a2810' },
+    GameReady: { cardCount:150, density:0.85, stiffness:0.80, damping:0.90, windStr:0.20, gravity:0.30, rootColor:'#2a1808', tipColor:'#6a3818' },
+    Afro:      { cardCount:700, density:0.90, stiffness:0.35, damping:0.65, windStr:0.10, gravity:0.15, rootColor:'#0a0804', tipColor:'#2a1808' },
+    Long:      { cardCount:600, density:0.75, stiffness:0.65, damping:0.85, windStr:0.30, gravity:0.55, rootColor:'#0a0808', tipColor:'#2a1808' },
+  };
+  const cfg = TEMPLATES[templateName] ?? TEMPLATES.Realistic;
+  return new HairSystem({ config: new HairSystemConfig(cfg), scene, scalp });
+}
+export function updateHairSystemMaterial(hairSystem, materialOpts) {
+  if (!hairSystem._material) return;
+  if (materialOpts.rootColor) hairSystem._material.color.set(materialOpts.rootColor);
+  if (materialOpts.roughness !== undefined) hairSystem._material.roughness = materialOpts.roughness;
+  if (materialOpts.opacity   !== undefined) hairSystem._material.opacity   = materialOpts.opacity;
+  hairSystem._material.needsUpdate = true;
+}
+export function getHairSystemBounds(hairSystem) {
+  const bbox = new THREE.Box3();
+  hairSystem._cards.forEach(c => c.rootPos && bbox.expandByPoint(c.rootPos));
+  return { box: bbox, center: bbox.getCenter(new THREE.Vector3()), size: bbox.getSize(new THREE.Vector3()) };
+}
+export function pauseAllHairSystems(systems) { systems.forEach(s => s.pause()); }
+export function resumeAllHairSystems(systems) { systems.forEach(s => s.resume()); }
+export function disposeAllHairSystems(systems) { systems.forEach(s => s.dispose()); systems.length = 0; }
+
+export function cloneHairSystem(source, scene) {
+  const cfg = source.config.clone();
+  const hs  = new HairSystem({ config: cfg, scene });
+  return hs;
+}
+export function setHairSystemVisible(hairSystem, visible) {
+  hairSystem.group.visible = visible;
+}
+export function getHairSystemCardAt(hairSystem, idx) {
+  return hairSystem._cards[idx] ?? null;
+}
+export function forEachCard(hairSystem, fn) {
+  hairSystem._cards.forEach((card, i) => fn(card, i));
+}
+export function getHairSystemVersion() { return '1.4.0'; }

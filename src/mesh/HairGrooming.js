@@ -279,3 +279,153 @@ export class HairGroomingSession {
 }
 
 export default HairGroomingSession;
+
+export function computeAverageDirection(strands) {
+  if (!strands.length) return new THREE.Vector3(0, 1, 0);
+  const avg = new THREE.Vector3();
+  strands.forEach(s => {
+    const dir = s.curve[s.curve.length-1].clone().sub(s.rootPos).normalize();
+    avg.add(dir);
+  });
+  return avg.divideScalar(strands.length).normalize();
+}
+
+export function getStrandLength(strand) {
+  let len = 0;
+  for (let i = 1; i < strand.curve.length; i++) {
+    len += strand.curve[i].distanceTo(strand.curve[i-1]);
+  }
+  return len;
+}
+
+export function resampleCurve(curve, targetSegments) {
+  if (curve.length <= 1) return curve;
+  const totalLen = curve.reduce((s, p, i) => i === 0 ? 0 : s + p.distanceTo(curve[i-1]), 0);
+  const segLen   = totalLen / targetSegments;
+  const result   = [curve[0].clone()];
+  let   traveled = 0, curIdx = 0;
+  for (let seg = 1; seg < targetSegments; seg++) {
+    const target = seg * segLen;
+    while (curIdx < curve.length - 1) {
+      const d = curve[curIdx+1].distanceTo(curve[curIdx]);
+      if (traveled + d >= target) {
+        const t = (target - traveled) / d;
+        result.push(curve[curIdx].clone().lerp(curve[curIdx+1], t));
+        break;
+      }
+      traveled += d; curIdx++;
+    }
+  }
+  result.push(curve[curve.length-1].clone());
+  return result;
+}
+
+export function snapStrandsToSurface(strands, scalp) {
+  if (!scalp?.geometry) return strands;
+  return strands.map(strand => {
+    const rootOffset = strand.rootPos.clone().normalize().multiplyScalar(0.002);
+    return { ...strand, rootPos: strand.rootPos.clone().add(rootOffset) };
+  });
+}
+
+export function filterStrandsByLength(strands, minLen, maxLen) {
+  return strands.filter(s => {
+    const len = getStrandLength(s);
+    return len >= minLen && len <= maxLen;
+  });
+}
+
+export function interpolateStrandDensity(strands, densityMap) {
+  return strands.filter((s, i) => (densityMap.get(i) ?? 1.0) > 0.5);
+}
+
+export function getGroomingStats(strands) {
+  if (!strands.length) return { count:0, avgLen:0, minLen:0, maxLen:0 };
+  const lengths = strands.map(getStrandLength);
+  return {
+    count:  strands.length,
+    avgLen: lengths.reduce((a,b)=>a+b,0)/lengths.length,
+    minLen: Math.min(...lengths),
+    maxLen: Math.max(...lengths),
+  };
+}
+
+export function buildGroomPreset(name) {
+  const presets = {
+    Natural:  { activeTool:'comb',   brushRadius:0.08, brushStr:0.4, falloff:0.6, xMirror:true  },
+    Slicked:  { activeTool:'smooth', brushRadius:0.12, brushStr:0.6, falloff:0.7, xMirror:true  },
+    Wild:     { activeTool:'puff',   brushRadius:0.10, brushStr:0.5, falloff:0.5, xMirror:false },
+    Trimmed:  { activeTool:'cut',    brushRadius:0.05, brushStr:0.8, falloff:0.8, xMirror:true  },
+    Fluffy:   { activeTool:'puff',   brushRadius:0.15, brushStr:0.6, falloff:0.4, xMirror:true  },
+  };
+  return presets[name] ?? presets.Natural;
+}
+export function applyGroomPreset(session, presetName) {
+  const p = buildGroomPreset(presetName);
+  session.setTool(p.activeTool);
+  session.setBrush(p.brushRadius, p.brushStr, p.falloff);
+  session.xMirror = p.xMirror;
+  return p;
+}
+export function computeGroomProgress(strands, targetStyle) {
+  const stats   = getGroomingStats(strands);
+  const targets = { Natural:0.25, Long:0.40, Short:0.06, Curly:0.20 };
+  const target  = targets[targetStyle] ?? 0.25;
+  const diff    = Math.abs(stats.avgLen - target);
+  return Math.max(0, 1 - diff / target);
+}
+export function exportGroomData(session) {
+  return JSON.stringify({ tool:session.activeTool, radius:session.brushRadius,
+    strength:session.brushStr, xMirror:session.xMirror,
+    strandCount:session.strands.length, historyLength:session.history.length });
+}
+export function getGroomBrushPreview(tool, radius) {
+  return { tool, radius, color: tool==='cut'?'#FF6600':tool==='grow'?'#00ffc8':'#ffffff',
+    icon: {comb:'🔀',push:'👋',pull:'✋',smooth:'✨',cut:'✂️',grow:'🌱',puff:'💨',flatten:'▬',relax:'😌',twist:'🌀'}[tool]??'⚙' };
+}
+
+export function buildGroomMask(strands, paintData) {
+  const mask = new Float32Array(strands.length).fill(0);
+  strands.forEach((s, i) => { mask[i] = paintData.get(s.id) ?? 0; });
+  return mask;
+}
+export function applyGroomMask(strands, mask, toolFn, brushPos, ...args) {
+  return strands.map((s, i) => {
+    if ((mask[i] ?? 0) < 0.5) return s;
+    return toolFn([s], brushPos, ...args)[0] ?? s;
+  });
+}
+export function computeDensityGradient(strands, center, falloff) {
+  return strands.map(s => {
+    const dist = s.rootPos.distanceTo(center);
+    return Math.max(0, 1 - dist / falloff);
+  });
+}
+export function sortStrandsByDistance(strands, point) {
+  return [...strands].sort((a, b) => a.rootPos.distanceTo(point) - b.rootPos.distanceTo(point));
+}
+export function getStrandTipPosition(strand) {
+  return strand.curve[strand.curve.length - 1]?.clone() ?? strand.rootPos.clone();
+}
+export function computeGroomQuality(strands) {
+  const lengths = strands.map(s => getStrandLength(s));
+  const avg     = lengths.reduce((a,b)=>a+b,0)/Math.max(1,lengths.length);
+  const variance= lengths.reduce((a,b)=>a+(b-avg)**2,0)/Math.max(1,lengths.length);
+  return { avgLength:avg, variance, stddev:Math.sqrt(variance),
+    uniformity: 1 - Math.min(1, Math.sqrt(variance)/Math.max(avg,0.001)) };
+}
+export function thinStrands(strands, keepRatio, seed=42) {
+  let s=seed; const rng=()=>{s=(s*9301+49297)%233280;return s/233280;};
+  return strands.filter(()=>rng()<keepRatio);
+}
+export function thickenStrands(strands, addCount, seed=42) {
+  let s=seed; const rng=()=>{s=(s*9301+49297)%233280;return s/233280;};
+  const extras = Array.from({length:addCount},()=>{
+    const src = strands[Math.floor(rng()*strands.length)];
+    if (!src) return null;
+    const offset = new THREE.Vector3((rng()-0.5)*0.01,(rng()-0.5)*0.005,(rng()-0.5)*0.01);
+    return { ...src, id:Date.now()+Math.random(), rootPos:src.rootPos.clone().add(offset),
+      curve:src.curve.map(p=>p.clone().add(offset)) };
+  }).filter(Boolean);
+  return [...strands, ...extras];
+}

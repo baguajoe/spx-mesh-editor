@@ -248,3 +248,210 @@ export class SkinningSystem {
 }
 
 export default SkinningSystem;
+
+export function buildAutomaticWeights(geometry, skeleton, maxInfluences = 4) {
+  const pos     = geometry.attributes.position;
+  const wm      = new VertexWeightMap(pos.count, skeleton.bones.length);
+  for (let vi = 0; vi < pos.count; vi++) {
+    const vp     = new THREE.Vector3().fromBufferAttribute(pos, vi);
+    const dists  = skeleton.bones.map((bone, bi) => ({
+      boneIndex: bi,
+      dist:      vp.distanceTo(new THREE.Vector3().setFromMatrixPosition(bone.matrixWorld)),
+    })).sort((a, b) => a.dist - b.dist).slice(0, maxInfluences);
+    const totalInv = dists.reduce((s, d) => s + (d.dist < 0.001 ? 1e6 : 1/d.dist), 0);
+    wm.setWeights(vi, dists.map(d => ({
+      boneIndex: d.boneIndex,
+      weight: d.dist < 0.001 ? 1e6/totalInv : (1/d.dist)/totalInv,
+    })));
+  }
+  return wm;
+}
+
+export function visualizeWeights(geometry, weightMap, boneIndex) {
+  const colors = new Float32Array(geometry.attributes.position.count * 3);
+  for (let vi = 0; vi < geometry.attributes.position.count; vi++) {
+    const weights  = weightMap.getWeights(vi);
+    const boneW    = weights.find(w => w.boneIndex === boneIndex)?.weight ?? 0;
+    const r = boneW, g = 0.1, b = 1 - boneW;
+    colors[vi*3]=r; colors[vi*3+1]=g; colors[vi*3+2]=b;
+  }
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  return geometry;
+}
+
+export function getHeaviestBone(weightMap, vertexIdx) {
+  const weights = weightMap.getWeights(vertexIdx);
+  if (!weights.length) return null;
+  return weights.reduce((best, w) => w.weight > best.weight ? w : best);
+}
+
+export function computeWeightVariance(weightMap, boneIndex) {
+  let sum = 0, sumSq = 0, count = 0;
+  for (let vi = 0; vi < weightMap.vertexCount; vi++) {
+    const w = weightMap.getWeights(vi).find(inf => inf.boneIndex === boneIndex)?.weight ?? 0;
+    if (w > 0.001) { sum += w; sumSq += w*w; count++; }
+  }
+  if (!count) return { mean:0, variance:0, stddev:0 };
+  const mean = sum / count;
+  return { mean, variance: sumSq/count - mean*mean, stddev: Math.sqrt(sumSq/count - mean*mean) };
+}
+
+export function mirrorWeights(weightMap, geometry, axis = 'X', threshold = 0.01) {
+  const pos     = geometry.attributes.position;
+  const mirrored = new VertexWeightMap(weightMap.vertexCount, weightMap.boneCount);
+  for (let vi = 0; vi < weightMap.vertexCount; vi++) {
+    const vp    = new THREE.Vector3().fromBufferAttribute(pos, vi);
+    const mirrorPos = vp.clone();
+    if (axis === 'X') mirrorPos.x = -mirrorPos.x;
+    let closest = -1, closestDist = Infinity;
+    for (let vj = 0; vj < pos.count; vj++) {
+      const d = new THREE.Vector3().fromBufferAttribute(pos, vj).distanceTo(mirrorPos);
+      if (d < closestDist && d < threshold) { closestDist = d; closest = vj; }
+    }
+    if (closest >= 0) mirrored.setWeights(vi, weightMap.getWeights(closest));
+    else              mirrored.setWeights(vi, weightMap.getWeights(vi));
+  }
+  return mirrored;
+}
+
+export function getSkinningReport(skinningSystem, weightMap) {
+  const unweighted = [], multiInfluence = [];
+  for (let vi = 0; vi < weightMap.vertexCount; vi++) {
+    const w = weightMap.getWeights(vi);
+    if (!w.length)  unweighted.push(vi);
+    if (w.length>2) multiInfluence.push(vi);
+  }
+  return {
+    totalVertices:      weightMap.vertexCount,
+    unweightedVertices: unweighted.length,
+    multiInfluenceVerts:multiInfluence.length,
+    mode:               skinningSystem.mode,
+    hasCorrectiveShapes:!!skinningSystem.correctives,
+  };
+}
+
+export function computeBoneInfluenceZones(skeleton, geometry, radius=0.15) {
+  const pos    = geometry.attributes.position;
+  const zones  = new Map();
+  skeleton.bones.forEach((bone, bi) => {
+    const bonePos = new THREE.Vector3().setFromMatrixPosition(bone.matrixWorld);
+    const verts   = [];
+    for (let vi=0; vi<pos.count; vi++) {
+      const vp = new THREE.Vector3().fromBufferAttribute(pos, vi);
+      if (vp.distanceTo(bonePos) <= radius) verts.push(vi);
+    }
+    zones.set(bi, verts);
+  });
+  return zones;
+}
+export function validateSkinning(weightMap, geometry) {
+  const pos    = geometry.attributes.position;
+  const errors = [];
+  for (let vi=0; vi<pos.count; vi++) {
+    const ws = weightMap.getWeights(vi);
+    if (!ws.length) errors.push({type:'unweighted', vertex:vi});
+    const total = ws.reduce((s,w)=>s+w.weight,0);
+    if (Math.abs(total-1.0) > 0.01) errors.push({type:'unnormalized', vertex:vi, total});
+  }
+  return {valid:errors.length===0, errors, vertexCount:pos.count};
+}
+export function getWeightPaintInfo(weightMap, boneIndex) {
+  const colored=[], uncolored=[];
+  for (let vi=0; vi<weightMap.vertexCount; vi++) {
+    const ws = weightMap.getWeights(vi);
+    const w  = ws.find(x=>x.boneIndex===boneIndex);
+    if (w) colored.push({vertex:vi, weight:w.weight});
+    else   uncolored.push(vi);
+  }
+  return { colored, uncolored, coverage: colored.length/weightMap.vertexCount };
+}
+export function cloneSkinningSystem(original, newGeometry) {
+  const clone = new SkinningSystem(original.skeleton, { mode: original.mode });
+  if (original.weightMap) clone.attachGeometry(newGeometry, original.weightMap);
+  return clone;
+}
+export function serializeSkinningSystem(system) {
+  return JSON.stringify({ mode:system.mode, hasWeightMap:!!system.weightMap,
+    boneCount:system.skeleton?.bones?.length??0, version:1 });
+}
+
+export function computeSkinningInfluenceStats(weightMap) {
+  const influenceCounts = new Array(weightMap.maxInfluences+1).fill(0);
+  for (let vi=0; vi<weightMap.vertexCount; vi++) {
+    const count = weightMap.getWeights(vi).length;
+    influenceCounts[Math.min(count, weightMap.maxInfluences)]++;
+  }
+  return { influenceCounts, maxInfluences: weightMap.maxInfluences,
+    totalVertices: weightMap.vertexCount };
+}
+export function pruneWeights(weightMap, threshold=0.05) {
+  for (let vi=0; vi<weightMap.vertexCount; vi++) {
+    const ws = weightMap.getWeights(vi).filter(w=>w.weight>=threshold);
+    const total = ws.reduce((s,w)=>s+w.weight,0)||1;
+    weightMap.setWeights(vi, ws.map(w=>({...w, weight:w.weight/total})));
+  }
+  return weightMap;
+}
+export function getSkinningMode(geometry) {
+  return geometry.attributes.skinIndex ? 'skinned' : 'rigid';
+}
+export function buildRigidBinding(geometry, boneIndex) {
+  const count = geometry.attributes.position.count;
+  const wm    = new VertexWeightMap(count, boneIndex+1);
+  for (let vi=0; vi<count; vi++) wm.setWeights(vi, [{boneIndex, weight:1.0}]);
+  return wm;
+}
+export function getPerBoneVertexCount(weightMap, boneCount) {
+  const counts = new Array(boneCount).fill(0);
+  for (let vi=0; vi<weightMap.vertexCount; vi++) {
+    weightMap.getWeights(vi).forEach(({boneIndex})=>{ if(boneIndex<boneCount) counts[boneIndex]++; });
+  }
+  return counts;
+}
+export function exportWeightMapAsCSV(weightMap) {
+  const rows = ['vertex,bone,weight'];
+  for (let vi=0; vi<weightMap.vertexCount; vi++) {
+    weightMap.getWeights(vi).forEach(({boneIndex,weight})=>{ rows.push(`${vi},${boneIndex},${weight.toFixed(4)}`); });
+  }
+  return rows.join('
+');
+}
+
+export function applyMorphAndSkin(geometry, morphValues, skinningSystem, weightMap) {
+  if(morphValues) {
+    const morphPos=geometry.morphAttributes?.position;
+    if(morphPos) {
+      geometry.morphTargetInfluences=geometry.morphTargetInfluences??new Array(morphPos.length).fill(0);
+      Object.entries(morphValues).forEach(([name,val])=>{
+        const idx=geometry.morphTargetDictionary?.[name];
+        if(idx!==undefined) geometry.morphTargetInfluences[idx]=val;
+      });
+    }
+  }
+  skinningSystem?.update(geometry);
+  return geometry;
+}
+export function buildDefaultSkinningSystem(skeleton) {
+  return new SkinningSystem(skeleton, {mode:'LBS'});
+}
+export function getSkinningPerformanceTier(weightMap) {
+  const maxInf=weightMap.maxInfluences;
+  if(maxInf<=1) return {tier:'A',label:'Rigid',cost:1.0};
+  if(maxInf<=2) return {tier:'B',label:'Smooth',cost:1.5};
+  if(maxInf<=4) return {tier:'C',label:'Full',cost:2.0};
+  return {tier:'D',label:'Heavy',cost:3.0};
+}
+export function computeBindPose(skeleton) {
+  return skeleton.bones.map(bone=>({
+    name:bone.name,
+    worldMatrix:bone.matrixWorld.clone(),
+    localMatrix:bone.matrix.clone(),
+  }));
+}
+export function restoreBindPose(skeleton, bindPose) {
+  bindPose.forEach(({name,localMatrix})=>{
+    const bone=skeleton.bones.find(b=>b.name===name);
+    if(bone) bone.matrix.copy(localMatrix);
+  });
+  skeleton.update?.();
+}

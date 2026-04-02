@@ -272,3 +272,161 @@ export class WalkCycleGenerator {
 }
 
 export default WalkCycleGenerator;
+
+export function createWalkAnimationClip(generator, name = 'Walk') {
+  const frames  = generator.generateFrames();
+  const fps     = generator.frameRate;
+  const tracks  = [];
+
+  BIPED_JOINTS.forEach(joint => {
+    const rotTimes  = frames.map(f => f.frame / fps);
+    const rotValues = [];
+    const q = new THREE.Quaternion();
+    const e = new THREE.Euler();
+    frames.forEach(fr => {
+      const data = fr[joint];
+      if (data?.rot) {
+        e.set(data.rot.x * (Math.PI/180), data.rot.y * (Math.PI/180), data.rot.z * (Math.PI/180));
+        q.setFromEuler(e);
+        rotValues.push(q.x, q.y, q.z, q.w);
+      } else {
+        rotValues.push(0, 0, 0, 1);
+      }
+    });
+    tracks.push(new THREE.QuaternionKeyframeTrack(`${joint}.quaternion`, rotTimes, rotValues));
+  });
+
+  const hipTimes  = frames.map(f => f.frame / fps);
+  const hipValues = frames.flatMap(fr => [fr.Hips.pos.x/100, fr.Hips.pos.y/100, 0]);
+  tracks.push(new THREE.VectorKeyframeTrack('Hips.position', hipTimes, hipValues));
+
+  return new THREE.AnimationClip(name, frames.length / fps, tracks);
+}
+
+export function blendWalkRunClips(walkGen, runGen, blend) {
+  blend = Math.max(0, Math.min(1, blend));
+  const blended = new WalkCycleGenerator({
+    frameRate: walkGen.frameRate,
+    speed:     walkGen.speed,
+  });
+  const keys = ['stepHeight','stepLen','armSwing','hipSway','bounciness','duration'];
+  keys.forEach(k => { blended[k] = walkGen[k] + (runGen[k] - walkGen[k]) * blend; });
+  return blended;
+}
+
+export function computeFootPlantFrames(generator) {
+  const frames     = generator.generateFrames();
+  const plantFrames = { left:[], right:[] };
+  frames.forEach((fr, i) => {
+    const lFoot = fr.LeftFoot?.rot?.x  ?? 0;
+    const rFoot = fr.RightFoot?.rot?.x ?? 0;
+    if (Math.abs(lFoot) < 5)  plantFrames.left.push(i);
+    if (Math.abs(rFoot) < 5)  plantFrames.right.push(i);
+  });
+  return plantFrames;
+}
+
+export function getStepTiming(generator) {
+  const fps   = generator.frameRate;
+  const total = Math.round(fps * generator.duration);
+  return {
+    totalFrames:   total,
+    leftStepFrame: Math.round(total * 0.0),
+    rightStepFrame:Math.round(total * 0.5),
+    cycleDuration: generator.duration,
+    stepsPerSecond:(2 / generator.duration).toFixed(2),
+  };
+}
+
+export function exportWalkCycleToObject(generator) {
+  return {
+    metadata: generator.toJSON(),
+    frames:   generator.generateFrames(),
+    bvh:      generator.toBVH(),
+    timing:   getStepTiming(generator),
+  };
+}
+
+export function validateWalkCycle(generator) {
+  const errors = [];
+  if (generator.stepHeight < 0)    errors.push('stepHeight must be >= 0');
+  if (generator.duration <= 0)     errors.push('duration must be > 0');
+  if (generator.frameRate < 12)    errors.push('frameRate too low (min 12)');
+  if (generator.armSwing < 0)      errors.push('armSwing must be >= 0');
+  if (!GAIT_PRESETS[generator.style]) errors.push(`Unknown gait style: ${generator.style}`);
+  return { valid: errors.length === 0, errors };
+}
+
+export function generateRunCycle(opts={}) {
+  const gen = new WalkCycleGenerator({ style:'Run', ...opts });
+  return { generator:gen, frames:gen.generateFrames(), bvh:gen.toBVH() };
+}
+export function generateIdleCycle(opts={}) {
+  const gen = new WalkCycleGenerator({ style:'Normal', ...opts });
+  gen.stepHeight = 0.0; gen.armSwing = 0.05; gen.hipSway = 0.01;
+  gen.bounciness = 0.005; gen.duration = 2.0;
+  return { generator:gen, frames:gen.generateFrames(), bvh:gen.toBVH() };
+}
+export function interpolateWalkCycles(genA, genB, blend, fps=30) {
+  const blended = new WalkCycleGenerator({ frameRate:fps });
+  const keys = ['stepHeight','stepLen','armSwing','hipSway','bounciness','duration'];
+  keys.forEach(k => { blended[k] = genA[k]+(genB[k]-genA[k])*blend; });
+  return blended;
+}
+export function getWalkCycleMetadata(generator) {
+  return { style:generator.style, fps:generator.frameRate, duration:generator.duration,
+    frameCount:Math.round(generator.frameRate*generator.duration),
+    stepHeight:generator.stepHeight, armSwing:generator.armSwing,
+    joints:BIPED_JOINTS.length, bvhSize: Math.round(generator.generateFrames().length * BIPED_JOINTS.length * 12) };
+}
+export function buildLocomotionStateMachine(generators) {
+  return {
+    generators,
+    current: 'idle',
+    blend:   0,
+    transitions: { idle:['walk'], walk:['idle','jog','run'], jog:['walk','run'], run:['jog'] },
+    transitionTo(next, blendTime=0.3) {
+      if (this.transitions[this.current]?.includes(next)) { this.current=next; return true; }
+      return false;
+    },
+    evaluate(t) {
+      const gen = this.generators[this.current];
+      return gen ? gen._evalAtT(t) : {};
+    },
+  };
+}
+
+export function scaleWalkCycle(generator, heightScale) {
+  const scaled = new WalkCycleGenerator(generator.toJSON());
+  scaled.stepHeight *= heightScale;
+  scaled.stepLen    *= heightScale;
+  return scaled;
+}
+export function mirrorWalkCycle(generator) {
+  const frames = generator.generateFrames();
+  return frames.map(fr=>({
+    ...fr,
+    LeftArm:    fr.RightArm,    RightArm:    fr.LeftArm,
+    LeftForeArm:fr.RightForeArm,RightForeArm:fr.LeftForeArm,
+    LeftUpLeg:  fr.RightUpLeg,  RightUpLeg:  fr.LeftUpLeg,
+    LeftLeg:    fr.RightLeg,    RightLeg:    fr.LeftLeg,
+    LeftFoot:   fr.RightFoot,   RightFoot:   fr.LeftFoot,
+  }));
+}
+export function getWalkCycleFootContacts(generator) {
+  const frames = generator.generateFrames();
+  const contacts = {left:[],right:[]};
+  frames.forEach((fr,i)=>{
+    const l = fr.LeftFoot?.rot?.x??0, r = fr.RightFoot?.rot?.x??0;
+    if(Math.abs(l)<8)  contacts.left.push(i);
+    if(Math.abs(r)<8) contacts.right.push(i);
+  });
+  return contacts;
+}
+export function listGaitStyles() { return Object.keys(GAIT_PRESETS); }
+export function getGaitPreset(name) { return GAIT_PRESETS[name] ?? GAIT_PRESETS.Normal; }
+export function estimateBVHSize(generator) {
+  const frames = Math.round(generator.frameRate * generator.duration);
+  const channels = 6 + (BIPED_JOINTS.length - 1) * 3;
+  return { frames, channels, estimatedBytes: frames * channels * 8 };
+}

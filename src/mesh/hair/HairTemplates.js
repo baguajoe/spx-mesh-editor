@@ -210,3 +210,216 @@ export function findClosestTemplate(params) {
 }
 
 export default HAIR_TEMPLATES;
+
+export function getTemplatesByLength(minLen, maxLen) {
+  return Object.entries(HAIR_TEMPLATES)
+    .filter(([, t]) => t.cardLength >= minLen && t.cardLength <= maxLen)
+    .map(([key, t]) => ({ key, ...t }));
+}
+
+export function getTemplatesByCurliness(minCurl, maxCurl) {
+  return Object.entries(HAIR_TEMPLATES)
+    .filter(([, t]) => t.curl >= minCurl && t.curl <= maxCurl)
+    .map(([key, t]) => ({ key, ...t }));
+}
+
+export function getRandomTemplate(seed = Math.random()) {
+  const keys = Object.keys(HAIR_TEMPLATES);
+  return keys[Math.floor(seed * keys.length)];
+}
+
+export function estimateTemplateCost(templateName) {
+  const t = getTemplate(templateName);
+  const tris = t.cardCount * 8 * 2;
+  return { cards: t.cardCount, tris, tier: tris < 30000 ? 'Fast' : tris < 80000 ? 'Medium' : 'Heavy' };
+}
+
+export function exportTemplateAsJSON(templateName) {
+  return JSON.stringify({ name: templateName, ...getTemplate(templateName), exportedAt: new Date().toISOString() });
+}
+
+export function importTemplateFromJSON(json) {
+  try {
+    const data = JSON.parse(json);
+    const { name, exportedAt, ...params } = data;
+    return { name: name ?? 'Imported', params };
+  } catch { return null; }
+}
+
+export function getTemplateColorScheme(templateName) {
+  const t = getTemplate(templateName);
+  return { rootColor: t.rootColor, tipColor: t.tipColor,
+    isDark:  parseInt(t.rootColor.slice(1,3),16) < 64,
+    isLight: parseInt(t.rootColor.slice(1,3),16) > 180 };
+}
+
+export function getTemplatePhysicsClass(templateName) {
+  const t = getTemplate(templateName);
+  if (t.stiffness > 0.85) return 'Rigid';
+  if (t.stiffness > 0.65) return 'Stiff';
+  if (t.stiffness > 0.45) return 'Normal';
+  if (t.stiffness > 0.30) return 'Soft';
+  return 'Loose';
+}
+
+export function scaleTemplate(templateName, scaleFactor) {
+  const t = { ...getTemplate(templateName) };
+  t.cardLength  *= scaleFactor;
+  t.cardWidth   *= Math.sqrt(scaleFactor);
+  t.cardCount    = Math.round(t.cardCount * scaleFactor);
+  return t;
+}
+
+export const TEMPLATE_CATEGORIES = {
+  Short:   ['shortBuzz','pixieCut','bobCut','mohawk'],
+  Medium:  ['longWavy','curlyLoose','ponytail','bun','dreadlocks'],
+  Long:    ['longStraight','tightCoils','afro','highlight','platinum','red'],
+  Fantasy: ['anime'],
+};
+
+export function getTemplatesByCategory(category) {
+  return (TEMPLATE_CATEGORIES[category] ?? []).map(key => ({ key, ...getTemplate(key) }));
+}
+
+export function buildTemplateVariant(base, overrides) {
+  return { ...HAIR_TEMPLATES[base] ?? HAIR_TEMPLATES.longStraight, ...overrides };
+}
+export function computeTemplateSimilarity(nameA, nameB) {
+  const a = HAIR_TEMPLATES[nameA], b = HAIR_TEMPLATES[nameB];
+  if (!a || !b) return 0;
+  const fields = ['cardLength','curl','density','stiffness','windStr'];
+  const diff = fields.reduce((s, k) => s + Math.abs((a[k]??0)-(b[k]??0)), 0);
+  return Math.max(0, 1 - diff / fields.length);
+}
+export function getTemplateTransitionTime(fromName, toName, fps=30) {
+  const sim = computeTemplateSimilarity(fromName, toName);
+  const frames = Math.round((1-sim) * fps * 2);
+  return { frames, seconds: (frames/fps).toFixed(2) };
+}
+export function getTemplatesForAge(age) {
+  if (age < 20) return ['shortBuzz','pixieCut','mohawk','anime'];
+  if (age < 40) return ['longStraight','longWavy','curlyLoose','bobCut','ponytail','bun'];
+  if (age < 60) return ['bobCut','longWavy','bun','dreadlocks'];
+  return ['shortBuzz','pixieCut','bobCut'];
+}
+export function applyTemplateToConfig(template, existingConfig) {
+  return { ...existingConfig, cardCount:template.cardCount, density:template.density,
+    cardWidth:template.cardWidth, cardLength:template.cardLength,
+    rootColor:template.rootColor, tipColor:template.tipColor,
+    stiffness:template.stiffness, damping:template.damping };
+}
+
+export function buildTemplatePreviewConfig(templateName) {
+  const t = getTemplate(templateName);
+  return { ...t, cardCount: Math.min(t.cardCount, 100), density: 0.5, enablePhysics: false, enableLOD: false };
+}
+export function getTemplatesForScene(sceneType) {
+  const map = {
+    'Game':    Object.keys(HAIR_TEMPLATES).filter(k=>HAIR_TEMPLATES[k].cardCount<300),
+    'Film':    Object.keys(HAIR_TEMPLATES).filter(k=>HAIR_TEMPLATES[k].cardCount>=400),
+    'Mobile':  Object.keys(HAIR_TEMPLATES).filter(k=>HAIR_TEMPLATES[k].cardCount<200),
+    'Preview': Object.keys(HAIR_TEMPLATES).slice(0,6),
+  };
+  return (map[sceneType]??Object.keys(HAIR_TEMPLATES)).map(k=>({key:k,...HAIR_TEMPLATES[k]}));
+}
+export function getTemplateWindResponse(templateName) {
+  const t = getTemplate(templateName);
+  const response = t.windStr * (1-t.stiffness);
+  return { windStr:t.windStr, stiffness:t.stiffness, response: response.toFixed(3),
+    tier: response<0.1?'Minimal':response<0.25?'Moderate':response<0.4?'High':'Very High' };
+}
+export function mutateTemplate(templateName, mutationRate=0.1, seed=42) {
+  let s=seed; const rng=()=>{s=(s*9301+49297)%233280;return s/233280;};
+  const t   = {...getTemplate(templateName)};
+  const numericKeys = ['cardCount','density','cardWidth','cardLength','stiffness','damping','windStr','gravity'];
+  numericKeys.forEach(k=>{
+    if(typeof t[k]==='number') t[k] = Math.max(0.01, t[k]*(1+(rng()-0.5)*mutationRate*2));
+  });
+  t.cardCount = Math.round(t.cardCount);
+  return t;
+}
+export function rankTemplatesByPerformance() {
+  return Object.entries(HAIR_TEMPLATES)
+    .map(([key,t])=>({ key, name:t.name, score: t.cardCount*(t.cardLength+1)*(1+t.curl) }))
+    .sort((a,b)=>a.score-b.score)
+    .map((t,i)=>({...t, rank:i+1}));
+}
+export function getTemplateLODConfigs(templateName) {
+  const t = getTemplate(templateName);
+  return [0,1,2,3].map(lod=>({
+    lod, cardCount:Math.round(t.cardCount*Math.pow(0.5,lod)),
+    segments:Math.max(2,(t.segments??8)-lod*2), label:['Full','High','Mid','Low'][lod],
+  }));
+}
+
+export function buildTemplateGrid(cols=4) {
+  const keys=Object.keys(HAIR_TEMPLATES);
+  const rows=Math.ceil(keys.length/cols);
+  return Array.from({length:rows},(_,r)=>keys.slice(r*cols,(r+1)*cols).map(k=>({key:k,...HAIR_TEMPLATES[k]})));
+}
+export function getTemplateByIndex(idx) {
+  const keys=Object.keys(HAIR_TEMPLATES);
+  return keys[((idx%keys.length)+keys.length)%keys.length];
+}
+export function computeTemplateComplexityScore(templateName) {
+  const t=getTemplate(templateName);
+  return (t.cardCount/100)*(1+t.curl*2)*(1+t.frizz*2)*(t.cardLength*3);
+}
+export function getTemplatesForEthnicity(ethnicity) {
+  const map={
+    Asian:   ['longStraight','bobCut','shortBuzz','longWavy'],
+    African: ['afro','tightCoils','dreadlocks','mohawk'],
+    European:['longWavy','longStraight','curlyLoose','bobCut','pixieCut'],
+    Latino:  ['longWavy','curlyLoose','longStraight','ponytail'],
+    Mixed:   Object.keys(HAIR_TEMPLATES),
+  };
+  return (map[ethnicity]??map.Mixed).map(k=>({key:k,...getTemplate(k)}));
+}
+export function getTemplateHairTexture(templateName) {
+  const t=getTemplate(templateName);
+  if(t.curl>0.6) return 'Kinky';
+  if(t.curl>0.3) return 'Curly';
+  if(t.wave>0.2||t.curl>0.1) return 'Wavy';
+  return 'Straight';
+}
+export function sortTemplatesByCardLength() {
+  return Object.entries(HAIR_TEMPLATES)
+    .sort((a,b)=>a[1].cardLength-b[1].cardLength)
+    .map(([key,t])=>({key,name:t.name,length:t.cardLength}));
+}
+
+export function getTemplateAgeRange(templateName) {
+  const map={shortBuzz:[16,80],pixieCut:[18,70],bobCut:[20,65],longStraight:[15,55],
+    longWavy:[15,55],curlyLoose:[16,60],tightCoils:[16,60],afro:[16,60],
+    ponytail:[15,45],bun:[20,60],mohawk:[16,35],dreadlocks:[18,55],
+    highlight:[20,50],platinum:[20,45],red:[16,40],anime:[14,30]};
+  return map[templateName]??[16,80];
+}
+export function isTemplateAgeAppropriate(templateName, age) {
+  const [min,max]=getTemplateAgeRange(templateName);
+  return age>=min && age<=max;
+}
+export function getTemplateWindEffect(templateName) {
+  const t=getTemplate(templateName);
+  const effect=(1-t.stiffness)*t.windStr*(t.cardLength+0.1);
+  return {low:effect<0.05,medium:effect<0.15,high:effect>=0.15,value:effect.toFixed(3)};
+}
+export function buildTemplateComparisonTable(names) {
+  return names.map(name=>{
+    const t=getTemplate(name);
+    return {name,cards:t.cardCount,length:t.cardLength.toFixed(2),
+      curl:t.curl.toFixed(2),stiffness:t.stiffness.toFixed(2),
+      windStr:t.windStr.toFixed(2),rootColor:t.rootColor};
+  });
+}
+export function getTemplateSearchResults(query) {
+  const q=query.toLowerCase();
+  return Object.entries(HAIR_TEMPLATES)
+    .filter(([k,t])=>k.includes(q)||t.name.toLowerCase().includes(q))
+    .map(([key,t])=>({key,...t}));
+}
+export function computeTemplateTransitionFrames(from, to, fps=30) {
+  const a=getTemplate(from), b=getTemplate(to);
+  const delta=Math.abs(a.cardLength-b.cardLength)+Math.abs(a.curl-b.curl)*0.5+Math.abs(a.stiffness-b.stiffness)*0.3;
+  return Math.round(fps*delta*3);
+}

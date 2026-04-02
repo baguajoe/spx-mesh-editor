@@ -217,3 +217,217 @@ export function cutByPlane(strands, planeNormal, planePoint, mask = null) {
 }
 
 export default { buildGuideCurve, clusterStrands, HairSymmetry, SplineHairShaper, StrandSelectionMask, cutToLength, cutByPlane };
+
+export function subdivideStrand(strand, times = 1) {
+  let curve = strand.curve;
+  for (let t = 0; t < times; t++) {
+    const newCurve = [curve[0].clone()];
+    for (let i = 0; i < curve.length - 1; i++) {
+      newCurve.push(curve[i].clone().lerp(curve[i+1], 0.5));
+      newCurve.push(curve[i+1].clone());
+    }
+    curve = newCurve;
+  }
+  return { ...strand, curve };
+}
+
+export function decimateStrand(strand, targetSegments) {
+  const current = strand.curve.length - 1;
+  if (current <= targetSegments) return strand;
+  const step = current / targetSegments;
+  const newCurve = Array.from({ length: targetSegments + 1 }, (_, i) => {
+    const idx = Math.min(Math.round(i * step), strand.curve.length - 1);
+    return strand.curve[idx].clone();
+  });
+  return { ...strand, curve: newCurve };
+}
+
+export function offsetStrandRoot(strand, offset) {
+  const newCurve = strand.curve.map(p => p.clone().add(offset));
+  return { ...strand, rootPos: strand.rootPos.clone().add(offset), curve: newCurve };
+}
+
+export function rotateStrandAroundRoot(strand, axis, angle) {
+  const newCurve = strand.curve.map((p, i) => {
+    if (i === 0) return p.clone();
+    return p.clone().sub(strand.rootPos).applyAxisAngle(axis, angle).add(strand.rootPos);
+  });
+  return { ...strand, curve: newCurve };
+}
+
+export function mergeStrandSets(setA, setB) {
+  const maxId = Math.max(...setA.map(s => s.id), 0);
+  const reindexed = setB.map((s, i) => ({ ...s, id: maxId + 1 + i }));
+  return [...setA, ...reindexed];
+}
+
+export function splitStrandSet(strands, predicate) {
+  const matching    = strands.filter(predicate);
+  const nonMatching = strands.filter(s => !predicate(s));
+  return { matching, nonMatching };
+}
+
+export function computeStrandBounds(strands) {
+  if (!strands.length) return null;
+  const min = new THREE.Vector3( Infinity,  Infinity,  Infinity);
+  const max = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
+  strands.forEach(s => s.curve.forEach(p => { min.min(p); max.max(p); }));
+  return { min, max, center: min.clone().add(max).multiplyScalar(0.5), size: max.clone().sub(min) };
+}
+
+export function normalizeStrandLengths(strands, targetLength) {
+  return strands.map(strand => {
+    const actual = strand.curve.reduce((s, p, i) => i===0 ? 0 : s + p.distanceTo(strand.curve[i-1]), 0);
+    if (Math.abs(actual - targetLength) < 0.001) return strand;
+    const scale    = targetLength / Math.max(actual, 0.001);
+    const newCurve = strand.curve.map((p, i) => {
+      if (i === 0) return p.clone();
+      const dir = p.clone().sub(strand.rootPos);
+      return strand.rootPos.clone().add(dir.multiplyScalar(scale));
+    });
+    return { ...strand, curve: newCurve, length: targetLength };
+  });
+}
+
+export function computeHairBoundingCapsule(strands) {
+  const bounds = computeStrandBounds(strands);
+  if (!bounds) return null;
+  const height = bounds.size.y;
+  const radius = Math.max(bounds.size.x, bounds.size.z) * 0.5;
+  return { center: bounds.center, height, radius };
+}
+
+export function projectStrandsOntoSphere(strands, radius) {
+  return strands.map(strand => {
+    const newCurve = strand.curve.map((pt, i) => {
+      if (i === 0) return pt.clone().normalize().multiplyScalar(radius);
+      return pt.clone();
+    });
+    return { ...strand, rootPos: strand.rootPos.clone().normalize().multiplyScalar(radius), curve: newCurve };
+  });
+}
+export function jitterStrandRoots(strands, amount, seed=42) {
+  let s = seed;
+  const rng = () => { s=(s*9301+49297)%233280; return s/233280-0.5; };
+  return strands.map(strand => {
+    const jitter = new THREE.Vector3(rng()*amount, rng()*amount*0.5, rng()*amount);
+    const newPos  = strand.rootPos.clone().add(jitter);
+    const newCurve = strand.curve.map((p,i) => i===0 ? newPos.clone() : p.clone().add(jitter));
+    return { ...strand, rootPos: newPos, curve: newCurve };
+  });
+}
+export function alignStrandsToNormal(strands, normal) {
+  const n = normal.clone().normalize();
+  return strands.map(strand => {
+    const currentDir = strand.curve[strand.curve.length-1].clone().sub(strand.rootPos).normalize();
+    const angle  = currentDir.angleTo(n);
+    if (angle < 0.01) return strand;
+    const axis   = currentDir.clone().cross(n).normalize();
+    const newCurve = strand.curve.map((p,i) => {
+      if (i===0) return p.clone();
+      return p.clone().sub(strand.rootPos).applyAxisAngle(axis, angle * 0.5).add(strand.rootPos);
+    });
+    return { ...strand, curve: newCurve };
+  });
+}
+export function getStrandDistribution(strands, resolution=10) {
+  const grid = new Array(resolution*resolution).fill(0);
+  strands.forEach(s => {
+    const u = Math.floor(Math.min(0.999, (s.rootPos.x+1)*0.5)*resolution);
+    const v = Math.floor(Math.min(0.999, (s.rootPos.z+1)*0.5)*resolution);
+    grid[v*resolution+u]++;
+  });
+  return { grid, resolution, min:Math.min(...grid), max:Math.max(...grid) };
+}
+
+export function snapToGrid(strands, gridSize=0.01) {
+  return strands.map(s=>({
+    ...s,
+    rootPos: new THREE.Vector3(
+      Math.round(s.rootPos.x/gridSize)*gridSize,
+      Math.round(s.rootPos.y/gridSize)*gridSize,
+      Math.round(s.rootPos.z/gridSize)*gridSize,
+    ),
+  }));
+}
+export function createStrandFromPoints(id, points, normalDir) {
+  const rootPos    = points[0].clone();
+  const rootNormal = normalDir ?? points[points.length-1].clone().sub(rootPos).normalize();
+  const length     = points.reduce((s,p,i)=>i===0?0:s+p.distanceTo(points[i-1]),0);
+  return { id, rootPos, rootNormal, curve: points.map(p=>p.clone()), length };
+}
+export function applyNoiseToStrands(strands, strength, frequency, seed=1) {
+  let s=seed; const rng=()=>{s=(s*9301+49297)%233280;return s/233280-0.5;};
+  return strands.map(strand=>({
+    ...strand,
+    curve: strand.curve.map((p,i)=>{
+      if(i===0) return p.clone();
+      const t = i/(strand.curve.length-1);
+      return p.clone().add(new THREE.Vector3(rng(),rng(),rng()).multiplyScalar(strength*t));
+    }),
+  }));
+}
+export function computeHairFlowField(strands, resolution=20) {
+  const grid = new Array(resolution*resolution).fill(null).map(()=>new THREE.Vector3());
+  const counts = new Array(resolution*resolution).fill(0);
+  strands.forEach(s=>{
+    const u = Math.floor(Math.min(0.999,(s.rootPos.x+1)*0.5)*resolution);
+    const v = Math.floor(Math.min(0.999,(s.rootPos.z+1)*0.5)*resolution);
+    const idx = v*resolution+u;
+    const dir = s.curve[s.curve.length-1].clone().sub(s.rootPos).normalize();
+    grid[idx].add(dir);
+    counts[idx]++;
+  });
+  grid.forEach((g,i)=>{if(counts[i]>0) g.divideScalar(counts[i]);});
+  return { grid, counts, resolution };
+}
+export function filterStrandsByMask(strands, mask) {
+  return strands.filter((_,i)=>(mask[i]??1)>0.5);
+}
+export function getStrandRoot(strand) { return strand.rootPos.clone(); }
+export function getStrandTip(strand) { return strand.curve[strand.curve.length-1]?.clone()??strand.rootPos.clone(); }
+export function setStrandLength(strand, targetLen) {
+  const dir = getStrandTip(strand).sub(strand.rootPos).normalize();
+  const newCurve = strand.curve.map((_,i)=>{
+    const t = i/(strand.curve.length-1);
+    return strand.rootPos.clone().add(dir.clone().multiplyScalar(targetLen*t));
+  });
+  return {...strand, curve:newCurve, length:targetLen};
+}
+
+export function buildHairEditingAPI(strands) {
+  let current=[...strands];
+  const history=[];
+  return {
+    get strands() { return current; },
+    exec(fn,...args) { history.push(current.map(s=>({...s,curve:s.curve.map(p=>p.clone()),rootPos:s.rootPos.clone()}))); current=fn(current,...args); return this; },
+    undo() { if(history.length) current=history.pop(); return this; },
+    canUndo() { return history.length>0; },
+    select(pred) { return current.filter(pred); },
+    count() { return current.length; },
+  };
+}
+export function randomizeStrandCurls(strands, minCurl, maxCurl, seed=42) {
+  let s=seed; const rng=()=>{s=(s*9301+49297)%233280;return s/233280;};
+  return strands.map(strand=>{
+    const curlAmt=minCurl+rng()*(maxCurl-minCurl);
+    const freq=2+rng()*3;
+    const right=strand.rootNormal.clone().cross(new THREE.Vector3(0,1,0)).normalize();
+    const newCurve=strand.curve.map((pt,i)=>{
+      if(i===0) return pt.clone();
+      const t=i/(strand.curve.length-1);
+      const offset=right.clone().multiplyScalar(Math.sin(t*Math.PI*2*freq)*curlAmt*t*0.04);
+      return pt.clone().add(offset);
+    });
+    return {...strand,curve:newCurve};
+  });
+}
+export function getEditingStats(strands) {
+  const bounds=computeStrandBounds(strands);
+  const stats=strands.reduce((acc,s)=>{
+    const len=s.curve.reduce((sum,p,i)=>i===0?0:sum+p.distanceTo(s.curve[i-1]),0);
+    acc.totalLength+=len; acc.minLength=Math.min(acc.minLength,len); acc.maxLength=Math.max(acc.maxLength,len);
+    return acc;
+  },{totalLength:0,minLength:Infinity,maxLength:-Infinity});
+  return {...stats,avgLength:stats.totalLength/Math.max(1,strands.length),bounds,count:strands.length};
+}

@@ -235,3 +235,204 @@ export class HairRigPhysics {
 }
 
 export default HairRigPhysics;
+
+export function buildPonytailChain(rootBoneName, segments, opts = {}) {
+  const physics = new HairRigPhysics(opts);
+  const chain   = physics.addSpringChain('ponytail', rootBoneName, segments, {
+    stiffness: opts.stiffness ?? 0.55,
+    damping:   opts.damping   ?? 0.80,
+    segLen:    opts.segLen    ?? 0.08,
+    gravity:   opts.gravity   ?? 0.55,
+  });
+  return { physics, chain };
+}
+
+export function buildBraidChains(rootBoneNames, segmentsEach, opts = {}) {
+  const physics = new HairRigPhysics(opts);
+  rootBoneNames.forEach((name, i) => {
+    physics.addSpringChain(`braid_${i}`, name, segmentsEach, {
+      stiffness: (opts.stiffness ?? 0.60) + i * 0.01,
+      damping:   opts.damping   ?? 0.82,
+      segLen:    opts.segLen    ?? 0.06,
+      gravity:   opts.gravity   ?? 0.50,
+    });
+  });
+  return physics;
+}
+
+export function buildHairAccessoryJiggle(accessoryNames, opts = {}) {
+  const physics = new HairRigPhysics(opts);
+  accessoryNames.forEach(name => {
+    physics.addJiggleBone(name, {
+      stiffness: opts.stiffness ?? 0.75,
+      damping:   opts.damping   ?? 0.70,
+      maxAngle:  opts.maxAngle  ?? Math.PI * 0.2,
+    });
+  });
+  return physics;
+}
+
+export function getChainWorldPositions(physics, chainId) {
+  const chain = physics.getChain(chainId);
+  if (!chain) return [];
+  return chain.getChainPositions();
+}
+
+export function applyChainToMeshCurve(physics, chainId, meshCurve) {
+  const chain = physics.getChain(chainId);
+  if (!chain) return meshCurve;
+  return chain.applyToHairCurve(meshCurve);
+}
+
+export function computeChainKineticEnergy(chain) {
+  if (!chain?.segments?.length) return 0;
+  return chain.segments.reduce((total, seg) => {
+    const speed = seg._vel?.length() ?? 0;
+    return total + 0.5 * seg.mass * speed * speed;
+  }, 0);
+}
+
+export function isChainAtRest(physics, chainId, threshold = 0.002) {
+  const ke = computeChainKineticEnergy(physics.getChain(chainId));
+  return ke < threshold;
+}
+
+export function serializeRigPhysicsState(physics) {
+  return JSON.stringify({
+    springBones:  physics.springBones.size,
+    springChains: physics.springChains.size,
+    jiggleBones:  physics.jiggleBones.size,
+    windForce:    physics.windForce.toArray(),
+  });
+}
+
+export function buildFullHeadHairRig(opts={}) {
+  const physics = new HairRigPhysics(opts);
+  const regions = ['crown','left_temple','right_temple','left_side','right_side','nape','fringe'];
+  regions.forEach(region => {
+    physics.addSpringChain(region, `Head_${region}`, opts.segments??5, {
+      stiffness: (opts.stiffness??0.60) + (region==='crown'?0.1:0),
+      damping:   opts.damping??0.82,
+      segLen:    opts.segLen??0.07,
+      gravity:   opts.gravity??0.50,
+    });
+  });
+  return physics;
+}
+export function syncRigPhysicsToHairSystem(rigPhysics, hairSystem) {
+  rigPhysics.springChains.forEach((chain, id) => {
+    const positions = chain.getChainPositions();
+    if (!positions.length) return;
+    hairSystem._cards.filter(c => c.groupId === [...rigPhysics.springChains.keys()].indexOf(id))
+      .forEach(card => {
+        if (card.curve && positions.length) {
+          card.curve[card.curve.length-1].lerp(positions[positions.length-1], 0.3);
+        }
+      });
+  });
+}
+export function getRigPhysicsDebugLines(physics) {
+  const lines = [];
+  physics.springChains.forEach((chain, id) => {
+    const pts = chain.getChainPositions();
+    for (let i=0; i<pts.length-1; i++) lines.push({from:pts[i], to:pts[i+1], id});
+  });
+  physics.springBones.forEach((bone, id) => {
+    lines.push({ from: new THREE.Vector3().setFromMatrixPosition(bone._parentMat), to: bone._pos.clone(), id });
+  });
+  return lines;
+}
+export function computeRigPhysicsEnergy(physics) {
+  let total = 0;
+  physics.springChains.forEach(chain => { total += computeChainKineticEnergy(chain); });
+  physics.springBones.forEach(bone => {
+    const spd = bone._vel?.length()??0;
+    total += 0.5 * bone.mass * spd * spd;
+  });
+  return total;
+}
+
+export function createAccessoryJiggle(mesh, stiffness=0.8, damping=0.72) {
+  const jiggle = new JiggleBone({ stiffness, damping });
+  return {
+    jiggle,
+    update() { jiggle.step(0.016); jiggle.applyToMesh(mesh); },
+    applyAcceleration(accel) { jiggle.step(0.016, accel); },
+    reset() { jiggle.reset(); },
+  };
+}
+export function buildHairPhysicsProfile(style) {
+  const profiles = {
+    Straight: { stiffness:0.75, damping:0.88, segLen:0.06, gravity:0.55 },
+    Wavy:     { stiffness:0.60, damping:0.83, segLen:0.07, gravity:0.50 },
+    Curly:    { stiffness:0.45, damping:0.78, segLen:0.08, gravity:0.42 },
+    Afro:     { stiffness:0.30, damping:0.65, segLen:0.06, gravity:0.25 },
+    Buzzcut:  { stiffness:0.98, damping:0.99, segLen:0.02, gravity:0.08 },
+    Ponytail: { stiffness:0.55, damping:0.80, segLen:0.08, gravity:0.60 },
+    Dread:    { stiffness:0.70, damping:0.87, segLen:0.10, gravity:0.58 },
+  };
+  return profiles[style] ?? profiles.Straight;
+}
+export function getSpringChainPositions(physics, chainId) {
+  return physics.getChain(chainId)?.getChainPositions() ?? [];
+}
+export function updateSpringChainParentMatrix(physics, chainId, matrix) {
+  const chain = physics.getChain(chainId);
+  if (!chain?.segments?.length) return;
+  chain.segments[0].setParentMatrix(matrix);
+}
+export function blendRigPhysicsResults(physicsA, physicsB, blend, chainId) {
+  const posA = getSpringChainPositions(physicsA, chainId);
+  const posB = getSpringChainPositions(physicsB, chainId);
+  if (!posA.length || !posB.length) return posA.length ? posA : posB;
+  const len = Math.min(posA.length, posB.length);
+  return Array.from({length:len}, (_,i) => posA[i].clone().lerp(posB[i], blend));
+}
+export function getPhysicsSimulationHealth(physics) {
+  const energy = computeRigPhysicsEnergy(physics);
+  return { energy: energy.toFixed(4), stable: energy < 1.0,
+    chainCount: physics.springChains.size,
+    boneCount:  physics.springBones.size,
+    status: energy < 0.01 ? 'At Rest' : energy < 0.5 ? 'Settling' : energy < 2.0 ? 'Active' : 'Unstable' };
+}
+export function resetAllChains(physics) {
+  physics.springChains.forEach(chain => {
+    chain.segments.forEach(seg => { seg._vel.set(0,0,0); });
+  });
+}
+
+export function createSimpleJiggleSetup(mesh, opts={}) {
+  const j=new JiggleBone({stiffness:opts.stiffness??0.75, damping:opts.damping??0.70, maxAngle:opts.maxAngle??Math.PI*0.2});
+  let lastPos=new THREE.Vector3();
+  return {
+    jiggle:j,
+    update(dt, currentPos) {
+      const accel=currentPos.clone().sub(lastPos).divideScalar(dt||0.016);
+      lastPos.copy(currentPos);
+      j.step(dt,accel);
+      j.applyToMesh(mesh);
+    },
+    getRotation() { return j.getRotation(); },
+    reset() { j.reset(); lastPos.set(0,0,0); },
+  };
+}
+export function addWindResponseToChain(chain, windDir, windStr) {
+  const force=windDir.clone().normalize().multiplyScalar(windStr);
+  chain.segments.forEach((seg,i)=>{
+    if(!seg._vel) return;
+    const t=i/Math.max(1,chain.segments.length-1);
+    seg._vel.add(force.clone().multiplyScalar(t*0.001));
+  });
+}
+export function interpolateChainPositions(positionsA, positionsB, t) {
+  const len=Math.min(positionsA.length,positionsB.length);
+  return Array.from({length:len},(_,i)=>positionsA[i].clone().lerp(positionsB[i],t));
+}
+export function getChainTipPosition(physics, chainId) {
+  const pts=getSpringChainPositions(physics,chainId);
+  return pts.length ? pts[pts.length-1] : new THREE.Vector3();
+}
+export function setChainGravity(physics, chainId, gravityScale) {
+  const chain=physics.getChain(chainId);
+  if(chain) chain.segments.forEach(seg=>{seg.gravity=gravityScale;});
+}

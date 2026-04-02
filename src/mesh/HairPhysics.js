@@ -209,3 +209,236 @@ export class HairPhysicsWorld {
 }
 
 export default HairPhysicsWorld;
+
+export class VolumeConstraint {
+  constructor(particles, restVolume, stiffness = 0.2) {
+    this.particles   = particles;
+    this.restVolume  = restVolume;
+    this.stiffness   = stiffness;
+  }
+  solve() {
+    if (this.particles.length < 3) return;
+    const center = new THREE.Vector3();
+    this.particles.forEach(p => center.add(p.pos));
+    center.divideScalar(this.particles.length);
+    const radius = this.particles.reduce((s, p) => s + p.pos.distanceTo(center), 0) / this.particles.length;
+    const targetR = Math.pow(this.restVolume * 0.75 / Math.PI, 1/3);
+    if (Math.abs(radius - targetR) < 0.001) return;
+    const scale = (1 + (targetR - radius) / Math.max(radius, 0.001) * this.stiffness);
+    this.particles.forEach(p => {
+      if (!p.pinned) p.pos.sub(center).multiplyScalar(scale).add(center);
+    });
+  }
+}
+
+export function createVerletRope(start, end, segments, opts = {}) {
+  const particles   = [];
+  const constraints = [];
+  const segLen = start.distanceTo(end) / segments;
+  for (let i = 0; i <= segments; i++) {
+    const t   = i / segments;
+    const pos = start.clone().lerp(end, t);
+    particles.push(new HairParticle(pos, i === 0 ? Infinity : opts.mass ?? 0.1));
+  }
+  for (let i = 0; i < particles.length - 1; i++) {
+    constraints.push(new DistanceConstraint(particles[i], particles[i+1], segLen, opts.stiffness ?? 0.9));
+  }
+  for (let i = 0; i < particles.length - 2; i++) {
+    constraints.push(new BendConstraint(particles[i], particles[i+1], particles[i+2], opts.bendStr ?? 0.3));
+  }
+  return { particles, constraints,
+    step(dt, gravity, wind, iters = 4) {
+      particles.forEach(p => p.integrate(dt, gravity, opts.damping ?? 0.92));
+      particles.forEach(p => { if (!p.pinned) p.pos.add(wind.clone().multiplyScalar(dt*dt*0.05)); });
+      for (let i = 0; i < iters; i++) constraints.forEach(c => c.solve());
+    },
+    getPositions() { return particles.map(p => p.pos.clone()); },
+  };
+}
+
+export function computeHairVolume(strands) {
+  if (!strands.length) return 0;
+  const bbox = { min:new THREE.Vector3(Infinity,Infinity,Infinity), max:new THREE.Vector3(-Infinity,-Infinity,-Infinity) };
+  strands.forEach(s => s.curve.forEach(p => { bbox.min.min(p); bbox.max.max(p); }));
+  const size = bbox.max.clone().sub(bbox.min);
+  return size.x * size.y * size.z;
+}
+
+export function detectHairSelfCollision(strands, radius = 0.01) {
+  const collisions = [];
+  for (let i = 0; i < strands.length; i++) {
+    for (let j = i + 1; j < Math.min(strands.length, i + 20); j++) {
+      const dist = strands[i].rootPos.distanceTo(strands[j].rootPos);
+      if (dist < radius * 2) collisions.push({ a:i, b:j, dist });
+    }
+  }
+  return collisions;
+}
+
+export function applyWindField(particles, windField, time, dt) {
+  particles.forEach(p => {
+    if (p.pinned) return;
+    const nx = Math.sin(p.pos.x * 2 + time * 0.8) * windField.turbulence;
+    const nz = Math.cos(p.pos.z * 2 + time * 0.6) * windField.turbulence;
+    const force = new THREE.Vector3(
+      windField.direction.x * windField.strength + nx,
+      0,
+      windField.direction.z * windField.strength + nz,
+    );
+    p.vel.add(force.multiplyScalar(dt * dt));
+  });
+}
+
+export function getSimulationStats(world) {
+  return {
+    strandCount:    world.strands.size,
+    colliderCount:  world.colliders.length,
+    time:           world.time.toFixed(3),
+    paused:         world._paused,
+    substeps:       world.substeps,
+    iterations:     world.iterations,
+  };
+}
+
+export function buildQuickSimulation(curve, gravity=0.5, stiffness=0.7) {
+  const strand = new HairStrandPhysics(curve, { stiffness, damping:0.90, bendStr:0.3 });
+  const grav   = new THREE.Vector3(0, -9.8*gravity, 0);
+  const wind   = new THREE.Vector3();
+  return {
+    strand,
+    step(dt) { strand.step(dt, grav, wind, 4); },
+    setWind(dir, str) { wind.copy(dir).normalize().multiplyScalar(str); },
+    getPositions() { return strand.getPositions(); },
+    updateGeometry(geo) { strand.updateMeshGeometry(geo); },
+  };
+}
+export function estimateSimulationCost(strandCount, segmentsPerStrand, iterations, substeps) {
+  const constraintsPerStrand = (segmentsPerStrand - 1) + (segmentsPerStrand - 2);
+  const opsPerFrame = strandCount * (segmentsPerStrand + constraintsPerStrand * iterations) * substeps;
+  return { opsPerFrame, estimatedMs: (opsPerFrame / 1_000_000 * 16).toFixed(2), tier: opsPerFrame < 500000 ? 'Fast' : opsPerFrame < 2000000 ? 'Medium' : 'Heavy' };
+}
+export function resetSimulation(world, restCurves) {
+  world.strands.forEach((strand, id) => {
+    const rest = restCurves.get(id);
+    if (!rest) return;
+    const pts = strand.particles;
+    pts.forEach((p, i) => { if (rest[i]) { p.pos.copy(rest[i]); p.prev.copy(rest[i]); p.vel.set(0,0,0); } });
+  });
+}
+export function getPhysicsDebugData(world) {
+  const result = { strands:[], colliders:world.colliders.map(c=>({center:c.center.toArray(),radius:c.radius})) };
+  world.strands.forEach((strand, id) => {
+    result.strands.push({ id, particleCount:strand.particles.length, positions:strand.getPositions().map(p=>p.toArray()) });
+  });
+  return result;
+}
+export function createWindGust(direction, peakStrength, duration) {
+  let elapsed = 0;
+  return {
+    direction: direction.clone().normalize(),
+    update(dt) {
+      elapsed += dt;
+      if (elapsed >= duration) return new THREE.Vector3();
+      const t = elapsed / duration;
+      const str = peakStrength * Math.sin(t * Math.PI);
+      return direction.clone().normalize().multiplyScalar(str);
+    },
+    isDone() { return elapsed >= duration; },
+  };
+}
+
+export function buildSpringSystem(points, stiffness=0.8, damping=0.9) {
+  const particles   = points.map((p,i) => new HairParticle(p, i===0?Infinity:0.1));
+  const constraints = [];
+  for (let i=0; i<particles.length-1; i++) {
+    constraints.push(new DistanceConstraint(particles[i], particles[i+1],
+      particles[i].pos.distanceTo(particles[i+1].pos), stiffness));
+  }
+  const gravity = new THREE.Vector3(0,-4.9,0);
+  return {
+    particles, constraints,
+    step(dt, damp=damping) {
+      particles.forEach(p=>p.integrate(dt, gravity, damp));
+      for(let i=0;i<4;i++) constraints.forEach(c=>c.solve());
+    },
+    getPositions() { return particles.map(p=>p.pos.clone()); },
+    addImpulse(idx, force) { particles[idx]?.applyImpulse(force); },
+    pin(idx) { if(particles[idx]) particles[idx].mass=Infinity; particles[idx].pinned=true; },
+    unpin(idx) { if(particles[idx]) particles[idx].mass=0.1; particles[idx].pinned=false; },
+  };
+}
+export function computeConstraintError(world) {
+  let totalErr = 0, count = 0;
+  world.strands.forEach(strand => {
+    for(let i=0; i<strand.distConstraints.length; i++) {
+      const c    = strand.distConstraints[i];
+      const dist = c.p0.pos.distanceTo(c.p1.pos);
+      totalErr  += Math.abs(dist - c.restLength);
+      count++;
+    }
+  });
+  return count > 0 ? totalErr / count : 0;
+}
+export function applyExternalForce(world, force, radius, center) {
+  world.strands.forEach(strand => {
+    strand.particles.forEach(p => {
+      if (p.pinned) return;
+      const dist = p.pos.distanceTo(center);
+      if (dist < radius) {
+        const w = 1 - dist/radius;
+        p.vel.add(force.clone().multiplyScalar(w * 0.1));
+      }
+    });
+  });
+}
+export function freezeStrands(world, ids) {
+  ids.forEach(id => {
+    const strand = world.strands.get(id);
+    strand?.particles.forEach(p => { p.prev.copy(p.pos); p.vel.set(0,0,0); });
+  });
+}
+export function serializePhysicsWorld(world) {
+  return JSON.stringify({
+    strandCount: world.strands.size, colliderCount: world.colliders.length,
+    gravity: world.gravity.toArray(), time: world.time, paused: world._paused,
+    substeps: world.substeps, iterations: world.iterations,
+  });
+}
+
+export function buildConstraintGraph(strand) {
+  const nodes=strand.particles.map((p,i)=>({id:i,pos:p.pos.toArray(),pinned:p.pinned,mass:p.mass}));
+  const edges=strand.distConstraints.map((c,i)=>({id:i,type:'distance',restLength:c.restLength,stiffness:c.stiffness}));
+  return {nodes,edges,strandLength:strand.restLength*strand.segments};
+}
+export function getParticleVelocities(strand) {
+  return strand.particles.map(p=>({vel:p.vel.clone(),speed:p.vel.length()}));
+}
+export function clampParticleVelocities(strand, maxSpeed=2.0) {
+  strand.particles.forEach(p=>{
+    const spd=p.vel.length();
+    if(spd>maxSpeed) p.vel.multiplyScalar(maxSpeed/spd);
+  });
+}
+export function teleportStrand(strand, newRootPos) {
+  const offset=newRootPos.clone().sub(strand.particles[0].pos);
+  strand.particles.forEach(p=>{p.pos.add(offset);p.prev.add(offset);});
+}
+export function computeStrandCurvature(strand) {
+  const pts=strand.getPositions();
+  const curvatures=[];
+  for(let i=1;i<pts.length-1;i++){
+    const d1=pts[i].clone().sub(pts[i-1]);
+    const d2=pts[i+1].clone().sub(pts[i]);
+    const cross=d1.clone().cross(d2);
+    const denom=d1.length()*d2.length()*d1.length();
+    curvatures.push(denom>0.0001?cross.length()/denom:0);
+  }
+  return curvatures;
+}
+export function getSimulationSnapshot(world) {
+  const strands=[];
+  world.strands.forEach((strand,id)=>{
+    strands.push({id,positions:strand.getPositions().map(p=>p.toArray())});
+  });
+  return {strands,time:world.time,windForce:world.windForce.toArray()};
+}
