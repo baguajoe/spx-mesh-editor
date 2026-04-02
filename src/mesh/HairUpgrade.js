@@ -349,8 +349,7 @@ export function generateUpgradeScript(fromVersion, toVersion=CURRENT_VERSION) {
     `// Run: importHairFromJSON(json)`,
     `// Steps: ${path.join(' → ')}`,
     `module.exports={migrate,validateHairData,repairHairData,stampVersion};`,
-  ].join('
-');
+  ].join('\n');
 }
 export function compareHairData(a, b) {
   const va=detectVersion(a), vb=detectVersion(b);
