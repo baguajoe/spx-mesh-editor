@@ -3,58 +3,7 @@
 // Features: Voronoi fracture, impact detection, debris physics,
 //           procedural cracks, material splitting, explosion force
 
-import * as THREE from 'three';
-
-// ─── Voronoi Cell ─────────────────────────────────────────────────────────────
-
-function generateVoronoiCells(geometry, count = 20, seed = 42) {
-  const pos = geometry.attributes.position;
-  const bbox = new THREE.Box3().setFromBufferAttribute(pos);
-  const size = bbox.getSize(new THREE.Vector3());
-  const center = bbox.getCenter(new THREE.Vector3());
-
-  // Seeded RNG
-  let s = seed;
-  const rng = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
-
-  // Generate seed points inside bbox
-  const seeds = [];
-  for (let i = 0; i < count; i++) {
-    seeds.push(new THREE.Vector3(
-      center.x + (rng()-0.5) * size.x,
-      center.y + (rng()-0.5) * size.y,
-      center.z + (rng()-0.5) * size.z,
-    ));
-  }
-
-  return seeds;
-}
-
-function assignVerticesToCells(geometry, cellSeeds) {
-  const pos = geometry.attributes.position;
-  const assignments = new Int32Array(pos.count);
-
-  for (let vi = 0; vi < pos.count; vi++) {
-    const vp = new THREE.Vector3(pos.getX(vi), pos.getY(vi), pos.getZ(vi));
-    let nearest = 0, nearDist = Infinity;
-    cellSeeds.forEach((seed, si) => {
-      const d = vp.distanceTo(seed);
-      if (d < nearDist) { nearDist = d; nearest = si; }
-    });
-    assignments[vi] = nearest;
-  }
-  return assignments;
-}
-
-function buildCellGeometries(geometry, assignments, cellCount) {
-  const pos = geometry.attributes.position;
-  const idx = geometry.index;
-  const cellGeos = Array.from({ length: cellCount }, () => ({ verts: [], indices: [] }));
-
-  if (idx) {
-    for (let i = 0; i < idx.count; i += 3) {
-      const a = idx.getX(i), b = idx.getX(i+1), c = idx.getX(i+2);
-      const cell = assignments[a]; // use first vertex's cell
+import * as THREE from 'three';\n\n// ─── Voronoi Cell ─────────────────────────────────────────────────────────────\n\nfunction generateVoronoiCells(geometry, count = 20, seed = 42) {\n  const pos = geometry.attributes.position;\n  const bbox = new THREE.Box3().setFromBufferAttribute(pos);\n  const size = bbox.getSize(new THREE.Vector3());\n  const center = bbox.getCenter(new THREE.Vector3());\n\n  // Seeded RNG\n  let s = seed;\n  const rng = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };\n\n  // Generate seed points inside bbox\n  const seeds = [];\n  for (let i = 0; i < count; i++) {\n    seeds.push(new THREE.Vector3(\n      center.x + (rng()-0.5) * size.x,\n      center.y + (rng()-0.5) * size.y,\n      center.z + (rng()-0.5) * size.z,\n    ));\n  }\n\n  return seeds;\n}\n\nfunction assignVerticesToCells(geometry, cellSeeds) {\n  const pos = geometry.attributes.position;\n  const assignments = new Int32Array(pos.count);\n\n  for (let vi = 0; vi < pos.count; vi++) {\n    const vp = new THREE.Vector3(pos.getX(vi), pos.getY(vi), pos.getZ(vi));\n    let nearest = 0, nearDist = Infinity;\n    cellSeeds.forEach((seed, si) => {\n      const d = vp.distanceTo(seed);\n      if (d < nearDist) { nearDist = d; nearest = si; }\n    });\n    assignments[vi] = nearest;\n  }\n  return assignments;\n}\n\nfunction buildCellGeometries(geometry, assignments, cellCount) {\n  const pos = geometry.attributes.position;\n  const idx = geometry.index;\n  const cellGeos = Array.from({ length: cellCount }, () => ({ verts: [], indices: [] }));\n\n  if (idx) {\n    for (let i = 0; i < idx.count; i += 3) {\n      const a = idx.getX(i), b = idx.getX(i+1), c = idx.getX(i+2);\n      const cell = assignments[a]; // use first vertex's cell
       const g = cellGeos[cell];
       const base = g.verts.length / 3;
       for (const v of [a, b, c]) {

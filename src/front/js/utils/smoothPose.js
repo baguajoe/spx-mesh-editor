@@ -116,17 +116,6 @@ export class EMAPoseSmoother {
 
 // ─── Factory ──────────────────────────────────────────────────────────────────
 
-export function createPoseSmoother(type = 'ONE_EURO', options = {}) {
-  switch (type) {
-    case 'KALMAN':   return new KalmanPoseSmoother(options.processNoise, options.measurementNoise);
-    case 'EMA':      return new EMAPoseSmoother(options.alpha);
-    case 'ONE_EURO':
-    default:         return new OneEuroPoseSmoother(options.minCutoff, options.beta);
-  }
-}
-
-export default { OneEuroPoseSmoother, KalmanPoseSmoother, EMAPoseSmoother, createPoseSmoother };
-
-export function createSmoothingPipeline(type = 'ONE_EURO', options = {}) {
+export function createPoseSmoother(type = 'ONE_EURO', options = {}) {\n  switch (type) {\n    case 'KALMAN':   return new KalmanPoseSmoother(options.processNoise, options.measurementNoise);\n    case 'EMA':      return new EMAPoseSmoother(options.alpha);\n    case 'ONE_EURO':\n    default:         return new OneEuroPoseSmoother(options.minCutoff, options.beta);\n  }\n}\n\nexport default { OneEuroPoseSmoother, KalmanPoseSmoother, EMAPoseSmoother, createPoseSmoother };\n\nexport function createSmoothingPipeline(type = 'ONE_EURO', options = {}) {
   return createPoseSmoother(type, options);
 }

@@ -3,62 +3,7 @@
  * Level-of-detail manager for hair: 4 LOD levels reducing card count,
  * segment count, and switching to proxy mesh at far distances.
  */
-import * as THREE from 'three';
-
-// ─── LOD Level definitions ────────────────────────────────────────────────────
-export const LOD_LEVELS = [
-  { name: 'LOD0', distance: 0,   cardFrac: 1.0,  segments: 8,  label: 'Full' },
-  { name: 'LOD1', distance: 3,   cardFrac: 0.6,  segments: 5,  label: 'High' },
-  { name: 'LOD2', distance: 8,   cardFrac: 0.3,  segments: 3,  label: 'Mid'  },
-  { name: 'LOD3', distance: 20,  cardFrac: 0.1,  segments: 2,  label: 'Low'  },
-  { name: 'LOD4', distance: 50,  cardFrac: 0.0,  segments: 1,  label: 'Proxy'},
-];
-
-// ─── HairLODLevel ─────────────────────────────────────────────────────────────
-export class HairLODLevel {
-  constructor(def, cards, material) {
-    this.def      = def;
-    this.group    = new THREE.Group();
-    this.group.name = def.name;
-    this.cardCount = 0;
-    if (def.cardFrac > 0 && cards.length > 0) {
-      const count = Math.max(1, Math.round(cards.length * def.cardFrac));
-      const step  = Math.floor(cards.length / count);
-      for (let i = 0; i < cards.length; i += step) {
-        const card = cards[i];
-        if (!card.geometry) continue;
-        this.group.add(new THREE.Mesh(card.geometry, material));
-        this.cardCount++;
-      }
-    }
-  }
-
-  buildProxyMesh(scalp, material) {
-    const proxy = new THREE.Mesh(
-      new THREE.SphereGeometry(0.12, 8, 6),
-      new THREE.MeshStandardMaterial({ color: 0x4a2810, roughness: 0.9, transparent: true, opacity: 0.7 })
-    );
-    proxy.name = 'HairProxy';
-    this.group.add(proxy);
-    return this;
-  }
-
-  setVisible(v) { this.group.visible = v; }
-}
-
-// ─── HairLODManager ───────────────────────────────────────────────────────────
-export class HairLODManager {
-  constructor(opts = {}) {
-    this.levels        = [];
-    this.currentLevel  = 0;
-    this.enabled       = opts.enabled      ?? true;
-    this.distances     = opts.distances    ?? LOD_LEVELS.map(l => l.distance);
-    this.hysteresis    = opts.hysteresis   ?? 0.5;  // prevents flickering at boundaries
-    this.throttle      = opts.throttle     ?? 3;    // update every N frames
-    this._frame        = 0;
-    this._lastDist     = 0;
-    this.group         = new THREE.Group();
-    this.group.name    = 'HairLOD';
+import * as THREE from 'three';\n\n// ─── LOD Level definitions ────────────────────────────────────────────────────\nexport const LOD_LEVELS = [\n  { name: 'LOD0', distance: 0,   cardFrac: 1.0,  segments: 8,  label: 'Full' },\n  { name: 'LOD1', distance: 3,   cardFrac: 0.6,  segments: 5,  label: 'High' },\n  { name: 'LOD2', distance: 8,   cardFrac: 0.3,  segments: 3,  label: 'Mid'  },\n  { name: 'LOD3', distance: 20,  cardFrac: 0.1,  segments: 2,  label: 'Low'  },\n  { name: 'LOD4', distance: 50,  cardFrac: 0.0,  segments: 1,  label: 'Proxy'},\n];\n\n// ─── HairLODLevel ─────────────────────────────────────────────────────────────\nexport class HairLODLevel {\n  constructor(def, cards, material) {\n    this.def      = def;\n    this.group    = new THREE.Group();\n    this.group.name = def.name;\n    this.cardCount = 0;\n    if (def.cardFrac > 0 && cards.length > 0) {\n      const count = Math.max(1, Math.round(cards.length * def.cardFrac));\n      const step  = Math.floor(cards.length / count);\n      for (let i = 0; i < cards.length; i += step) {\n        const card = cards[i];\n        if (!card.geometry) continue;\n        this.group.add(new THREE.Mesh(card.geometry, material));\n        this.cardCount++;\n      }\n    }\n  }\n\n  buildProxyMesh(scalp, material) {\n    const proxy = new THREE.Mesh(\n      new THREE.SphereGeometry(0.12, 8, 6),\n      new THREE.MeshStandardMaterial({ color: 0x4a2810, roughness: 0.9, transparent: true, opacity: 0.7 })\n    );\n    proxy.name = 'HairProxy';\n    this.group.add(proxy);\n    return this;\n  }\n\n  setVisible(v) { this.group.visible = v; }\n}\n\n// ─── HairLODManager ───────────────────────────────────────────────────────────\nexport class HairLODManager {\n  constructor(opts = {}) {\n    this.levels        = [];\n    this.currentLevel  = 0;\n    this.enabled       = opts.enabled      ?? true;\n    this.distances     = opts.distances    ?? LOD_LEVELS.map(l => l.distance);\n    this.hysteresis    = opts.hysteresis   ?? 0.5;  // prevents flickering at boundaries\n    this.throttle      = opts.throttle     ?? 3;    // update every N frames\n    this._frame        = 0;\n    this._lastDist     = 0;\n    this.group         = new THREE.Group();\n    this.group.name    = 'HairLOD';
     this._onLevelChange = null;
   }
 
