@@ -1,4 +1,15 @@
-/**
+#!/usr/bin/env python3
+"""
+Upgrade SPX3DTo2DPipeline.js — 41 cinematic styles, perspective projection,
+style transfer, depth compositing, render passes, motion blur
+Run: python3 install_3d_2d_pipeline.py
+"""
+import os
+
+TARGET = "/workspaces/spx-mesh-editor/src/pipeline/SPX3DTo2DPipeline.js"
+os.makedirs(os.path.dirname(TARGET), exist_ok=True)
+
+CODE = r'''/**
  * SPX3DTo2DPipeline.js — PRO 3D→2D Conversion Pipeline
  * SPX Mesh Editor | StreamPireX
  *
@@ -704,3 +715,38 @@ export default {
   downloadSPXMotion, exportFrameSequence, exportToGIF, exportToVideoBlobs,
   getStylesByCategory, getStyleCount,
 };
+'''
+
+with open(TARGET, 'w') as f:
+    f.write(CODE)
+
+lines = len(CODE.splitlines())
+print(f"✅ SPX3DTo2DPipeline.js ({lines} lines)")
+print(f"""
+🎉 3D→2D Pipeline upgraded — now industry-leading
+
+41 cinematic styles across 8 categories:
+  Photo:     photorealistic, cinematic, HDR, film noir, vintage
+  Cartoon:   toon, cel animation, ink wash, comic book, manga, anime, Pixar
+  Paint:     oil painting, watercolor, gouache, impressionist, expressionist
+  Sketch:    pencil, charcoal, blueprint, wireframe, X-ray
+  Stylized:  low poly, voxel, glitch, hologram, neon, retrowave
+  Cinematic: sci-fi, horror, western, fantasy, cyberpunk, post-apocalyptic
+  Special:   silhouette, shadow play, stencil, pixel art, thermal
+  Studio:    Disney 2D, DreamWorks, stop motion
+
+New features:
+  ✅ Render pass system — diffuse, shadow, outline, AO, specular, effects
+  ✅ Perspective projection (in addition to orthographic)
+  ✅ Motion blur
+  ✅ Post effects: vignette, grain, scanlines, halftone, glitch
+  ✅ Neon/hologram/X-ray special effects
+  ✅ Depth-aware compositing
+  ✅ Multi-layer canvas compositing
+  ✅ Frame capture + export
+  ✅ GIF/video blob export
+  ✅ Style category browser
+
+Run: npm run build 2>&1 | grep "error" | head -10
+Then: git add -A && git commit -m "feat: 3D→2D pipeline — 41 cinematic styles, render passes, perspective projection, motion blur, post-effects" && git push
+""")
