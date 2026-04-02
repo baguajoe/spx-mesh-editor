@@ -472,14 +472,10 @@ const AvatarRigPlayer3D = ({ recordedFrames, avatarUrl, liveFrame, smoothingEnab
     }, undefined, (err) => console.warn('[AvatarRigPlayer3D] Load error:', err));
 
     // Animate
-    let angle = 0;
     function animate() {
       frameRef.current = requestAnimationFrame(animate);
       const delta = clockRef.current.getDelta();
       mixerRef.current?.update(delta);
-      angle += 0.005;
-      camera.position.set(Math.sin(angle) * 3, 1.5, Math.cos(angle) * 3);
-      camera.lookAt(0, 1, 0);
       renderer.render(scene, camera);
     }
     animate();
