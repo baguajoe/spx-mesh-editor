@@ -3518,7 +3518,7 @@ export default function App() {
 
       {/* Grease Pencil Panel */}
       {greasePencilPanelOpen && (
-        <div style={{position:"fixed",top:60,right:0,width:320,height:"calc(100vh - 60px)",zIndex:50,background:"#0d1117",borderLeft:"1px solid #21262d",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        <div style={{position:"fixed",top:132,right:0,width:320,height:"calc(100vh - 132px)",zIndex:50,background:"#0d1117",borderLeft:"1px solid #21262d",display:"flex",flexDirection:"column",overflow:"hidden"}}>
           <GreasePencilPanel
             onApplyFunction={applyFunction}
             onClose={() => setGreasePencilPanelOpen(false)}
@@ -3679,7 +3679,7 @@ export default function App() {
       />
 
       {(faceGenOpen || foliageGenOpen || vehicleGenOpen || creatureGenOpen || propGenOpen) && (
-        <div style={{position:"fixed",top:60,right:0,width:320,height:"calc(100vh - 60px)",zIndex:50,background:"#0d1117",borderLeft:"1px solid #21262d",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        <div style={{position:"fixed",top:132,right:0,width:320,height:"calc(100vh - 132px)",zIndex:50,background:"#0d1117",borderLeft:"1px solid #21262d",display:"flex",flexDirection:"column",overflow:"hidden"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",borderBottom:"1px solid #21262d",background:"#161b22"}}>
             <span style={{color:"#00ffc8",fontWeight:700,fontSize:12,fontFamily:"JetBrains Mono,monospace"}}>
               {faceGenOpen?"Face Generator":foliageGenOpen?"Foliage Generator":vehicleGenOpen?"Vehicle Generator":creatureGenOpen?"Creature Generator":"Prop Generator"}
