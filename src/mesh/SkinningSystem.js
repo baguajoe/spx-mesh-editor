@@ -413,8 +413,7 @@ export function exportWeightMapAsCSV(weightMap) {
   for (let vi=0; vi<weightMap.vertexCount; vi++) {
     weightMap.getWeights(vi).forEach(({boneIndex,weight})=>{ rows.push(`${vi},${boneIndex},${weight.toFixed(4)}`); });
   }
-  return rows.join('
-');
+  return rows.join('\n');
 }
 
 export function applyMorphAndSkin(geometry, morphValues, skinningSystem, weightMap) {
