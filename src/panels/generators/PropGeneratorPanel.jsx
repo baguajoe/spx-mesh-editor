@@ -1,192 +1,307 @@
 import React, { useState, useCallback } from "react";
 
-const S = {
-  panel: { background:"#0d1117", color:"#e6edf3", fontFamily:"JetBrains Mono,monospace", fontSize:12, padding:12, overflowY:"auto", maxHeight:"100%", boxSizing:"border-box" },
-  h3:    { color:"#00ffc8", fontSize:13, fontWeight:700, marginBottom:10, borderBottom:"1px solid #21262d", paddingBottom:6 },
-  section:{ marginBottom:10 },
-  label: { display:"flex", justifyContent:"space-between", color:"#8b949e", marginBottom:2 },
-  row:   { display:"grid", gridTemplateColumns:"1fr 1fr", gap:6, marginBottom:8 },
-  slider:{ width:"100%", accentColor:"#00ffc8" },
-  btn:   { width:"100%", padding:"8px 0", background:"#00ffc8", color:"#06060f", border:"none", borderRadius:4, fontFamily:"JetBrains Mono,monospace", fontSize:12, fontWeight:700, cursor:"pointer", marginTop:4 },
-  btnSec:{ width:"100%", padding:"6px 0", background:"#21262d", color:"#e6edf3", border:"1px solid #30363d", borderRadius:4, fontFamily:"JetBrains Mono,monospace", fontSize:11, cursor:"pointer", marginTop:4 },
-  select:{ width:"100%", background:"#21262d", color:"#e6edf3", border:"1px solid #30363d", borderRadius:4, padding:"4px 6px", fontFamily:"JetBrains Mono,monospace", fontSize:11 },
-  tag:   { display:"inline-block", background:"#21262d", color:"#8b949e", borderRadius:3, padding:"2px 6px", fontSize:10, marginRight:4, marginBottom:4, cursor:"pointer" },
-  tagOn: { display:"inline-block", background:"#00ffc8", color:"#06060f", borderRadius:3, padding:"2px 6px", fontSize:10, marginRight:4, marginBottom:4, cursor:"pointer", fontWeight:700 },
-};
-
-const CATEGORIES = {
-  Furniture: ["Chair","Table","Sofa","Bed","Desk","Bookshelf","Cabinet","Lamp","Wardrobe","Stool"],
-  Kitchen:   ["Pot","Pan","Cup","Plate","Bowl","Knife","Fork","Spoon","Bottle","Vase"],
-  Weapons:   ["Sword","Axe","Spear","Bow","Shield","Dagger","Mace","Staff","Crossbow","Hammer"],
-  SciFi:     ["Console","Terminal","Crate","Barrel","Generator","Antenna","Pod","Turret","Scanner","Drone"],
-  Fantasy:   ["Chest","Torch","Cauldron","Scroll","Crystal","Rune Stone","Magic Staff","Amulet","Potion","Tome"],
-  Street:    ["Bench","Mailbox","Fire Hydrant","Traffic Cone","Trash Can","Street Light","Bus Stop","Newspaper Box","Bike Rack","Planter"],
-  Nature:    ["Rock","Boulder","Log","Stump","Mushroom","Flower","Bush","Pebble","Stick","Leaf Pile"],
-  Tech:      ["Laptop","Phone","TV","Speaker","Keyboard","Monitor","Router","Camera","Tablet","Headphones"],
-};
-
-const MATERIALS = ["Wood","Metal","Plastic","Stone","Fabric","Glass","Ceramic","Leather","Rubber","Gold","Silver","Bronze","Carbon Fiber","Marble"];
-const STYLES    = ["Realistic","Cartoon","Low Poly","Stylized","Worn","Rusted","Futuristic","Medieval","Modern","Antique"];
-const DAMAGE    = ["None","Scratched","Dented","Cracked","Burnt","Rusted","Broken","Weathered","Battle Worn"];
-
-function Slider({ label, value, min, max, step=0.01, onChange }) {
+function Slider({ label, value, min=0, max=1, step=0.01, onChange, unit="" }) {
   return (
-    <div style={S.section}>
-      <div style={S.label}><span>{label}</span><span style={{color:"#00ffc8"}}>{typeof value==="number"?value.toFixed(2):value}</span></div>
-      <input type="range" style={S.slider} min={min} max={max} step={step} value={value} onChange={e => onChange(Number(e.target.value))} />
+    <div style={{ marginBottom:6 }}>
+      <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, color:"#8b949e", marginBottom:2 }}>
+        <span>{label}</span>
+        <span style={{ color:"#00ffc8", fontWeight:700 }}>
+          {typeof value==="number" ? (step<0.1 ? value.toFixed(2) : Math.round(value)) : value}{unit}
+        </span>
+      </div>
+      <input type="range" min={min} max={max} step={step} value={value}
+        onChange={e => onChange(parseFloat(e.target.value))}
+        style={{ width:"100%", accentColor:"#00ffc8", cursor:"pointer", height:16 }} />
     </div>
   );
 }
+function Select({ label, value, options, onChange }) {
+  return (
+    <div style={{ marginBottom:6 }}>
+      {label && <div style={{ fontSize:10, color:"#8b949e", marginBottom:2 }}>{label}</div>}
+      <select value={value} onChange={e => onChange(e.target.value)} style={{
+        width:"100%", background:"#161b22", color:"#e6edf3",
+        border:"1px solid #30363d", borderRadius:4, padding:"4px 8px", fontSize:11, cursor:"pointer"
+      }}>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+function Check({ label, value, onChange }) {
+  return (
+    <label style={{ display:"flex", alignItems:"center", gap:7, fontSize:11, color:"#c9d1d9", cursor:"pointer", marginBottom:5 }}>
+      <input type="checkbox" checked={value} onChange={e => onChange(e.target.checked)}
+        style={{ accentColor:"#00ffc8", width:13, height:13 }} />
+      {label}
+    </label>
+  );
+}
+function ColorRow({ label, value, onChange }) {
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+      <span style={{ fontSize:10, color:"#8b949e", flex:1 }}>{label}</span>
+      <input type="color" value={value} onChange={e => onChange(e.target.value)}
+        style={{ width:32, height:22, border:"none", cursor:"pointer", borderRadius:3 }} />
+      <span style={{ fontSize:9, color:"#555", fontFamily:"monospace" }}>{value}</span>
+    </div>
+  );
+}
+function Badges({ items, active, onSelect }) {
+  return (
+    <div style={{ display:"flex", flexWrap:"wrap", gap:3, marginBottom:8 }}>
+      {items.map(item => (
+        <button key={item} onClick={() => onSelect(item)} style={{
+          padding:"3px 9px", fontSize:9, borderRadius:4, cursor:"pointer", fontWeight:600,
+          background: active===item ? "#00ffc8" : "#21262d",
+          color:      active===item ? "#0d1117" : "#8b949e",
+          border:     `1px solid ${active===item ? "#00ffc8" : "#30363d"}`,
+        }}>{item}</button>
+      ))}
+    </div>
+  );
+}
+function Section({ title, children, defaultOpen=true }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ marginBottom:8, border:"1px solid #21262d", borderRadius:6, overflow:"hidden" }}>
+      <div onClick={() => setOpen(o => !o)} style={{
+        background:"#161b22", padding:"6px 10px", cursor:"pointer",
+        display:"flex", justifyContent:"space-between", alignItems:"center",
+        fontSize:11, fontWeight:700, color:"#00ffc8", userSelect:"none",
+      }}>
+        <span>{title}</span>
+        <span style={{ fontSize:9, opacity:0.7 }}>{open ? "▲" : "▼"}</span>
+      </div>
+      {open && <div style={{ padding:"8px 10px", background:"#0d1117" }}>{children}</div>}
+    </div>
+  );
+}
+function NumInput({ label, value, min, max, step=1, onChange, unit="" }) {
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:6 }}>
+      <span style={{ fontSize:10, color:"#8b949e", flex:1 }}>{label}</span>
+      <input type="number" value={value} min={min} max={max} step={step}
+        onChange={e => onChange(parseFloat(e.target.value))}
+        style={{ width:64, background:"#161b22", color:"#e6edf3", border:"1px solid #30363d",
+          padding:"3px 5px", borderRadius:3, fontSize:11, textAlign:"right" }} />
+      {unit && <span style={{ fontSize:9, color:"#555" }}>{unit}</span>}
+    </div>
+  );
+}
+const GenBtn = ({ label, onClick }) => (
+  <button onClick={onClick} style={{
+    width:"100%", background:"#00ffc8", color:"#0d1117", border:"none",
+    borderRadius:6, padding:"9px 0", cursor:"pointer", fontWeight:700,
+    fontSize:13, marginTop:8, letterSpacing:0.5, fontFamily:"JetBrains Mono,monospace",
+  }}>{label}</button>
+);
+const RandBtn = ({ onClick }) => (
+  <button onClick={onClick} style={{
+    background:"#21262d", color:"#8b949e", border:"1px solid #30363d",
+    borderRadius:4, padding:"7px 12px", cursor:"pointer", fontSize:12, marginTop:8, marginRight:6,
+  }}>🎲</button>
+);
+const P = { fontFamily:"JetBrains Mono,monospace", color:"#e6edf3", fontSize:12, userSelect:"none", width:"100%" };
 
-export default function PropGeneratorPanel({ addObject }) {
-  const [category, setCategory]   = useState("Furniture");
-  const [propType, setPropType]   = useState("Chair");
-  const [material, setMaterial]   = useState("Wood");
-  const [style, setStyle]         = useState("Realistic");
-  const [damage, setDamage]       = useState("None");
-  const [scaleX, setScaleX]       = useState(1.0);
-  const [scaleY, setScaleY]       = useState(1.0);
-  const [scaleZ, setScaleZ]       = useState(1.0);
-  const [uniformScale, setUniformScale] = useState(1.0);
-  const [lockScale, setLockScale] = useState(true);
-  const [roughness, setRoughness] = useState(0.5);
-  const [metalness, setMetalness] = useState(0.0);
-  const [color, setColor]         = useState("#a0785a");
-  const [uvScale, setUvScale]     = useState(1.0);
-  const [subdivision, setSubdivision] = useState(1);
-  const [count, setCount]         = useState(1);
-  const [scatter, setScatter]     = useState(0);
-  const [seed, setSeed]           = useState(42);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [detailLevel, setDetailLevel] = useState("Medium");
+const PROP_CATEGORIES = {
+  "Furniture":   ["Chair","Table","Desk","Sofa","Bed","Bookshelf","Cabinet","Wardrobe","Stool","Bench"],
+  "Containers":  ["Barrel","Crate","Box","Chest","Bag","Bucket","Vase","Jar","Bottle","Can"],
+  "Weapons":     ["Sword","Axe","Spear","Shield","Bow","Dagger","Mace","Staff","Crossbow","Hammer"],
+  "Tools":       ["Hammer","Wrench","Saw","Shovel","Pickaxe","Lantern","Key","Lock","Rope","Chain"],
+  "Electronics": ["Computer","TV","Radio","Phone","Camera","Speaker","Lamp","Clock","Keyboard","Monitor"],
+  "Architecture":["Door","Window","Column","Arch","Stairs","Railing","Fence","Wall","Pillar","Beam"],
+  "Nature":      ["Rock","Log","Stump","Boulder","Crystal","Mushroom","Root","Branch","Stone","Pebble"],
+  "Fantasy":     ["Magic Orb","Potion","Scroll","Tome","Rune Stone","Amulet","Crown","Scepter","Candle","Altar"],
+};
 
-  const generate = () => {
-    if (!addObject) return;
-    for (let i = 0; i < count; i++) {
-      addObject({
-        type: "prop",
-        category, propType, material, style, damage,
-        scale: lockScale ? [uniformScale, uniformScale, uniformScale] : [scaleX, scaleY, scaleZ],
-        roughness, metalness, color, uvScale, subdivision, detailLevel,
-        name: `${propType}_${material}_${Date.now()}_${i}`,
-        scatter: scatter > 0 ? { radius: scatter, seed: seed + i } : null,
-      });
-    }
-  };
+const PROP_PRESETS = {
+  "Wooden Chair":   { category:"Furniture", propType:"Chair",   primaryColor:"#8a5520", secondColor:"#6a3a10", material:"Wood",   roughness:0.80, metalness:0.00, scaleX:1.0, scaleY:1.0, scaleZ:1.0, worn:0.20, damaged:0.00 },
+  "Metal Barrel":   { category:"Containers",propType:"Barrel",  primaryColor:"#556055", secondColor:"#888888", material:"Metal",  roughness:0.50, metalness:0.80, scaleX:1.0, scaleY:1.0, scaleZ:1.0, worn:0.40, damaged:0.10 },
+  "Iron Sword":     { category:"Weapons",   propType:"Sword",   primaryColor:"#c0c8d0", secondColor:"#8a6030", material:"Metal",  roughness:0.20, metalness:0.90, scaleX:1.0, scaleY:1.0, scaleZ:1.0, worn:0.15, damaged:0.00 },
+  "Stone Boulder":  { category:"Nature",    propType:"Boulder", primaryColor:"#888880", secondColor:"#606058", material:"Stone",  roughness:0.95, metalness:0.00, scaleX:1.2, scaleY:0.9, scaleZ:1.1, worn:0.60, damaged:0.20 },
+  "Magic Crystal":  { category:"Fantasy",   propType:"Crystal", primaryColor:"#6080ff", secondColor:"#4060cc", material:"Glass",  roughness:0.05, metalness:0.30, scaleX:1.0, scaleY:1.4, scaleZ:1.0, worn:0.00, damaged:0.00 },
+  "Wooden Crate":   { category:"Containers",propType:"Crate",   primaryColor:"#a07040", secondColor:"#705020", material:"Wood",   roughness:0.85, metalness:0.00, scaleX:1.0, scaleY:1.0, scaleZ:1.0, worn:0.35, damaged:0.15 },
+  "Desk Lamp":      { category:"Electronics",propType:"Lamp",   primaryColor:"#c8a830", secondColor:"#222222", material:"Metal",  roughness:0.30, metalness:0.85, scaleX:1.0, scaleY:1.0, scaleZ:1.0, worn:0.05, damaged:0.00 },
+  "Ancient Altar":  { category:"Fantasy",   propType:"Altar",   primaryColor:"#504840", secondColor:"#c8a830", material:"Stone",  roughness:0.90, metalness:0.10, scaleX:1.0, scaleY:1.0, scaleZ:1.0, worn:0.70, damaged:0.30 },
+};
 
-  const randomize = () => {
-    const cats = Object.keys(CATEGORIES);
+const MATERIALS     = ["Wood","Metal","Stone","Fabric","Plastic","Glass","Ceramic","Leather","Bone","Crystal","Rust","Gold","Silver"];
+const SURFACE_TYPES = ["Smooth","Rough","Carved","Worn","Polished","Painted","Rusted","Mossy","Cracked","Burnt"];
+
+export default function PropGeneratorPanel({ onGenerate }) {
+  const [category,       setCategory]       = useState("Furniture");
+  const [propType,       setPropType]       = useState("Chair");
+  const [activePreset,   setActivePreset]   = useState("Wooden Chair");
+  const [seed,           setSeed]           = useState(1);
+  // Scale
+  const [scaleX,         setScaleX]         = useState(1.0);
+  const [scaleY,         setScaleY]         = useState(1.0);
+  const [scaleZ,         setScaleZ]         = useState(1.0);
+  const [uniformScale,   setUniformScale]   = useState(false);
+  // Material
+  const [material,       setMaterial]       = useState("Wood");
+  const [primaryColor,   setPrimaryColor]   = useState("#8a5520");
+  const [secondColor,    setSecondColor]    = useState("#6a3a10");
+  const [accentColor,    setAccentColor]    = useState("#c8a830");
+  const [roughness,      setRoughness]      = useState(0.80);
+  const [metalness,      setMetalness]      = useState(0.00);
+  const [surfaceType,    setSurfaceType]    = useState("Rough");
+  // Wear
+  const [worn,           setWorn]           = useState(0.20);
+  const [damaged,        setDamaged]        = useState(0.00);
+  const [dirty,          setDirty]          = useState(0.00);
+  const [mossy,          setMossy]          = useState(0.00);
+  const [burnt,          setBurnt]          = useState(0.00);
+  // Details
+  const [addDecals,      setAddDecals]      = useState(false);
+  const [decalType,      setDecalType]      = useState("Graffiti");
+  const [addPhysics,     setAddPhysics]     = useState(false);
+  const [breakable,      setBreakable]      = useState(false);
+  const [glowing,        setGlowing]        = useState(false);
+  const [glowColor,      setGlowColor]      = useState("#00ffc8");
+  const [glowIntensity,  setGlowIntensity]  = useState(0.50);
+  const [animated,       setAnimated]       = useState(false);
+  const [animType,       setAnimType]       = useState("Idle Float");
+  // Variation
+  const [variation,      setVariation]      = useState(0.00);
+  const [randomRotation, setRandomRotation] = useState(false);
+  const [batchCount,     setBatchCount]     = useState(1);
+  // Output
+  const [polyBudget,     setPolyBudget]     = useState("Mid");
+  const [addLOD,         setAddLOD]         = useState(true);
+  const [addCollider,    setAddCollider]    = useState(true);
+
+  const applyPreset = useCallback((name) => {
+    const p = PROP_PRESETS[name];
+    if (!p) return;
+    setActivePreset(name);
+    setCategory(p.category);     setPropType(p.propType);
+    setPrimaryColor(p.primaryColor); setSecondColor(p.secondColor);
+    setMaterial(p.material);     setRoughness(p.roughness);
+    setMetalness(p.metalness);   setScaleX(p.scaleX);
+    setScaleY(p.scaleY);         setScaleZ(p.scaleZ);
+    setWorn(p.worn);             setDamaged(p.damaged);
+  }, []);
+
+  const randomize = useCallback(() => {
+    const cats = Object.keys(PROP_CATEGORIES);
     const cat  = cats[Math.floor(Math.random() * cats.length)];
-    const props = CATEGORIES[cat];
+    const types = PROP_CATEGORIES[cat];
     setCategory(cat);
-    setPropType(props[Math.floor(Math.random() * props.length)]);
+    setPropType(types[Math.floor(Math.random() * types.length)]);
     setMaterial(MATERIALS[Math.floor(Math.random() * MATERIALS.length)]);
-    setStyle(STYLES[Math.floor(Math.random() * STYLES.length)]);
-    setDamage(DAMAGE[Math.floor(Math.random() * DAMAGE.length)]);
-    setRoughness(Math.random());
-    setMetalness(Math.random() * 0.5);
-    setUniformScale(0.5 + Math.random() * 2);
-    setSeed(Math.floor(Math.random() * 9999));
-  };
+    setPrimaryColor(`#${Math.floor(Math.random()*0xffffff).toString(16).padStart(6,"0")}`);
+    const rn = (a,b) => parseFloat((a + Math.random()*(b-a)).toFixed(2));
+    setRoughness(rn(0.1,1.0)); setMetalness(rn(0,0.9));
+    setWorn(rn(0,0.7)); setDamaged(rn(0,0.5));
+    setScaleX(rn(0.7,1.5)); setScaleY(rn(0.7,1.5)); setScaleZ(rn(0.7,1.5));
+    setVariation(rn(0,0.3)); setSeed(Math.floor(Math.random()*9999));
+  }, []);
+
+  const handleGenerate = useCallback(() => {
+    onGenerate?.({
+      identity:  { category, propType, seed },
+      scale:     { scaleX, scaleY, scaleZ, uniformScale },
+      material:  { material, primaryColor, secondColor, accentColor, roughness, metalness, surfaceType },
+      wear:      { worn, damaged, dirty, mossy, burnt },
+      details:   { addDecals, decalType, addPhysics, breakable, glowing, glowColor, glowIntensity, animated, animType },
+      variation: { variation, randomRotation, batchCount },
+      output:    { polyBudget, addLOD, addCollider },
+    });
+  }, [category, propType, seed, scaleX, scaleY, scaleZ, uniformScale, material, primaryColor,
+      secondColor, accentColor, roughness, metalness, surfaceType, worn, damaged, dirty, mossy, burnt,
+      addDecals, decalType, addPhysics, breakable, glowing, glowColor, glowIntensity, animated, animType,
+      variation, randomRotation, batchCount, polyBudget, addLOD, addCollider, onGenerate]);
 
   return (
-    <div style={S.panel}>
-      <div style={S.h3}>📦 Prop Generator</div>
-
-      {/* Category */}
-      <div style={S.section}>
-        <div style={{...S.label, marginBottom:4}}><span>Category</span></div>
-        <div style={{display:"flex", flexWrap:"wrap", gap:4, marginBottom:6}}>
-          {Object.keys(CATEGORIES).map(c => (
-            <span key={c} style={category===c ? S.tagOn : S.tag} onClick={() => { setCategory(c); setPropType(CATEGORIES[c][0]); }}>{c}</span>
+    <div style={P}>
+      {/* Presets */}
+      <Section title="📦 Presets">
+        <div style={{ display:"flex", flexWrap:"wrap", gap:4 }}>
+          {Object.keys(PROP_PRESETS).map(name => (
+            <button key={name} onClick={() => applyPreset(name)} style={{
+              padding:"4px 9px", fontSize:9, borderRadius:4, cursor:"pointer", fontWeight:600,
+              background: activePreset===name ? "#00ffc8" : "#21262d",
+              color:      activePreset===name ? "#0d1117" : "#8b949e",
+              border:     `1px solid ${activePreset===name ? "#00ffc8" : "#30363d"}`,
+            }}>{name}</button>
           ))}
         </div>
-      </div>
+      </Section>
 
-      {/* Type */}
-      <div style={S.row}>
-        <div>
-          <div style={{...S.label, marginBottom:4}}><span>Prop Type</span></div>
-          <select style={S.select} value={propType} onChange={e => setPropType(e.target.value)}>
-            {(CATEGORIES[category] || []).map(p => <option key={p}>{p}</option>)}
-          </select>
-        </div>
-        <div>
-          <div style={{...S.label, marginBottom:4}}><span>Style</span></div>
-          <select style={S.select} value={style} onChange={e => setStyle(e.target.value)}>
-            {STYLES.map(s => <option key={s}>{s}</option>)}
-          </select>
-        </div>
-      </div>
-
-      <div style={S.row}>
-        <div>
-          <div style={{...S.label, marginBottom:4}}><span>Material</span></div>
-          <select style={S.select} value={material} onChange={e => setMaterial(e.target.value)}>
-            {MATERIALS.map(m => <option key={m}>{m}</option>)}
-          </select>
-        </div>
-        <div>
-          <div style={{...S.label, marginBottom:4}}><span>Damage</span></div>
-          <select style={S.select} value={damage} onChange={e => setDamage(e.target.value)}>
-            {DAMAGE.map(d => <option key={d}>{d}</option>)}
-          </select>
-        </div>
-      </div>
+      {/* Category & Type */}
+      <Section title="🗂 Category & Type">
+        <Select label="Category" value={category} options={Object.keys(PROP_CATEGORIES)}
+          onChange={v => { setCategory(v); setPropType(PROP_CATEGORIES[v][0]); }} />
+        <Badges items={PROP_CATEGORIES[category] ?? []} active={propType} onSelect={setPropType} />
+        <Slider label="Random Seed" value={seed} min={0} max={9999} step={1} onChange={setSeed} />
+      </Section>
 
       {/* Scale */}
-      <div style={{...S.label, marginBottom:6, marginTop:4}}><span style={{color:"#00ffc8"}}>Scale</span>
-        <span style={lockScale ? S.tagOn : S.tag} onClick={() => setLockScale(!lockScale)}>🔒 Lock</span>
-      </div>
-      {lockScale ? (
-        <Slider label="Uniform Scale" value={uniformScale} min={0.1} max={5} onChange={setUniformScale} />
-      ) : (
-        <>
-          <Slider label="Scale X" value={scaleX} min={0.1} max={5} onChange={setScaleX} />
-          <Slider label="Scale Y" value={scaleY} min={0.1} max={5} onChange={setScaleY} />
-          <Slider label="Scale Z" value={scaleZ} min={0.1} max={5} onChange={setScaleZ} />
-        </>
-      )}
+      <Section title="📏 Scale">
+        <Check label="Uniform Scale" value={uniformScale} onChange={setUniformScale} />
+        <Slider label="Scale X" value={scaleX} min={0.1} max={5} step={0.05}
+          onChange={v => { setScaleX(v); if(uniformScale){setScaleY(v);setScaleZ(v);} }} />
+        <Slider label="Scale Y" value={scaleY} min={0.1} max={5} step={0.05}
+          onChange={v => { setScaleY(v); if(uniformScale){setScaleX(v);setScaleZ(v);} }} />
+        <Slider label="Scale Z" value={scaleZ} min={0.1} max={5} step={0.05}
+          onChange={v => { setScaleZ(v); if(uniformScale){setScaleX(v);setScaleY(v);} }} />
+      </Section>
 
-      {/* Material props */}
-      <div style={{...S.label, marginBottom:6, marginTop:4}}><span style={{color:"#00ffc8"}}>Material Properties</span></div>
-      <div style={{...S.row, alignItems:"center", marginBottom:8}}>
-        <div>
-          <div style={{...S.label, marginBottom:4}}><span>Base Color</span></div>
-          <input type="color" value={color} onChange={e => setColor(e.target.value)} style={{width:"100%", height:28, borderRadius:4, border:"none", cursor:"pointer"}} />
-        </div>
-        <div>
-          <div style={{...S.label, marginBottom:4}}><span>Detail</span></div>
-          <select style={S.select} value={detailLevel} onChange={e => setDetailLevel(e.target.value)}>
-            {["Low","Medium","High","Ultra"].map(d => <option key={d}>{d}</option>)}
-          </select>
-        </div>
-      </div>
-      <Slider label="Roughness"   value={roughness} min={0} max={1} onChange={setRoughness} />
-      <Slider label="Metalness"   value={metalness} min={0} max={1} onChange={setMetalness} />
-      <Slider label="UV Scale"    value={uvScale}   min={0.1} max={4} onChange={setUvScale} />
+      {/* Material */}
+      <Section title="🎨 Material & Color">
+        <Badges items={MATERIALS} active={material} onSelect={setMaterial} />
+        <Badges items={SURFACE_TYPES} active={surfaceType} onSelect={setSurfaceType} />
+        <ColorRow label="Primary Color" value={primaryColor} onChange={setPrimaryColor} />
+        <ColorRow label="Secondary"     value={secondColor}  onChange={setSecondColor}  />
+        <ColorRow label="Accent"        value={accentColor}  onChange={setAccentColor}  />
+        <Slider label="Roughness"       value={roughness}    onChange={setRoughness}    />
+        <Slider label="Metalness"       value={metalness}    onChange={setMetalness}    />
+      </Section>
 
-      {/* Count */}
-      <div style={S.row}>
-        <div><div style={{...S.label, marginBottom:4}}><span>Count</span></div>
-          <input type="number" min={1} max={50} value={count} onChange={e => setCount(Number(e.target.value))} style={{...S.select}} /></div>
-        <div><div style={{...S.label, marginBottom:4}}><span>Subdivision</span></div>
-          <input type="number" min={0} max={3} value={subdivision} onChange={e => setSubdivision(Number(e.target.value))} style={{...S.select}} /></div>
-      </div>
+      {/* Wear & Damage */}
+      <Section title="💥 Wear & Damage">
+        <Slider label="Worn"    value={worn}    onChange={setWorn}    />
+        <Slider label="Damaged" value={damaged} onChange={setDamaged} />
+        <Slider label="Dirty"   value={dirty}   onChange={setDirty}   />
+        <Slider label="Mossy"   value={mossy}   onChange={setMossy}   />
+        <Slider label="Burnt"   value={burnt}   onChange={setBurnt}   />
+      </Section>
 
-      {/* Advanced */}
-      <div style={{...S.label, cursor:"pointer", marginBottom:6}} onClick={() => setShowAdvanced(!showAdvanced)}>
-        <span style={{color:"#00ffc8"}}>Advanced {showAdvanced?"▲":"▼"}</span>
-      </div>
-      {showAdvanced && (
-        <>
-          <Slider label="Scatter Radius" value={scatter} min={0} max={20} onChange={setScatter} />
-          <Slider label="Random Seed"    value={seed}    min={0} max={9999} step={1} onChange={setSeed} />
-        </>
-      )}
+      {/* Details */}
+      <Section title="✨ Details" defaultOpen={false}>
+        <Check  label="Add Decals"    value={addDecals}   onChange={setAddDecals}   />
+        {addDecals && <Select label="Decal Type" value={decalType} options={["Graffiti","Labels","Runes","Insignia","Scratches","Bullet Holes"]} onChange={setDecalType} />}
+        <Check  label="Physics"       value={addPhysics}  onChange={setAddPhysics}  />
+        <Check  label="Breakable"     value={breakable}   onChange={setBreakable}   />
+        <Check  label="Glowing"       value={glowing}     onChange={setGlowing}     />
+        {glowing && <>
+          <ColorRow label="Glow Color"    value={glowColor}     onChange={setGlowColor}     />
+          <Slider   label="Glow Intensity" value={glowIntensity} onChange={setGlowIntensity} />
+        </>}
+        <Check  label="Animated"      value={animated}    onChange={setAnimated}    />
+        {animated && <Select label="Anim Type" value={animType} options={["Idle Float","Spin","Bob","Pulse","Open/Close","Flicker"]} onChange={setAnimType} />}
+      </Section>
 
-      <button style={S.btn} onClick={generate}>Generate {count > 1 ? `${count} Props` : "Prop"}</button>
-      <button style={S.btnSec} onClick={randomize}>🎲 Randomize</button>
+      {/* Variation */}
+      <Section title="🔀 Variation" defaultOpen={false}>
+        <Slider   label="Variation Amount" value={variation} onChange={setVariation} />
+        <Check    label="Random Rotation"  value={randomRotation} onChange={setRandomRotation} />
+        <NumInput label="Batch Count"      value={batchCount} min={1} max={100} onChange={setBatchCount} />
+      </Section>
+
+      {/* Output */}
+      <Section title="⚙ Output" defaultOpen={false}>
+        <Select label="Poly Budget"  value={polyBudget} options={["Low","Mid","High","Ultra"]} onChange={setPolyBudget} />
+        <Check  label="Auto LOD"     value={addLOD}     onChange={setAddLOD}     />
+        <Check  label="Add Collider" value={addCollider} onChange={setAddCollider} />
+      </Section>
+
+      <div style={{ display:"flex", gap:6 }}>
+        <RandBtn onClick={randomize} />
+        <GenBtn label="⚡ Generate Prop" onClick={handleGenerate} />
+      </div>
     </div>
   );
 }
