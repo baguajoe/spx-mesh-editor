@@ -458,7 +458,6 @@ const AvatarRigPlayer3D = ({ recordedFrames, avatarUrl, liveFrame, smoothingEnab
     scene.add(new THREE.GridHelper(10, 10, 0x1a2a1a, 0x1a2a1a));
 
     // Load avatar
-    const { GLTFLoader } = require('three/examples/jsm/loaders/GLTFLoader');
     const loader = new GLTFLoader();
     loader.load(avatarUrl || '/ybot.glb', (gltf) => {
       const model = gltf.scene;
