@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 
 function Slider({ label, value, min=0, max=1, step=0.01, onChange, unit="" }) {
   return (
@@ -179,6 +179,9 @@ export default function FaceGeneratorPanel({ onGenerate }) {
     setLipThickness(p.lipThick); setAsymmetry(p.asymmetry);
     setWrinkles(p.wrinkles);
   }, []);
+
+  // Apply default preset on mount
+  useEffect(() => { applyPreset("Young Male"); }, []);
 
   const randomize = useCallback(() => {
     const pick = arr => arr[Math.floor(Math.random() * arr.length)];

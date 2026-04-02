@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 
 // ── Shared primitives ─────────────────────────────────────────────────────
 function Slider({ label, value, min=0, max=1, step=0.01, onChange, unit="" }) {
@@ -192,6 +192,9 @@ export default function VehicleGeneratorPanel({ onGenerate }) {
     setMetalness(p.metalness);           setSpoiler(p.spoiler);
     setPrimaryColor(p.primaryColor);     setSecondColor(p.secondColor);
   }, []);
+
+  // Apply default preset on mount
+  useEffect(() => { applyPreset("Sports Car"); }, []);
 
   const randomize = useCallback(() => {
     const pick = arr => arr[Math.floor(Math.random() * arr.length)];

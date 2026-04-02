@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 
 function Slider({ label, value, min=0, max=1, step=0.01, onChange, unit="" }) {
   return (
@@ -183,6 +183,9 @@ export default function PropGeneratorPanel({ onGenerate }) {
     setScaleY(p.scaleY);         setScaleZ(p.scaleZ);
     setWorn(p.worn);             setDamaged(p.damaged);
   }, []);
+
+  // Apply default preset on mount
+  useEffect(() => { applyPreset("Wooden Chair"); }, []);
 
   const randomize = useCallback(() => {
     const cats = Object.keys(PROP_CATEGORIES);

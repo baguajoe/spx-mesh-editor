@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 
 function Slider({ label, value, min=0, max=1, step=0.01, onChange, unit="" }) {
   return (
@@ -182,6 +182,9 @@ export default function FoliageGeneratorPanel({ onGenerate }) {
     setLeafSize(p.leafSize);       setBarkColor(p.barkColor);
     setLeafColor(p.leafColor);     setLeafColor2(p.leafColor2);
   }, []);
+
+  // Apply default preset on mount
+  useEffect(() => { applyPreset("Oak Tree"); }, []);
 
   const randomize = useCallback(() => {
     const pick = arr => arr[Math.floor(Math.random() * arr.length)];
