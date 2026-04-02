@@ -217,7 +217,126 @@ const COLORS = {
 };
 
 export default function App() {
+  // --- AUTO-SAVE LOGIC ---
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (meshRef.current) {
+        const data = {
+          name: "autosave_mesh",
+          timestamp: Date.now(),
+          pos: meshRef.current.position.toArray(),
+          rot: meshRef.current.rotation.toArray()
+        };
+        localStorage.setItem("spx_autosave", JSON.stringify(data));
+        console.log("💾 Auto-save complete.");
+      }
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
 
+  // --- PERFORMANCE MONITORING ---
+  const [fps, setFps] = useState(0);
+  const [polyCount, setPolyCount] = useState(0);
+
+  useEffect(() => {
+    let lastTime = performance.now();
+    let frames = 0;
+    
+    const updateStats = () => {
+      frames++;
+      const now = performance.now();
+      if (now >= lastTime + 1000) {
+        setFps(Math.round((frames * 1000) / (now - lastTime)));
+        frames = 0;
+        lastTime = now;
+        
+        // Update triangle count from renderer info
+        if (rendererRef.current) {
+          setPolyCount(rendererRef.current.info.render.triangles);
+        }
+      }
+      requestAnimationFrame(updateStats);
+    };
+    const handle = requestAnimationFrame(updateStats);
+    
+  
+  window.hardResetScene = () => {
+    if (!sceneRef.current) return;
+    console.log("🧹 Initializing Factory Reset...");
+    
+    // 1. Dispose GPU Memory
+    sceneRef.current.traverse(child => {
+      if (child.isMesh) {
+        child.geometry.dispose();
+        if (child.material.dispose) child.material.dispose();
+      }
+    });
+
+    // 2. Clear Three.js Scene
+    while(sceneRef.current.children.length > 0){ 
+      sceneRef.current.remove(sceneRef.current.children[0]); 
+    }
+
+    // 3. Clear React State
+    setSceneObjects([]);
+    setActiveObjId(null);
+    setSelectedObject(null);
+    setHistory([]);
+    setRedoStack([]);
+    
+    console.log("✅ App & Engine fully synchronized at Zero.");
+  };
+
+
+  return () => cancelAnimationFrame(handle);
+  }, []);
+
+  // --- HOISTED CORE ARCHITECTURE ---
+  const [wireframe, setWireframe] = useState(false);
+  const [stats, setStats] = useState({ vertices: 0, edges: 0, faces: 0, halfEdges: 0 });
+  const [activeWorkspace, setActiveWorkspace] = useState(DEFAULT_WORKSPACE);
+  const [sceneObjects, setSceneObjects] = useState([]);
+  const [selectedObject, setSelectedObject] = useState(null);
+  const [activeObjId, setActiveObjId] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentFrame, setCurrentFrame] = useState(0);
+  const canvasRef = useRef(null);
+  const sceneRef = useRef(null);
+  const meshRef = useRef(null);
+  const rendererRef = useRef(null);
+  const cameraRef = useRef(null);
+  const heMeshRef = useRef(null);
+  const importGLB = async (file) => {
+    const { GLTFLoader } = await import(
+      "three/examples/jsm/loaders/GLTFLoader.js"
+    );
+    const scene = sceneRef.current;
+    if (!scene) return;
+    clearOverlays();
+    if (meshRef.current) scene.remove(meshRef.current);
+    const url = URL.createObjectURL(file);
+    new GLTFLoader().load(url, (gltf) => {
+      const obj = gltf.scene;
+      const box = new THREE.Box3().setFromObject(obj);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      obj.position.sub(center);
+      obj.scale.setScalar(3 / Math.max(size.x, size.y, size.z));
+      scene.add(obj);
+      meshRef.current = obj;
+      obj.traverse((child) => {
+        if (child.isMesh && !heMeshRef.current) {
+          heMeshRef.current = HalfEdgeMesh.fromBufferGeometry(child.geometry);
+          setStats(heMeshRef.current.stats());
+        }
+      });
+      setStatus(`Imported ${file.name}`);
+      URL.revokeObjectURL(url);
+    });
+  };
+
+
+  
   const [renderWorkspaceOpen, setRenderWorkspaceOpen] = useState(false);
   const [mocapWorkspaceOpen, setMocapWorkspaceOpen] = useState(false);
 
@@ -498,16 +617,16 @@ export default function App() {
 
 
   const [objectsAddedCounter, setObjectsAddedCounter] = useState(0);
-  const [stats, setStats] = useState({ vertices: 0, edges: 0, faces: 0, halfEdges: 0 });
-  const [activeWorkspace, setActiveWorkspace] = useState(DEFAULT_WORKSPACE);
-  const [sceneObjects, setSceneObjects] = useState([]);
-  const [selectedObject, setSelectedObject] = useState(null);
-  const [activeObjId, setActiveObjId] = useState(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentFrame, setCurrentFrame] = useState(0);
-  const canvasRef = useRef(null);
-  const sceneRef = useRef(null);
-  const meshRef = useRef(null);
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
 
   // sceneObjects managed directly via addSceneObject/deleteSceneObject
 
@@ -799,7 +918,6 @@ export default function App() {
         try {
           const heMesh = HalfEdgeMesh.fromBufferGeometry(mesh.geometry);
           heMeshRef.current = heMesh;
-          const [wireframe, setWireframe] = useState(false);
   const s = heMesh.stats();
           setStats(s);
           setStatus(`Added ${type} — ${s.vertices} verts · ${s.faces} faces · ${s.edges} edges`);
@@ -943,11 +1061,11 @@ export default function App() {
     window.setSelectedObject = (obj) => setSelectedObject(obj);
   }, [selectedObject]);
 
-  const rendererRef = useRef(null);
-  const cameraRef = useRef(null);
+  
+  
   const rafRef = useRef(null);
 
-  const heMeshRef = useRef(null);
+  
   const orbitRef = useRef(null);
   const orbitState = useRef({ theta: 0.6, phi: 1.1, radius: 5 });
   const orbitDragging = useRef(false);
@@ -1729,7 +1847,7 @@ export default function App() {
       addPrimitive(def.type === "sphere" ? "Sphere" : "Box");
       setStatus(`✓ ${def.label} loaded — ready for ${workspaceType}`);
     }
-  }, [activeObjId, sceneObjects, meshRef, sceneRef, addPrimitive, setActiveObjId, importGLB]);
+  }, [activeObjId, sceneObjects, meshRef, sceneRef, setActiveObjId]);
 
 
 
@@ -2256,34 +2374,7 @@ export default function App() {
   }, [loopCutT, pushHistory, rebuildMeshGeometry]);
 
   // ── Import GLB ─────────────────────────────────────────────────────────────
-  const importGLB = async (file) => {
-    const { GLTFLoader } = await import(
-      "three/examples/jsm/loaders/GLTFLoader.js"
-    );
-    const scene = sceneRef.current;
-    if (!scene) return;
-    clearOverlays();
-    if (meshRef.current) scene.remove(meshRef.current);
-    const url = URL.createObjectURL(file);
-    new GLTFLoader().load(url, (gltf) => {
-      const obj = gltf.scene;
-      const box = new THREE.Box3().setFromObject(obj);
-      const center = box.getCenter(new THREE.Vector3());
-      const size = box.getSize(new THREE.Vector3());
-      obj.position.sub(center);
-      obj.scale.setScalar(3 / Math.max(size.x, size.y, size.z));
-      scene.add(obj);
-      meshRef.current = obj;
-      obj.traverse((child) => {
-        if (child.isMesh && !heMeshRef.current) {
-          heMeshRef.current = HalfEdgeMesh.fromBufferGeometry(child.geometry);
-          setStats(heMeshRef.current.stats());
-        }
-      });
-      setStatus(`Imported ${file.name}`);
-      URL.revokeObjectURL(url);
-    });
-  };
+  
 
   // ── Export GLB ─────────────────────────────────────────────────────────────
   const exportGLB = async () => {
@@ -3035,6 +3126,15 @@ export default function App() {
             </div>
 
 <canvas ref={canvasRef} />
+          <div style={{
+            position: 'absolute', bottom: 10, left: 10, 
+            background: 'rgba(0,0,0,0.5)', padding: '4px 8px', 
+            borderRadius: '4px', color: fps < 30 ? '#ff4444' : '#00ffc8',
+            fontSize: '10px', fontFamily: 'monospace', pointerEvents: 'none', zIndex: 100
+          }}>
+            FPS: {fps} | Δ: {polyCount.toLocaleString()}
+          </div>
+
           {/* XYZ orientation gizmo — top right corner */}
           <div style={{
             position:"absolute", top:8, right:8,
