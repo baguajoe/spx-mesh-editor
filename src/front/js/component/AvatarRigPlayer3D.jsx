@@ -2,7 +2,7 @@
 // Replaces the old position-based system that caused static/broken avatars
 // Drop-in replacement: src/front/js/component/AvatarRigPlayer3D.jsx
 
-import React, { useRef, useEffect, useMemo } from 'react';
+import React, { useRef, useEffect, useMemo, Suspense } from 'react';
 import { Canvas, useFrame, useLoader } from '@react-three/fiber';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
