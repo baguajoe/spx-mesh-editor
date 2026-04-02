@@ -1,136 +1,53 @@
-
 .spx-native-workspace-tabs{
   position:fixed;
   top:52px;
   left:220px;
   right:10px;
   z-index:13000;
-  display:flex;
-  gap:6px;
-  align-items:center;
-  flex-wrap:nowrap;
-  overflow-x:auto;
-  overflow-y:hidden;
-  padding:4px 8px;
+  display:flex !important;
+  flex-wrap:wrap !important;
+  flex-direction:row !important;
+  gap:3px !important;
+  align-items:flex-start !important;
+  padding:4px 8px !important;
+  overflow:hidden !important;
+  max-height:92px !important;
   background:rgba(8,12,18,0.96);
   border-bottom:1px solid rgba(255,255,255,0.08);
-  scrollbar-width:thin;
+  scrollbar-width:none;
+  right:10px !important;
 }
-
+.spx-native-workspace-tabs::-webkit-scrollbar { display:none; }
 .spx-native-workspace-tab{
   appearance:none;
   border:1px solid rgba(255,255,255,0.10);
   background:#132031;
   color:#e8edf5;
   border-radius:6px;
-  padding:4px 8px;
-  min-width:84px;
+  padding:4px 6px;
+  min-width:80px !important;
+  max-width:130px !important;
+  height:34px !important;
   cursor:pointer;
   display:flex;
   flex-direction:column;
   align-items:flex-start;
   gap:1px;
-  flex:0 0 auto;
+  flex:0 0 auto !important;
+  white-space:nowrap;
+  margin:0 !important;
 }
-
 .spx-native-workspace-tab:hover{
   border-color:#4a8cff;
   background:#18304b;
 }
-
 .spx-native-workspace-tab-label{
-  font-size:11px;
+  font-size:10px;
   line-height:1.1;
   font-weight:600;
 }
-
 .spx-native-workspace-tab-hint{
-  font-size:9px;
+  font-size:8px;
   line-height:1.1;
   color:#8eaed3;
-}
-
-@media (max-width: 1400px){
-  .spx-native-workspace-tabs{
-    left:208px;
-    right:8px;
-  }
-
-  .spx-native-workspace-tab{
-    min-width:74px;
-    padding:4px 6px;
-  }
-
-  .spx-native-workspace-tab-label{
-    font-size:10px;
-  }
-
-  .spx-native-workspace-tab-hint{
-    font-size:8px;
-  }
-}
-
-/* =========================================
-   FORCE WORKSPACE TABS INTO 2 ROWS
-   ========================================= */
-
-.spx-native-workspace-tabs,
-.spx-workspace-tabs,
-.workspace-tabs,
-.workspace-toolbar {
-  display: grid !important;
-  grid-template-rows: repeat(2, minmax(38px, auto)) !important;
-  grid-auto-flow: column !important;
-  grid-auto-columns: max-content !important;
-  gap: 8px !important;
-  align-items: start !important;
-  align-content: start !important;
-  padding: 6px 8px !important;
-  overflow-x: auto !important;
-  overflow-y: hidden !important;
-  white-space: normal !important;
-  max-height: 96px !important;
-}
-
-.spx-native-workspace-tab,
-.spx-workspace-tab,
-.workspace-tab,
-.workspace-toolbar button {
-  min-width: 130px !important;
-  height: 38px !important;
-  white-space: nowrap !important;
-  margin: 0 !important;
-  flex: none !important;
-}
-
-/* kill flex/no-wrap behavior if earlier css set it */
-.spx-native-workspace-tabs > *,
-.spx-workspace-tabs > *,
-.workspace-tabs > *,
-.workspace-toolbar > * {
-  margin: 0 !important;
-}
-
-/* =========================================
-   WORKSPACE TABS — 2 ROW WRAP, NO SCROLLBAR
-   ========================================= */
-.spx-native-workspace-tabs {
-  display: flex !important;
-  flex-wrap: wrap !important;
-  flex-direction: row !important;
-  gap: 3px !important;
-  padding: 4px 8px !important;
-  overflow: hidden !important;
-  max-height: 96px !important;
-  right: 330px !important;
-  scrollbar-width: none !important;
-}
-.spx-native-workspace-tabs::-webkit-scrollbar { display: none !important; }
-.spx-native-workspace-tab {
-  min-width: 100px !important;
-  max-width: 160px !important;
-  height: 38px !important;
-  white-space: nowrap !important;
-  margin: 0 !important;
-  flex: 0 0 auto !important;
 }
