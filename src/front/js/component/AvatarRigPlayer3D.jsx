@@ -415,10 +415,13 @@ const AvatarRig = ({ recordedFrames, avatarUrl, liveFrame, smoothingEnabled = tr
 // ─────────────────────────────────────────────────────────────
 const AvatarRigPlayer3D = ({ recordedFrames, avatarUrl, liveFrame, smoothingEnabled, visemes = [], audioRef = null }) => {
   return (
-    <Canvas camera={{ position: [0, 1.5, 3], fov: 50 }}>
+    <Canvas camera={{ position: [0, 1.5, 3], fov: 50 }} style={{ background: '#0d1117' }} gl={{ alpha: false }}>
+      <color attach="background" args={['#0d1117']} />
       <ambientLight intensity={0.8} />
       <directionalLight position={[3, 5, 5]} intensity={1} />
-      <AvatarRig recordedFrames={recordedFrames} avatarUrl={avatarUrl} liveFrame={liveFrame} smoothingEnabled={smoothingEnabled} visemes={visemes} audioRef={audioRef} />
+      <Suspense fallback={null}>
+        <AvatarRig recordedFrames={recordedFrames} avatarUrl={avatarUrl} liveFrame={liveFrame} smoothingEnabled={smoothingEnabled} visemes={visemes} audioRef={audioRef} />
+      </Suspense>
     </Canvas>
   );
 };
