@@ -461,15 +461,34 @@ const AvatarRigPlayer3D = ({ recordedFrames, avatarUrl, liveFrame, smoothingEnab
     const loader = new GLTFLoader();
     loader.load(avatarUrl || '/ybot.glb', (gltf) => {
       const model = gltf.scene;
-      model.traverse(child => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
+      // Scale and center the model
+      const box = new THREE.Box3().setFromObject(model);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const scale = 2.0 / maxDim;
+      model.scale.setScalar(scale);
+      model.position.set(-center.x * scale, -box.min.y * scale, -center.z * scale);
+      model.traverse(child => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+          if (child.material) {
+            child.material.needsUpdate = true;
+          }
+        }
+      });
       scene.add(model);
       avatarRef.current = model;
+      console.log('[AvatarRig] Model loaded, size:', size, 'scale:', scale);
       if (gltf.animations?.length) {
         const mixer = new THREE.AnimationMixer(model);
         mixerRef.current = mixer;
         mixer.clipAction(gltf.animations[0]).play();
       }
-    }, undefined, (err) => console.warn('[AvatarRigPlayer3D] Load error:', err));
+    }, (progress) => {
+      console.log('[AvatarRig] Loading:', Math.round(progress.loaded/progress.total*100)+'%');
+    }, (err) => console.error('[AvatarRigPlayer3D] Load error:', err));
 
     // Animate
     function animate() {
