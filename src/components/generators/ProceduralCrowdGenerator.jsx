@@ -200,6 +200,8 @@ export default function ProceduralCrowdGenerator({ sceneRef, setStatus }) {
 
   function generate(sc) {
     const scene=sc||scene3Ref.current; if(!scene) return;
+    // Force fresh randomization by consuming some random values
+    for(let i=0;i<Math.floor(Math.random()*100)+1;i++) Math.random();
     meshesRef.current.forEach(m=>{ scene.remove(m); m.geometry?.dispose(); m.material?.dispose(); });
     meshesRef.current=[];
     const positions=getPositions(formation,npcCount,spread);
