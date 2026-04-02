@@ -1127,3 +1127,84 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px s
 .quad-toggle-btn:hover{border-color:#4a8cff !important;}
 .quad-toggle-btn.is-active{background:#4a8cff !important; color:#fff !important; border-color:#4a8cff !important;}
 /* === QUAD VIEW CLEAN FIX END === */
+
+
+/* ============================================
+   TWO-ROW FEATURE TOOLBAR
+   makes blue strip wrap into 2 rows
+   ============================================ */
+
+.feature-toolbar,
+.mode-toolbar,
+.toolbar-features,
+.top-feature-strip,
+.toolbar-row,
+.spx-feature-strip {
+
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+
+    padding: 6px 8px;
+
+    max-width: 1400px;
+}
+
+/* button sizing for consistent wrap */
+.feature-toolbar button,
+.mode-toolbar button,
+.toolbar-features button,
+.top-feature-strip button,
+.toolbar-row button,
+.spx-feature-strip button {
+
+    flex: 0 0 auto;
+    min-width: 130px;
+
+}
+
+/* keeps rows visually grouped */
+.feature-toolbar > *,
+.mode-toolbar > *,
+.toolbar-features > *,
+.top-feature-strip > *,
+.toolbar-row > *,
+.spx-feature-strip > * {
+
+    margin-bottom: 4px;
+
+}
+
+
+
+/* new generator floating panels */
+.spx-floating-panel-wrap{
+  position:absolute;
+  top:110px;
+  left:20px;
+  z-index:120;
+  background:rgba(10,14,22,.96);
+  border:1px solid rgba(120,160,220,.22);
+  border-radius:12px;
+  padding:12px;
+  box-shadow:0 14px 40px rgba(0,0,0,.35);
+}
+.spx-panel{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  min-width:220px;
+}
+.spx-panel h3{
+  margin:0 0 4px 0;
+  color:#dbe7ff;
+}
+.spx-panel button,
+.spx-panel input{
+  background:#12233c;
+  color:#dbe7ff;
+  border:1px solid #29486f;
+  border-radius:8px;
+  padding:8px 10px;
+}

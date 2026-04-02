@@ -159,6 +159,13 @@ import AdvancedRigPanel from "./components/rig/AdvancedRigPanel.jsx";
 import "./styles/advanced-rig.css";
 import "./styles/native-workspace-tabs.css";
 import RenderWorkspacePanel from "./components/workspace/RenderWorkspacePanel.jsx";
+
+import FaceGeneratorPanel from "./panels/generators/FaceGeneratorPanel.jsx";
+import FoliageGeneratorPanel from "./panels/generators/FoliageGeneratorPanel.jsx";
+import VehicleGeneratorPanel from "./panels/generators/VehicleGeneratorPanel.jsx";
+import CreatureGeneratorPanel from "./panels/generators/CreatureGeneratorPanel.jsx";
+import PropGeneratorPanel from "./panels/generators/PropGeneratorPanel.jsx";
+
 import "./styles/render-workspace.css";
 import { createDefaultRigGuides, mirrorGuidePoint, guidesToRigSettings } from "./mesh/rig/AutoRigGuides.js";
 import MocapWorkspace from "./workspaces/mocap/MocapWorkspace.jsx";
@@ -399,6 +406,11 @@ export default function App() {
     else if (toolId === "hair_fx") setHairFXOpen?.(true);
     else if (toolId === "autorig") setAutoRigOpen?.(true);
     else if (toolId === "advanced_rig") setAdvancedRigOpen?.(true);
+    else if (toolId === "face_gen") setFaceGenOpen?.(true);
+    else if (toolId === "foliage_gen") setFoliageGenOpen?.(true);
+    else if (toolId === "vehicle_gen") setVehicleGenOpen?.(true);
+    else if (toolId === "creature_gen") setCreatureGenOpen?.(true);
+    else if (toolId === "prop_gen") setPropGenOpen?.(true);
     else if (toolId === "mocap") setMocapWorkspaceOpen?.(true);
   };
 
@@ -482,6 +494,13 @@ export default function App() {
   const [vrPreviewOpen,  setVrPreviewOpen]  = useState(false);
   const [crowdGenOpen,   setCrowdGenOpen]   = useState(false);
   const [terrainOpen,    setTerrainOpen]    = useState(false);
+
+  const [faceGenOpen, setFaceGenOpen] = useState(false);
+  const [foliageGenOpen, setFoliageGenOpen] = useState(false);
+  const [vehicleGenOpen, setVehicleGenOpen] = useState(false);
+  const [creatureGenOpen, setCreatureGenOpen] = useState(false);
+  const [propGenOpen, setPropGenOpen] = useState(false);
+
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [activeModelUrl, setActiveModelUrl] = useState(null);
   const [modelPickerContext, setModelPickerContext] = useState("general");
@@ -607,6 +626,11 @@ export default function App() {
     setVrPreviewOpen(false);
     setCrowdGenOpen(false);
     setTerrainOpen(false);
+    setFaceGenOpen(false);
+    setFoliageGenOpen(false);
+    setVehicleGenOpen(false);
+    setCreatureGenOpen(false);
+    setPropGenOpen(false);
   };
 
   const quadCamerasRef = useRef(null);
@@ -3362,6 +3386,26 @@ export default function App() {
           <span className="spx-native-workspace-tab-label">🏔️ Terrain</span>
           <span className="spx-native-workspace-tab-hint">World</span>
         </button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("face_gen")}>
+          <span className="spx-native-workspace-tab-label">🙂 Face</span>
+          <span className="spx-native-workspace-tab-hint">Gen</span>
+        </button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("foliage_gen")}>
+          <span className="spx-native-workspace-tab-label">🌿 Foliage</span>
+          <span className="spx-native-workspace-tab-hint">Gen</span>
+        </button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("vehicle_gen")}>
+          <span className="spx-native-workspace-tab-label">🚗 Vehicle</span>
+          <span className="spx-native-workspace-tab-hint">Gen</span>
+        </button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("creature_gen")}>
+          <span className="spx-native-workspace-tab-label">👹 Creature</span>
+          <span className="spx-native-workspace-tab-hint">Gen</span>
+        </button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("prop_gen")}>
+          <span className="spx-native-workspace-tab-label">📦 Prop</span>
+          <span className="spx-native-workspace-tab-hint">Gen</span>
+        </button>
       </div>
 
 
@@ -3633,6 +3677,41 @@ export default function App() {
         onClose={() => setMocapWorkspaceOpen(false)}
         onExportGlb={() => window.dispatchEvent(new CustomEvent("spx:mocap-export-glb"))}
       />
+
+      {faceGenOpen && (
+        <FaceGeneratorPanel
+          sceneRef={sceneRef}
+          setStatus={setStatus}
+        />
+      )}
+
+      {foliageGenOpen && (
+        <FoliageGeneratorPanel
+          sceneRef={sceneRef}
+          setStatus={setStatus}
+        />
+      )}
+
+      {vehicleGenOpen && (
+        <VehicleGeneratorPanel
+          sceneRef={sceneRef}
+          setStatus={setStatus}
+        />
+      )}
+
+      {creatureGenOpen && (
+        <CreatureGeneratorPanel
+          sceneRef={sceneRef}
+          setStatus={setStatus}
+        />
+      )}
+
+      {propGenOpen && (
+        <PropGeneratorPanel
+          sceneRef={sceneRef}
+          setStatus={setStatus}
+        />
+      )}
 
       <RenderWorkspacePanel
         open={renderWorkspaceOpen}

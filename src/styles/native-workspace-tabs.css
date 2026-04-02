@@ -69,3 +69,44 @@
     font-size:8px;
   }
 }
+
+/* =========================================
+   FORCE WORKSPACE TABS INTO 2 ROWS
+   ========================================= */
+
+.spx-native-workspace-tabs,
+.spx-workspace-tabs,
+.workspace-tabs,
+.workspace-toolbar {
+  display: grid !important;
+  grid-template-rows: repeat(2, minmax(38px, auto)) !important;
+  grid-auto-flow: column !important;
+  grid-auto-columns: max-content !important;
+  gap: 8px !important;
+  align-items: start !important;
+  align-content: start !important;
+  padding: 6px 8px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  white-space: normal !important;
+  max-height: 96px !important;
+}
+
+.spx-native-workspace-tab,
+.spx-workspace-tab,
+.workspace-tab,
+.workspace-toolbar button {
+  min-width: 130px !important;
+  height: 38px !important;
+  white-space: nowrap !important;
+  margin: 0 !important;
+  flex: none !important;
+}
+
+/* kill flex/no-wrap behavior if earlier css set it */
+.spx-native-workspace-tabs > *,
+.spx-workspace-tabs > *,
+.workspace-tabs > *,
+.workspace-toolbar > * {
+  margin: 0 !important;
+}
