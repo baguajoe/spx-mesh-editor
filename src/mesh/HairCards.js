@@ -236,7 +236,163 @@ function _fmt(n) { return n.toLocaleString(); }
 //
 // UNDO / REDO
 //   Destructive operations push a memento to the global UndoStack.
-//   Import { undoStack } from 'src/core/UndoStack.js'.\n//\n// TESTING\n//   Unit tests live in tests/<ModuleName>.test.js\n//   Run with: npm run test -- --testPathPattern=<ModuleName>\n//\n// CHANGELOG\n//   v1.0  Initial implementation\n//   v1.1  Added toJSON / fromJSON\n//   v1.2  Performance pass — reduced GC pressure\n//   v1.3  Added event system\n//   v1.4  Expanded to 400+ lines with full feature set\n// ──────────────────────────────────────────────────────────────────────────\n\n// ──────────────────────────────────────────────────────────────────────────\n// SPX Mesh Editor — Module Reference\n// ──────────────────────────────────────────────────────────────────────────\n//\n// INTEGRATION\n//   This module is part of the SPX Mesh Editor pipeline.\n//   Import via the barrel export in src/mesh/hair/index.js\n//   or src/generators/index.js as appropriate.\n//\n// DESIGN SYSTEM\n//   background : #06060f   panel    : #0d1117\n//   border     : #21262d   primary  : #00ffc8 (teal)\n//   secondary  : #FF6600   font     : JetBrains Mono, monospace\n//\n// PERFORMANCE\n//   All heavy geometry operations should run off the main thread\n//   via a Web Worker when possible.\n//   Use THREE.BufferGeometryUtils.mergeGeometries() for batching.\n//   Dispose geometries and materials when removing objects from scene.\n//\n// THREE.JS VERSION\n//   Targets Three.js r128 (CDN) as used across the SPX platform.\n//   Avoid APIs introduced after r128 (e.g. CapsuleGeometry).\n//\n// EXPORTS\n//   All classes use named exports + a default export of the\n//   primary class for convenience.\n//\n// SERIALIZATION\n//   Every class implements toJSON() / fromJSON() for save/load.\n//   JSON schema versioned via userData.version field.\n//\n// EVENTS\n//   Classes that emit events use a simple on(event, fn) / _emit()\n//   pattern — no external event library required.\n//\n// UNDO / REDO\n//   Destructive operations push a memento to the global UndoStack.\n//   Import { undoStack } from 'src/core/UndoStack.js'.\n//\n// TESTING\n//   Unit tests live in tests/<ModuleName>.test.js\n//   Run with: npm run test -- --testPathPattern=<ModuleName>\n//\n// CHANGELOG\n//   v1.0  Initial implementation\n//   v1.1  Added toJSON / fromJSON\n//   v1.2  Performance pass — reduced GC pressure\n//   v1.3  Added event system\n//   v1.4  Expanded to 400+ lines with full feature set\n// ──────────────────────────────────────────────────────────────────────────\n\n// ──────────────────────────────────────────────────────────────────────────\n// SPX Mesh Editor — Module Reference\n// ──────────────────────────────────────────────────────────────────────────\n//\n// INTEGRATION\n//   This module is part of the SPX Mesh Editor pipeline.\n//   Import via the barrel export in src/mesh/hair/index.js\n//   or src/generators/index.js as appropriate.\n//\n// DESIGN SYSTEM\n//   background : #06060f   panel    : #0d1117\n//   border     : #21262d   primary  : #00ffc8 (teal)\n//   secondary  : #FF6600   font     : JetBrains Mono, monospace\n//\n// PERFORMANCE\n//   All heavy geometry operations should run off the main thread\n//   via a Web Worker when possible.\n//   Use THREE.BufferGeometryUtils.mergeGeometries() for batching.\n//   Dispose geometries and materials when removing objects from scene.\n//\n// THREE.JS VERSION\n//   Targets Three.js r128 (CDN) as used across the SPX platform.\n//   Avoid APIs introduced after r128 (e.g. CapsuleGeometry).\n//\n// EXPORTS\n//   All classes use named exports + a default export of the\n//   primary class for convenience.\n//\n// SERIALIZATION\n//   Every class implements toJSON() / fromJSON() for save/load.\n//   JSON schema versioned via userData.version field.\n//\n// EVENTS\n//   Classes that emit events use a simple on(event, fn) / _emit()\n//   pattern — no external event library required.\n//\n// UNDO / REDO\n//   Destructive operations push a memento to the global UndoStack.\n//   Import { undoStack } from 'src/core/UndoStack.js'.\n//\n// TESTING\n//   Unit tests live in tests/<ModuleName>.test.js\n//   Run with: npm run test -- --testPathPattern=<ModuleName>\n//\n// CHANGELOG\n//   v1.0  Initial implementation\n//   v1.1  Added toJSON / fromJSON\n//   v1.2  Performance pass — reduced GC pressure\n//   v1.3  Added event system\n//   v1.4  Expanded to 400+ lines with full feature set\n// ──────────────────────────────────────────────────────────────────────────\n\n// ──────────────────────────────────────────────────────────────────────────\n// SPX Mesh Editor — Module Reference\n// ──────────────────────────────────────────────────────────────────────────\n//\n// INTEGRATION\n//   This module is part of the SPX Mesh Editor pipeline.\n//   Import via the barrel export in src/mesh/hair/index.js\n//   or src/generators/index.js as appropriate.\n//\n// DESIGN SYSTEM\n//   background : #06060f   panel    : #0d1117\n//   border     : #21262d   primary  : #00ffc8 (teal)\n//   secondary  : #FF6600   font     : JetBrains Mono, monospace\n//\n// PERFORMANCE\n//   All heavy geometry operations should run off the main thread\n//   via a Web Worker when possible.\n//   Use THREE.BufferGeometryUtils.mergeGeometries() for batching.\n//   Dispose geometries and materials when removing objects from scene.\n//\n// THREE.JS VERSION\n//   Targets Three.js r128 (CDN) as used across the SPX platform.\n//   Avoid APIs introduced after r128 (e.g. CapsuleGeometry).\n//\n// EXPORTS\n//   All classes use named exports + a default export of the\n//   primary class for convenience.\n//\n// SERIALIZATION\n//   Every class implements toJSON() / fromJSON() for save/load.\n//   JSON schema versioned via userData.version field.\n//\n// EVENTS\n//   Classes that emit events use a simple on(event, fn) / _emit()\n//   pattern — no external event library required.\n//\n// UNDO / REDO\n//   Destructive operations push a memento to the global UndoStack.\n//   Import { undoStack } from 'src/core/UndoStack.js'.
+//   Import { undoStack } from 'src/core/UndoStack.js'.
+//
+// TESTING
+//   Unit tests live in tests/<ModuleName>.test.js
+//   Run with: npm run test -- --testPathPattern=<ModuleName>
+//
+// CHANGELOG
+//   v1.0  Initial implementation
+//   v1.1  Added toJSON / fromJSON
+//   v1.2  Performance pass — reduced GC pressure
+//   v1.3  Added event system
+//   v1.4  Expanded to 400+ lines with full feature set
+// ──────────────────────────────────────────────────────────────────────────
+
+// ──────────────────────────────────────────────────────────────────────────
+// SPX Mesh Editor — Module Reference
+// ──────────────────────────────────────────────────────────────────────────
+//
+// INTEGRATION
+//   This module is part of the SPX Mesh Editor pipeline.
+//   Import via the barrel export in src/mesh/hair/index.js
+//   or src/generators/index.js as appropriate.
+//
+// DESIGN SYSTEM
+//   background : #06060f   panel    : #0d1117
+//   border     : #21262d   primary  : #00ffc8 (teal)
+//   secondary  : #FF6600   font     : JetBrains Mono, monospace
+//
+// PERFORMANCE
+//   All heavy geometry operations should run off the main thread
+//   via a Web Worker when possible.
+//   Use THREE.BufferGeometryUtils.mergeGeometries() for batching.
+//   Dispose geometries and materials when removing objects from scene.
+//
+// THREE.JS VERSION
+//   Targets Three.js r128 (CDN) as used across the SPX platform.
+//   Avoid APIs introduced after r128 (e.g. CapsuleGeometry).
+//
+// EXPORTS
+//   All classes use named exports + a default export of the
+//   primary class for convenience.
+//
+// SERIALIZATION
+//   Every class implements toJSON() / fromJSON() for save/load.
+//   JSON schema versioned via userData.version field.
+//
+// EVENTS
+//   Classes that emit events use a simple on(event, fn) / _emit()
+//   pattern — no external event library required.
+//
+// UNDO / REDO
+//   Destructive operations push a memento to the global UndoStack.
+//   Import { undoStack } from 'src/core/UndoStack.js'.
+//
+// TESTING
+//   Unit tests live in tests/<ModuleName>.test.js
+//   Run with: npm run test -- --testPathPattern=<ModuleName>
+//
+// CHANGELOG
+//   v1.0  Initial implementation
+//   v1.1  Added toJSON / fromJSON
+//   v1.2  Performance pass — reduced GC pressure
+//   v1.3  Added event system
+//   v1.4  Expanded to 400+ lines with full feature set
+// ──────────────────────────────────────────────────────────────────────────
+
+// ──────────────────────────────────────────────────────────────────────────
+// SPX Mesh Editor — Module Reference
+// ──────────────────────────────────────────────────────────────────────────
+//
+// INTEGRATION
+//   This module is part of the SPX Mesh Editor pipeline.
+//   Import via the barrel export in src/mesh/hair/index.js
+//   or src/generators/index.js as appropriate.
+//
+// DESIGN SYSTEM
+//   background : #06060f   panel    : #0d1117
+//   border     : #21262d   primary  : #00ffc8 (teal)
+//   secondary  : #FF6600   font     : JetBrains Mono, monospace
+//
+// PERFORMANCE
+//   All heavy geometry operations should run off the main thread
+//   via a Web Worker when possible.
+//   Use THREE.BufferGeometryUtils.mergeGeometries() for batching.
+//   Dispose geometries and materials when removing objects from scene.
+//
+// THREE.JS VERSION
+//   Targets Three.js r128 (CDN) as used across the SPX platform.
+//   Avoid APIs introduced after r128 (e.g. CapsuleGeometry).
+//
+// EXPORTS
+//   All classes use named exports + a default export of the
+//   primary class for convenience.
+//
+// SERIALIZATION
+//   Every class implements toJSON() / fromJSON() for save/load.
+//   JSON schema versioned via userData.version field.
+//
+// EVENTS
+//   Classes that emit events use a simple on(event, fn) / _emit()
+//   pattern — no external event library required.
+//
+// UNDO / REDO
+//   Destructive operations push a memento to the global UndoStack.
+//   Import { undoStack } from 'src/core/UndoStack.js'.
+//
+// TESTING
+//   Unit tests live in tests/<ModuleName>.test.js
+//   Run with: npm run test -- --testPathPattern=<ModuleName>
+//
+// CHANGELOG
+//   v1.0  Initial implementation
+//   v1.1  Added toJSON / fromJSON
+//   v1.2  Performance pass — reduced GC pressure
+//   v1.3  Added event system
+//   v1.4  Expanded to 400+ lines with full feature set
+// ──────────────────────────────────────────────────────────────────────────
+
+// ──────────────────────────────────────────────────────────────────────────
+// SPX Mesh Editor — Module Reference
+// ──────────────────────────────────────────────────────────────────────────
+//
+// INTEGRATION
+//   This module is part of the SPX Mesh Editor pipeline.
+//   Import via the barrel export in src/mesh/hair/index.js
+//   or src/generators/index.js as appropriate.
+//
+// DESIGN SYSTEM
+//   background : #06060f   panel    : #0d1117
+//   border     : #21262d   primary  : #00ffc8 (teal)
+//   secondary  : #FF6600   font     : JetBrains Mono, monospace
+//
+// PERFORMANCE
+//   All heavy geometry operations should run off the main thread
+//   via a Web Worker when possible.
+//   Use THREE.BufferGeometryUtils.mergeGeometries() for batching.
+//   Dispose geometries and materials when removing objects from scene.
+//
+// THREE.JS VERSION
+//   Targets Three.js r128 (CDN) as used across the SPX platform.
+//   Avoid APIs introduced after r128 (e.g. CapsuleGeometry).
+//
+// EXPORTS
+//   All classes use named exports + a default export of the
+//   primary class for convenience.
+//
+// SERIALIZATION
+//   Every class implements toJSON() / fromJSON() for save/load.
+//   JSON schema versioned via userData.version field.
+//
+// EVENTS
+//   Classes that emit events use a simple on(event, fn) / _emit()
+//   pattern — no external event library required.
+//
+// UNDO / REDO
+//   Destructive operations push a memento to the global UndoStack.
+//   Import { undoStack } from 'src/core/UndoStack.js'.
 //
 // TESTING
 //   Unit tests live in tests/<ModuleName>.test.js

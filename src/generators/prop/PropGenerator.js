@@ -1,7 +1,219 @@
 // PropGenerator.js — Procedural Prop Geometry Generator
 // SPX Mesh Editor | StreamPireX
 
-import * as THREE from 'three';\n\nfunction lerp(a,b,t){return a+(b-a)*t;}\nfunction seededRng(seed){let s=seed;return ()=>{s=(s*9301+49297)%233280;return s/233280;};}\n\n// ─── Generic Box Prop ─────────────────────────────────────────────────────────\n\nexport function generateBoxProp(params = {}) {\n  const { width=1, height=1, depth=1, bevelSize=0.02, subdivision=1 } = params;\n  const geo = new THREE.BoxGeometry(width, height, depth, subdivision, subdivision, subdivision);\n  return geo;\n}\n\n// ─── Chair ────────────────────────────────────────────────────────────────────\n\nexport function generateChair(params = {}) {\n  const { seatHeight=0.45, seatWidth=0.45, seatDepth=0.45, backHeight=0.5, legRadius=0.025, style='modern' } = params;\n  const group = new THREE.Group();\n  const mat = new THREE.MeshStandardMaterial({ color: params.color ?? 0xa0785a, roughness: 0.8 });\n\n  // Seat\n  const seat = new THREE.Mesh(new THREE.BoxGeometry(seatWidth, 0.05, seatDepth), mat);\n  seat.position.y = seatHeight;\n  group.add(seat);\n\n  // Back\n  const back = new THREE.Mesh(new THREE.BoxGeometry(seatWidth, backHeight, 0.05), mat);\n  back.position.set(0, seatHeight + backHeight/2, -seatDepth/2);\n  group.add(back);\n\n  // Legs\n  const legPositions = [[-1,-1],[1,-1],[1,1],[-1,1]].map(([x,z]) => [x*seatWidth/2*0.85, 0, z*seatDepth/2*0.85]);\n  legPositions.forEach(([x,y,z]) => {\n    const leg = new THREE.Mesh(new THREE.CylinderGeometry(legRadius, legRadius*1.2, seatHeight, 6), mat);\n    leg.position.set(x, seatHeight/2, z);\n    group.add(leg);\n  });\n\n  return group;\n}\n\n// ─── Table ────────────────────────────────────────────────────────────────────\n\nexport function generateTable(params = {}) {\n  const { width=1.2, depth=0.8, height=0.75, thickness=0.05, legRadius=0.04, style='modern' } = params;\n  const group = new THREE.Group();\n  const mat = new THREE.MeshStandardMaterial({ color: params.color ?? 0x8b6914, roughness: 0.7 });\n\n  // Top\n  const top = new THREE.Mesh(new THREE.BoxGeometry(width, thickness, depth), mat);\n  top.position.y = height;\n  group.add(top);\n\n  // Legs\n  [[-1,-1],[1,-1],[1,1],[-1,1]].forEach(([x,z]) => {\n    const leg = new THREE.Mesh(new THREE.CylinderGeometry(legRadius, legRadius*1.3, height, 8), mat);\n    leg.position.set(x*(width/2-0.08), height/2, z*(depth/2-0.08));\n    group.add(leg);\n  });\n\n  return group;\n}\n\n// ─── Barrel ───────────────────────────────────────────────────────────────────\n\nexport function generateBarrel(params = {}) {\n  const { radius=0.3, height=0.5, hoopCount=3, segments=16 } = params;\n  const group = new THREE.Group();\n  const woodMat = new THREE.MeshStandardMaterial({ color: params.color ?? 0x8b6914, roughness: 0.9 });\n  const metalMat = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.3, metalness: 0.8 });\n\n  // Barrel body (bulged cylinder)\n  const positions=[], normals=[], uvs=[], indices=[];\n  const rings = 12;\n  for (let r=0;r<=rings;r++) {\n    const t=r/rings;\n    const y=t*height-height/2;\n    const bulgeFactor = 1 + Math.sin(t*Math.PI)*0.12;\n    const rad = radius*bulgeFactor;\n    for (let s=0;s<=segments;s++) {\n      const a=(s/segments)*Math.PI*2;\n      const x=Math.cos(a)*rad, z=Math.sin(a)*rad;\n      positions.push(x,y,z); normals.push(x/rad,0,z/rad); uvs.push(s/segments,t);\n    }\n  }\n  for (let r=0;r<rings;r++) for (let s=0;s<segments;s++) {\n    const a=r*(segments+1)+s,b=a+1,c=a+(segments+1),d=c+1;\n    indices.push(a,b,d,a,d,c);\n  }\n  const bodyGeo = new THREE.BufferGeometry();\n  bodyGeo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));\n  bodyGeo.setAttribute('normal',  new THREE.Float32BufferAttribute(normals,3));\n  bodyGeo.setAttribute('uv',      new THREE.Float32BufferAttribute(uvs,2));\n  bodyGeo.setIndex(indices);\n  bodyGeo.computeVertexNormals();\n  group.add(new THREE.Mesh(bodyGeo, woodMat));\n\n  // Top/bottom caps\n  [height/2, -height/2].forEach(y => {\n    const cap = new THREE.Mesh(new THREE.CircleGeometry(radius*0.95, segments), woodMat);\n    cap.rotation.x = -Math.PI/2; cap.position.y = y;\n    group.add(cap);\n  });\n\n  // Metal hoops\n  for (let h=0;h<hoopCount;h++) {\n    const y = lerp(-height/2+0.05, height/2-0.05, h/(hoopCount-1));\n    const hoop = new THREE.Mesh(new THREE.TorusGeometry(radius*1.05, 0.015, 6, segments), metalMat);\n    hoop.rotation.x = Math.PI/2; hoop.position.y = y;\n    group.add(hoop);\n  }\n\n  return group;\n}\n\n// ─── Sword ────────────────────────────────────────────────────────────────────\n\nexport function generateSword(params = {}) {\n  const { bladeLength=1.2, bladeWidth=0.06, guardWidth=0.22, handleLength=0.22, style='medieval' } = params;\n  const group = new THREE.Group();\n  const bladeMat = new THREE.MeshStandardMaterial({ color: 0xccccdd, roughness: 0.2, metalness: 0.9 });\n  const handleMat = new THREE.MeshStandardMaterial({ color: 0x8b4513, roughness: 0.8 });\n  const goldMat = new THREE.MeshStandardMaterial({ color: 0xffd700, roughness: 0.3, metalness: 0.8 });\n\n  // Blade\n  const bladeShape = new THREE.Shape();\n  bladeShape.moveTo(0, 0);\n  bladeShape.lineTo(-bladeWidth/2, 0.1);\n  bladeShape.lineTo(-bladeWidth/3, bladeLength);\n  bladeShape.lineTo(0, bladeLength+0.05);\n  bladeShape.lineTo(bladeWidth/3, bladeLength);\n  bladeShape.lineTo(bladeWidth/2, 0.1);\n  bladeShape.lineTo(0, 0);\n  const bladeGeo = new THREE.ExtrudeGeometry(bladeShape, { depth: 0.01, bevelEnabled: false });\n  const blade = new THREE.Mesh(bladeGeo, bladeMat);\n  blade.position.y = handleLength + 0.03;\n  group.add(blade);\n\n  // Guard\n  const guard = new THREE.Mesh(new THREE.BoxGeometry(guardWidth, 0.04, 0.04), goldMat);\n  guard.position.y = handleLength;\n  group.add(guard);\n\n  // Handle\n  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.02, handleLength, 8), handleMat);\n  handle.position.y = handleLength/2;\n  group.add(handle);\n\n  // Pommel\n  const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), goldMat);\n  pommel.position.y = 0;\n  group.add(pommel);\n\n  return group;\n}\n\n// ─── Crate ────────────────────────────────────────────────────────────────────\n\nexport function generateCrate(params = {}) {\n  const { size=0.6, planks=true, metalCorners=true } = params;\n  const group = new THREE.Group();\n  const woodMat = new THREE.MeshStandardMaterial({ color: params.color??0x8b6914, roughness:0.9 });\n  const metalMat = new THREE.MeshStandardMaterial({ color:0x555555, roughness:0.4, metalness:0.7 });\n\n  const box = new THREE.Mesh(new THREE.BoxGeometry(size,size,size), woodMat);\n  group.add(box);\n\n  if (metalCorners) {\n    const cornerSize = size*0.12;\n    const s2 = size/2;\n    [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]].forEach(([x,y,z]) => {\n      const corner = new THREE.Mesh(new THREE.BoxGeometry(cornerSize,cornerSize,cornerSize), metalMat);\n      corner.position.set(x*s2,y*s2,z*s2);\n      group.add(corner);\n    });\n  }\n\n  return group;\n}\n\n// ─── Main factory ─────────────────────────────────────────────────────────────\n\nexport function createProp(params = {}) {\n  const { propType='Chair', category='Furniture' } = params;\n\n  const generators = {\n    Chair: generateChair, Table: generateTable, Barrel: generateBarrel,\n    Sword: generateSword, Crate: generateCrate,\n  };\n\n  const fn = generators[propType];\n  if (fn) {\n    const result = fn(params);\n    if (result.isGroup) { result.name = propType; return result; }\n    const mat = new THREE.MeshStandardMaterial({ color: params.color??0x888888, roughness: params.roughness??0.5, metalness: params.metalness??0 });\n    const mesh = new THREE.Mesh(result, mat);\n    mesh.name = propType;\n    return mesh;\n  }\n\n  // Fallback — generic box prop\n  const geo = generateBoxProp(params);\n  const mat = new THREE.MeshStandardMaterial({ color: params.color??0x888888, roughness: params.roughness??0.5 });\n  const mesh = new THREE.Mesh(geo, mat);\n  mesh.name = propType;\n  return mesh;\n}\n\nexport const PROP_CATEGORIES = {\n  Furniture: ['Chair','Table','Sofa','Bed','Desk','Bookshelf','Cabinet','Lamp'],\n  Weapons:   ['Sword','Axe','Spear','Bow','Shield','Dagger','Mace','Staff'],\n  SciFi:     ['Console','Crate','Barrel','Generator','Antenna','Pod','Turret'],\n  Fantasy:   ['Chest','Torch','Cauldron','Crystal','Magic Staff','Amulet','Potion'],
+import * as THREE from 'three';
+
+function lerp(a,b,t){return a+(b-a)*t;}
+function seededRng(seed){let s=seed;return ()=>{s=(s*9301+49297)%233280;return s/233280;};}
+
+// ─── Generic Box Prop ─────────────────────────────────────────────────────────
+
+export function generateBoxProp(params = {}) {
+  const { width=1, height=1, depth=1, bevelSize=0.02, subdivision=1 } = params;
+  const geo = new THREE.BoxGeometry(width, height, depth, subdivision, subdivision, subdivision);
+  return geo;
+}
+
+// ─── Chair ────────────────────────────────────────────────────────────────────
+
+export function generateChair(params = {}) {
+  const { seatHeight=0.45, seatWidth=0.45, seatDepth=0.45, backHeight=0.5, legRadius=0.025, style='modern' } = params;
+  const group = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color: params.color ?? 0xa0785a, roughness: 0.8 });
+
+  // Seat
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(seatWidth, 0.05, seatDepth), mat);
+  seat.position.y = seatHeight;
+  group.add(seat);
+
+  // Back
+  const back = new THREE.Mesh(new THREE.BoxGeometry(seatWidth, backHeight, 0.05), mat);
+  back.position.set(0, seatHeight + backHeight/2, -seatDepth/2);
+  group.add(back);
+
+  // Legs
+  const legPositions = [[-1,-1],[1,-1],[1,1],[-1,1]].map(([x,z]) => [x*seatWidth/2*0.85, 0, z*seatDepth/2*0.85]);
+  legPositions.forEach(([x,y,z]) => {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(legRadius, legRadius*1.2, seatHeight, 6), mat);
+    leg.position.set(x, seatHeight/2, z);
+    group.add(leg);
+  });
+
+  return group;
+}
+
+// ─── Table ────────────────────────────────────────────────────────────────────
+
+export function generateTable(params = {}) {
+  const { width=1.2, depth=0.8, height=0.75, thickness=0.05, legRadius=0.04, style='modern' } = params;
+  const group = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color: params.color ?? 0x8b6914, roughness: 0.7 });
+
+  // Top
+  const top = new THREE.Mesh(new THREE.BoxGeometry(width, thickness, depth), mat);
+  top.position.y = height;
+  group.add(top);
+
+  // Legs
+  [[-1,-1],[1,-1],[1,1],[-1,1]].forEach(([x,z]) => {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(legRadius, legRadius*1.3, height, 8), mat);
+    leg.position.set(x*(width/2-0.08), height/2, z*(depth/2-0.08));
+    group.add(leg);
+  });
+
+  return group;
+}
+
+// ─── Barrel ───────────────────────────────────────────────────────────────────
+
+export function generateBarrel(params = {}) {
+  const { radius=0.3, height=0.5, hoopCount=3, segments=16 } = params;
+  const group = new THREE.Group();
+  const woodMat = new THREE.MeshStandardMaterial({ color: params.color ?? 0x8b6914, roughness: 0.9 });
+  const metalMat = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.3, metalness: 0.8 });
+
+  // Barrel body (bulged cylinder)
+  const positions=[], normals=[], uvs=[], indices=[];
+  const rings = 12;
+  for (let r=0;r<=rings;r++) {
+    const t=r/rings;
+    const y=t*height-height/2;
+    const bulgeFactor = 1 + Math.sin(t*Math.PI)*0.12;
+    const rad = radius*bulgeFactor;
+    for (let s=0;s<=segments;s++) {
+      const a=(s/segments)*Math.PI*2;
+      const x=Math.cos(a)*rad, z=Math.sin(a)*rad;
+      positions.push(x,y,z); normals.push(x/rad,0,z/rad); uvs.push(s/segments,t);
+    }
+  }
+  for (let r=0;r<rings;r++) for (let s=0;s<segments;s++) {
+    const a=r*(segments+1)+s,b=a+1,c=a+(segments+1),d=c+1;
+    indices.push(a,b,d,a,d,c);
+  }
+  const bodyGeo = new THREE.BufferGeometry();
+  bodyGeo.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  bodyGeo.setAttribute('normal',  new THREE.Float32BufferAttribute(normals,3));
+  bodyGeo.setAttribute('uv',      new THREE.Float32BufferAttribute(uvs,2));
+  bodyGeo.setIndex(indices);
+  bodyGeo.computeVertexNormals();
+  group.add(new THREE.Mesh(bodyGeo, woodMat));
+
+  // Top/bottom caps
+  [height/2, -height/2].forEach(y => {
+    const cap = new THREE.Mesh(new THREE.CircleGeometry(radius*0.95, segments), woodMat);
+    cap.rotation.x = -Math.PI/2; cap.position.y = y;
+    group.add(cap);
+  });
+
+  // Metal hoops
+  for (let h=0;h<hoopCount;h++) {
+    const y = lerp(-height/2+0.05, height/2-0.05, h/(hoopCount-1));
+    const hoop = new THREE.Mesh(new THREE.TorusGeometry(radius*1.05, 0.015, 6, segments), metalMat);
+    hoop.rotation.x = Math.PI/2; hoop.position.y = y;
+    group.add(hoop);
+  }
+
+  return group;
+}
+
+// ─── Sword ────────────────────────────────────────────────────────────────────
+
+export function generateSword(params = {}) {
+  const { bladeLength=1.2, bladeWidth=0.06, guardWidth=0.22, handleLength=0.22, style='medieval' } = params;
+  const group = new THREE.Group();
+  const bladeMat = new THREE.MeshStandardMaterial({ color: 0xccccdd, roughness: 0.2, metalness: 0.9 });
+  const handleMat = new THREE.MeshStandardMaterial({ color: 0x8b4513, roughness: 0.8 });
+  const goldMat = new THREE.MeshStandardMaterial({ color: 0xffd700, roughness: 0.3, metalness: 0.8 });
+
+  // Blade
+  const bladeShape = new THREE.Shape();
+  bladeShape.moveTo(0, 0);
+  bladeShape.lineTo(-bladeWidth/2, 0.1);
+  bladeShape.lineTo(-bladeWidth/3, bladeLength);
+  bladeShape.lineTo(0, bladeLength+0.05);
+  bladeShape.lineTo(bladeWidth/3, bladeLength);
+  bladeShape.lineTo(bladeWidth/2, 0.1);
+  bladeShape.lineTo(0, 0);
+  const bladeGeo = new THREE.ExtrudeGeometry(bladeShape, { depth: 0.01, bevelEnabled: false });
+  const blade = new THREE.Mesh(bladeGeo, bladeMat);
+  blade.position.y = handleLength + 0.03;
+  group.add(blade);
+
+  // Guard
+  const guard = new THREE.Mesh(new THREE.BoxGeometry(guardWidth, 0.04, 0.04), goldMat);
+  guard.position.y = handleLength;
+  group.add(guard);
+
+  // Handle
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.02, handleLength, 8), handleMat);
+  handle.position.y = handleLength/2;
+  group.add(handle);
+
+  // Pommel
+  const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), goldMat);
+  pommel.position.y = 0;
+  group.add(pommel);
+
+  return group;
+}
+
+// ─── Crate ────────────────────────────────────────────────────────────────────
+
+export function generateCrate(params = {}) {
+  const { size=0.6, planks=true, metalCorners=true } = params;
+  const group = new THREE.Group();
+  const woodMat = new THREE.MeshStandardMaterial({ color: params.color??0x8b6914, roughness:0.9 });
+  const metalMat = new THREE.MeshStandardMaterial({ color:0x555555, roughness:0.4, metalness:0.7 });
+
+  const box = new THREE.Mesh(new THREE.BoxGeometry(size,size,size), woodMat);
+  group.add(box);
+
+  if (metalCorners) {
+    const cornerSize = size*0.12;
+    const s2 = size/2;
+    [[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]].forEach(([x,y,z]) => {
+      const corner = new THREE.Mesh(new THREE.BoxGeometry(cornerSize,cornerSize,cornerSize), metalMat);
+      corner.position.set(x*s2,y*s2,z*s2);
+      group.add(corner);
+    });
+  }
+
+  return group;
+}
+
+// ─── Main factory ─────────────────────────────────────────────────────────────
+
+export function createProp(params = {}) {
+  const { propType='Chair', category='Furniture' } = params;
+
+  const generators = {
+    Chair: generateChair, Table: generateTable, Barrel: generateBarrel,
+    Sword: generateSword, Crate: generateCrate,
+  };
+
+  const fn = generators[propType];
+  if (fn) {
+    const result = fn(params);
+    if (result.isGroup) { result.name = propType; return result; }
+    const mat = new THREE.MeshStandardMaterial({ color: params.color??0x888888, roughness: params.roughness??0.5, metalness: params.metalness??0 });
+    const mesh = new THREE.Mesh(result, mat);
+    mesh.name = propType;
+    return mesh;
+  }
+
+  // Fallback — generic box prop
+  const geo = generateBoxProp(params);
+  const mat = new THREE.MeshStandardMaterial({ color: params.color??0x888888, roughness: params.roughness??0.5 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.name = propType;
+  return mesh;
+}
+
+export const PROP_CATEGORIES = {
+  Furniture: ['Chair','Table','Sofa','Bed','Desk','Bookshelf','Cabinet','Lamp'],
+  Weapons:   ['Sword','Axe','Spear','Bow','Shield','Dagger','Mace','Staff'],
+  SciFi:     ['Console','Crate','Barrel','Generator','Antenna','Pod','Turret'],
+  Fantasy:   ['Chest','Torch','Cauldron','Crystal','Magic Staff','Amulet','Potion'],
 };
 
 export default { createProp, generateChair, generateTable, generateBarrel, generateSword, generateCrate, PROP_CATEGORIES };

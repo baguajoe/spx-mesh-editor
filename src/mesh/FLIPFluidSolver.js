@@ -4,7 +4,368 @@
 // Features: MAC grid, particle-to-grid transfer, pressure solve,
 //           grid-to-particle transfer, surface reconstruction, foam/spray
 
-import * as THREE from 'three';\n\n// ─── MAC Grid ─────────────────────────────────────────────────────────────────\n\nclass MACGrid {\n  constructor(nx, ny, nz, cellSize) {\n    this.nx = nx; this.ny = ny; this.nz = nz;\n    this.cellSize = cellSize;\n    this.u  = new Float32Array((nx+1)*ny*nz).fill(0);   // x-face velocities\n    this.v  = new Float32Array(nx*(ny+1)*nz).fill(0);   // y-face velocities\n    this.w  = new Float32Array(nx*ny*(nz+1)).fill(0);   // z-face velocities\n    this.p  = new Float32Array(nx*ny*nz).fill(0);        // pressure\n    this.d  = new Float32Array(nx*ny*nz).fill(0);        // divergence\n    this.type = new Uint8Array(nx*ny*nz).fill(0);       // 0=air, 1=fluid, 2=solid\n  }\n\n  idx(x,y,z) { return z*this.ny*this.nx + y*this.nx + x; }\n  uIdx(x,y,z) { return z*this.ny*(this.nx+1) + y*(this.nx+1) + x; }\n  vIdx(x,y,z) { return z*(this.ny+1)*this.nx + y*this.nx + x; }\n  wIdx(x,y,z) { return z*this.ny*this.nx + y*this.nx + x; }\n\n  clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }\n\n  sampleU(x,y,z) {\n    const xi = this.clamp(Math.floor(x), 0, this.nx);\n    const yi = this.clamp(Math.floor(y-0.5), 0, this.ny-1);\n    const zi = this.clamp(Math.floor(z-0.5), 0, this.nz-1);\n    return this.u[this.uIdx(xi,yi,zi)];\n  }\n  sampleV(x,y,z) {\n    const xi = this.clamp(Math.floor(x-0.5), 0, this.nx-1);\n    const yi = this.clamp(Math.floor(y), 0, this.ny);\n    const zi = this.clamp(Math.floor(z-0.5), 0, this.nz-1);\n    return this.v[this.vIdx(xi,yi,zi)];\n  }\n  sampleW(x,y,z) {\n    const xi = this.clamp(Math.floor(x-0.5), 0, this.nx-1);\n    const yi = this.clamp(Math.floor(y-0.5), 0, this.ny-1);\n    const zi = this.clamp(Math.floor(z), 0, this.nz);\n    return this.w[this.wIdx(xi,yi,zi)];\n  }\n\n  velocityAt(x,y,z) {\n    return new THREE.Vector3(this.sampleU(x,y,z), this.sampleV(x,y,z), this.sampleW(x,y,z));\n  }\n\n  clearVelocities() { this.u.fill(0); this.v.fill(0); this.w.fill(0); }\n  clearPressure()   { this.p.fill(0); this.d.fill(0); }\n}\n\n// ─── FLIP Particle ────────────────────────────────────────────────────────────\n\nexport function createFLIPParticle(position, velocity, options = {}) {\n  return {\n    position: position.clone(),\n    velocity: velocity?.clone() ?? new THREE.Vector3(),\n    mass:     options.mass     ?? 1,\n    radius:   options.radius   ?? 0.05,\n    phase:    options.phase    ?? 0,   // 0=fluid, 1=foam, 2=spray, 3=bubble\n    age:      0,\n    alive:    true,\n  };\n}\n\n// ─── FLIP Fluid Solver ────────────────────────────────────────────────────────\n\nexport class FLIPFluidSolver {\n  constructor(options = {}) {\n    this.cellSize   = options.cellSize   ?? 0.1;\n    this.gravity    = options.gravity    ?? new THREE.Vector3(0, -9.8, 0);\n    this.flipRatio  = options.flipRatio  ?? 0.95; // FLIP/PIC blend: 1=full FLIP, 0=full PIC\n    this.viscosity  = options.viscosity  ?? 0;\n    this.density    = options.density    ?? 1000;\n    this.particles  = [];\n    this.bounds     = options.bounds ?? {\n      min: new THREE.Vector3(-1,-1,-1), max: new THREE.Vector3(1,1,1),\n    };\n    this.subSteps   = options.subSteps   ?? 2;\n    this.maxParticles = options.maxParticles ?? 5000;\n    this.foam       = options.foam       ?? false;\n    this.foamThreshold = options.foamThreshold ?? 6;\n    this.enabled    = true;\n\n    // Build grid\n    const size = this.bounds.max.clone().sub(this.bounds.min);\n    this.nx = Math.ceil(size.x / this.cellSize);\n    this.ny = Math.ceil(size.y / this.cellSize);\n    this.nz = Math.ceil(size.z / this.cellSize);\n    this.grid = new MACGrid(this.nx, this.ny, this.nz, this.cellSize);\n    this._prevU = new Float32Array(this.grid.u.length);\n    this._prevV = new Float32Array(this.grid.v.length);\n    this._prevW = new Float32Array(this.grid.w.length);\n  }\n\n  _worldToGrid(pos) {\n    return new THREE.Vector3(\n      (pos.x - this.bounds.min.x) / this.cellSize,\n      (pos.y - this.bounds.min.y) / this.cellSize,\n      (pos.z - this.bounds.min.z) / this.cellSize,\n    );\n  }\n\n  // ─── Particle → Grid (P2G) ─────────────────────────────────────────────\n\n  _particleToGrid() {\n    const g = this.grid;\n    g.clearVelocities();\n    const uWeights = new Float32Array(g.u.length);\n    const vWeights = new Float32Array(g.v.length);\n    const wWeights = new Float32Array(g.w.length);\n\n    this.particles.forEach(p => {\n      if (!p.alive || p.phase !== 0) return;\n      const gp = this._worldToGrid(p.position);\n\n      // Splat velocity to grid using trilinear weights\n      for (let dz = 0; dz <= 1; dz++) for (let dy = 0; dy <= 1; dy++) for (let dx = 0; dx <= 1; dx++) {\n        const xi = Math.floor(gp.x) + dx;\n        const yi = Math.floor(gp.y) + dy;\n        const zi = Math.floor(gp.z) + dz;\n        if (xi < 0 || xi > g.nx || yi < 0 || yi >= g.ny || zi < 0 || zi >= g.nz) continue;\n        const wx = dx === 0 ? (1-(gp.x%1)) : (gp.x%1);\n        const wy = dy === 0 ? (1-(gp.y%1)) : (gp.y%1);\n        const wz = dz === 0 ? (1-(gp.z%1)) : (gp.z%1);\n        const w = wx * wy * wz;\n        const ui = g.uIdx(xi,yi,zi);\n        if (ui < g.u.length) { g.u[ui] += p.velocity.x * w; uWeights[ui] += w; }\n        const vi = g.vIdx(xi,yi,zi);\n        if (vi < g.v.length) { g.v[vi] += p.velocity.y * w; vWeights[vi] += w; }\n        const wi2 = g.wIdx(xi,yi,zi);\n        if (wi2 < g.w.length) { g.w[wi2] += p.velocity.z * w; wWeights[wi2] += w; }\n      }\n    });\n\n    // Normalize\n    for (let i = 0; i < g.u.length; i++) if (uWeights[i] > 0) g.u[i] /= uWeights[i];\n    for (let i = 0; i < g.v.length; i++) if (vWeights[i] > 0) g.v[i] /= vWeights[i];\n    for (let i = 0; i < g.w.length; i++) if (wWeights[i] > 0) g.w[i] /= wWeights[i];\n  }\n\n  // ─── Apply External Forces ──────────────────────────────────────────────\n\n  _applyForces(dt) {\n    const g = this.grid;\n    for (let z = 0; z < g.nz; z++) for (let y = 0; y <= g.ny; y++) for (let x = 0; x < g.nx; x++) {\n      g.v[g.vIdx(x,y,z)] += this.gravity.y * dt;\n    }\n  }\n\n  // ─── Pressure Solve (Jacobi iterations) ────────────────────────────────\n\n  _solvePressure(dt, iterations = 40) {\n    const g = this.grid;\n    const scale = dt / (this.density * this.cellSize * this.cellSize);\n    g.clearPressure();\n\n    // Compute divergence\n    for (let z = 0; z < g.nz; z++) for (let y = 0; y < g.ny; y++) for (let x = 0; x < g.nx; x++) {\n      if (g.type[g.idx(x,y,z)] !== 1) continue;\n      const div = (g.u[g.uIdx(x+1,y,z)] - g.u[g.uIdx(x,y,z)] +\n                   g.v[g.vIdx(x,y+1,z)] - g.v[g.vIdx(x,y,z)] +\n                   g.w[g.wIdx(x,y,z+1)] - g.w[g.wIdx(x,y,z)]) / this.cellSize;\n      g.d[g.idx(x,y,z)] = -div;\n    }\n\n    // Jacobi pressure solve\n    const pNew = new Float32Array(g.p.length);\n    for (let iter = 0; iter < iterations; iter++) {\n      for (let z = 0; z < g.nz; z++) for (let y = 0; y < g.ny; y++) for (let x = 0; x < g.nx; x++) {\n        if (g.type[g.idx(x,y,z)] !== 1) continue;\n        let sum = 0, count = 0;\n        if (x>0)      { sum += g.p[g.idx(x-1,y,z)]; count++; }\n        if (x<g.nx-1) { sum += g.p[g.idx(x+1,y,z)]; count++; }\n        if (y>0)      { sum += g.p[g.idx(x,y-1,z)]; count++; }\n        if (y<g.ny-1) { sum += g.p[g.idx(x,y+1,z)]; count++; }\n        if (z>0)      { sum += g.p[g.idx(x,y,z-1)]; count++; }\n        if (z<g.nz-1) { sum += g.p[g.idx(x,y,z+1)]; count++; }\n        pNew[g.idx(x,y,z)] = (sum - g.d[g.idx(x,y,z)] * this.cellSize * this.cellSize) / (count || 1);\n      }\n      g.p.set(pNew);\n    }\n\n    // Apply pressure gradient\n    for (let z = 0; z < g.nz; z++) for (let y = 0; y < g.ny; y++) for (let x = 0; x <= g.nx; x++) {\n      if (x > 0 && x < g.nx) {\n        g.u[g.uIdx(x,y,z)] -= scale * (g.p[g.idx(x,y,z)] - g.p[g.idx(x-1,y,z)]);\n      }\n    }\n    for (let z = 0; z < g.nz; z++) for (let y = 0; y <= g.ny; y++) for (let x = 0; x < g.nx; x++) {\n      if (y > 0 && y < g.ny) {\n        g.v[g.vIdx(x,y,z)] -= scale * (g.p[g.idx(x,y,z)] - g.p[g.idx(x,y-1,z)]);\n      }\n    }\n  }\n\n  // ─── Grid → Particle (G2P) ─────────────────────────────────────────────\n\n  _gridToParticle(dt) {\n    this.particles.forEach(p => {\n      if (!p.alive || p.phase !== 0) return;\n      const gp = this._worldToGrid(p.position);\n      const picVel  = this.grid.velocityAt(gp.x, gp.y, gp.z);\n      const prevVel = new THREE.Vector3(\n        this._interpU(gp.x, gp.y, gp.z, true),\n        this._interpV(gp.x, gp.y, gp.z, true),\n        this._interpW(gp.x, gp.y, gp.z, true),\n      );\n      const flipVel = p.velocity.clone().add(picVel.clone().sub(prevVel));\n      p.velocity.lerpVectors(picVel, flipVel, this.flipRatio);\n    });\n  }\n\n  _interpU(gx,gy,gz, prev=false) {\n    const arr = prev ? this._prevU : this.grid.u;\n    const xi = Math.floor(gx), yi = Math.floor(gy-0.5), zi = Math.floor(gz-0.5);\n    const xi2 = Math.min(xi+1, this.nx), yi2 = Math.min(yi+1, this.ny-1), zi2 = Math.min(zi+1, this.nz-1);\n    const tx = gx-xi, ty = gy-0.5-yi, tz = gz-0.5-zi;\n    const g = this.grid;\n    return arr[g.uIdx(xi,yi,zi)]*(1-tx)*(1-ty)*(1-tz) + arr[g.uIdx(xi2,yi,zi)]*tx*(1-ty)*(1-tz);\n  }\n  _interpV(gx,gy,gz, prev=false) { return prev ? this._prevV[0] : this.grid.sampleV(gx,gy,gz); }\n  _interpW(gx,gy,gz, prev=false) { return prev ? this._prevW[0] : this.grid.sampleW(gx,gy,gz); }\n\n  // ─── Advect Particles ──────────────────────────────────────────────────\n\n  _advectParticles(dt) {\n    this.particles.forEach(p => {\n      if (!p.alive) return;\n      p.age += dt;\n\n      // RK2 advection\n      const gp = this._worldToGrid(p.position);\n      const v1 = this.grid.velocityAt(gp.x, gp.y, gp.z);\n      const midPos = p.position.clone().addScaledVector(v1, dt*0.5);\n      const gp2 = this._worldToGrid(midPos);\n      const v2 = this.grid.velocityAt(gp2.x, gp2.y, gp2.z);\n\n      p.position.addScaledVector(v2, dt);\n\n      // Boundary collision\n      ['x','y','z'].forEach(axis => {\n        if (p.position[axis] < this.bounds.min[axis] + p.radius) {\n          p.position[axis] = this.bounds.min[axis] + p.radius;\n          p.velocity[axis] *= -0.3;\n        }\n        if (p.position[axis] > this.bounds.max[axis] - p.radius) {\n          p.position[axis] = this.bounds.max[axis] - p.radius;\n          p.velocity[axis] *= -0.3;\n        }\n      });\n\n      // Kill escaped particles\n      if (!p.position.x) p.alive = false;\n    });\n\n    this.particles = this.particles.filter(p => p.alive);\n  }\n\n  // ─── Foam / Spray ──────────────────────────────────────────────────────\n\n  _updateFoamSpray() {\n    if (!this.foam) return;\n    this.particles.forEach(p => {\n      if (p.phase !== 0) return;\n      const speed = p.velocity.length();\n      const trapped = this._countNeighbors(p) < 4;\n      if (speed > this.foamThreshold && trapped) {\n        p.phase = Math.random() < 0.5 ? 1 : 2; // foam or spray\n      }\n    });\n    this.particles.forEach(p => {\n      if (p.phase === 1) { // foam — floats on surface\n        p.velocity.y += 0.1;\n        p.velocity.multiplyScalar(0.95);\n      } else if (p.phase === 2) { // spray — flies through air\n        p.velocity.y += this.gravity.y * 0.01;\n        if (this._countNeighbors(p) > 6) p.phase = 0; // reabsorb\n      }\n    });\n  }\n\n  _countNeighbors(particle) {\n    const radius = this.cellSize * 2;\n    return this.particles.filter(p => p !== particle && p.alive && p.phase === 0 &&\n      p.position.distanceTo(particle.position) < radius).length;\n  }\n\n  // ─── Mark Fluid Cells ──────────────────────────────────────────────────\n\n  _markFluidCells() {\n    this.grid.type.fill(0); // air\n    this.particles.forEach(p => {\n      if (!p.alive || p.phase !== 0) return;\n      const gp = this._worldToGrid(p.position);\n      const xi = Math.floor(gp.x), yi = Math.floor(gp.y), zi = Math.floor(gp.z);\n      if (xi>=0 && xi<this.nx && yi>=0 && yi<this.ny && zi>=0 && zi<this.nz) {\n        this.grid.type[this.grid.idx(xi,yi,zi)] = 1;\n      }\n    });\n    // Solid boundary\n    for (let z=0; z<this.nz; z++) for (let y=0; y<this.ny; y++) for (let x=0; x<this.nx; x++) {\n      if (x===0||x===this.nx-1||y===0||y===this.ny-1||z===0||z===this.nz-1)\n        this.grid.type[this.grid.idx(x,y,z)] = 2;\n    }\n  }\n\n  // ─── Main Step ─────────────────────────────────────────────────────────\n\n  step(dt = 1/60) {\n    if (!this.enabled || !this.particles.length) return;\n    const subDt = dt / this.subSteps;\n\n    for (let sub = 0; sub < this.subSteps; sub++) {\n      this._markFluidCells();\n      this._particleToGrid();\n      this._prevU.set(this.grid.u);\n      this._prevV.set(this.grid.v);\n      this._prevW.set(this.grid.w);\n      this._applyForces(subDt);\n      this._solvePressure(subDt);\n      this._gridToParticle(subDt);\n      this._advectParticles(subDt);\n      if (this.foam) this._updateFoamSpray();\n    }\n  }\n\n  // ─── Public API ────────────────────────────────────────────────────────\n\n  addParticle(position, velocity, options) {\n    if (this.particles.length >= this.maxParticles) return null;\n    const p = createFLIPParticle(position, velocity, options);\n    this.particles.push(p);\n    return p;\n  }\n\n  spawnBox(min, max, count = 200, velocity) {\n    for (let i = 0; i < count; i++) {\n      const pos = new THREE.Vector3(\n        min.x + Math.random()*(max.x-min.x),\n        min.y + Math.random()*(max.y-min.y),\n        min.z + Math.random()*(max.z-min.z),\n      );\n      this.addParticle(pos, velocity?.clone() ?? new THREE.Vector3(), { radius: this.cellSize*0.5 });\n    }\n  }\n\n  buildPointCloud() {\n    const positions = new Float32Array(this.particles.length * 3);\n    const colors    = new Float32Array(this.particles.length * 3);\n    this.particles.forEach((p, i) => {\n      positions[i*3]   = p.position.x;\n      positions[i*3+1] = p.position.y;\n      positions[i*3+2] = p.position.z;\n      // Color by phase\n      if (p.phase === 0) { colors[i*3]=0.2; colors[i*3+1]=0.5; colors[i*3+2]=1.0; } // water=blue\n      else if (p.phase===1) { colors[i*3]=1;colors[i*3+1]=1;colors[i*3+2]=1; }       // foam=white\n      else { colors[i*3]=0.7;colors[i*3+1]=0.9;colors[i*3+2]=1; }                    // spray=light blue\n    });\n    const { THREE: T } = { THREE };\n    const geo = new THREE.BufferGeometry();\n    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));\n    geo.setAttribute('color',    new THREE.BufferAttribute(colors, 3));
+import * as THREE from 'three';
+
+// ─── MAC Grid ─────────────────────────────────────────────────────────────────
+
+class MACGrid {
+  constructor(nx, ny, nz, cellSize) {
+    this.nx = nx; this.ny = ny; this.nz = nz;
+    this.cellSize = cellSize;
+    this.u  = new Float32Array((nx+1)*ny*nz).fill(0);   // x-face velocities
+    this.v  = new Float32Array(nx*(ny+1)*nz).fill(0);   // y-face velocities
+    this.w  = new Float32Array(nx*ny*(nz+1)).fill(0);   // z-face velocities
+    this.p  = new Float32Array(nx*ny*nz).fill(0);        // pressure
+    this.d  = new Float32Array(nx*ny*nz).fill(0);        // divergence
+    this.type = new Uint8Array(nx*ny*nz).fill(0);       // 0=air, 1=fluid, 2=solid
+  }
+
+  idx(x,y,z) { return z*this.ny*this.nx + y*this.nx + x; }
+  uIdx(x,y,z) { return z*this.ny*(this.nx+1) + y*(this.nx+1) + x; }
+  vIdx(x,y,z) { return z*(this.ny+1)*this.nx + y*this.nx + x; }
+  wIdx(x,y,z) { return z*this.ny*this.nx + y*this.nx + x; }
+
+  clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  sampleU(x,y,z) {
+    const xi = this.clamp(Math.floor(x), 0, this.nx);
+    const yi = this.clamp(Math.floor(y-0.5), 0, this.ny-1);
+    const zi = this.clamp(Math.floor(z-0.5), 0, this.nz-1);
+    return this.u[this.uIdx(xi,yi,zi)];
+  }
+  sampleV(x,y,z) {
+    const xi = this.clamp(Math.floor(x-0.5), 0, this.nx-1);
+    const yi = this.clamp(Math.floor(y), 0, this.ny);
+    const zi = this.clamp(Math.floor(z-0.5), 0, this.nz-1);
+    return this.v[this.vIdx(xi,yi,zi)];
+  }
+  sampleW(x,y,z) {
+    const xi = this.clamp(Math.floor(x-0.5), 0, this.nx-1);
+    const yi = this.clamp(Math.floor(y-0.5), 0, this.ny-1);
+    const zi = this.clamp(Math.floor(z), 0, this.nz);
+    return this.w[this.wIdx(xi,yi,zi)];
+  }
+
+  velocityAt(x,y,z) {
+    return new THREE.Vector3(this.sampleU(x,y,z), this.sampleV(x,y,z), this.sampleW(x,y,z));
+  }
+
+  clearVelocities() { this.u.fill(0); this.v.fill(0); this.w.fill(0); }
+  clearPressure()   { this.p.fill(0); this.d.fill(0); }
+}
+
+// ─── FLIP Particle ────────────────────────────────────────────────────────────
+
+export function createFLIPParticle(position, velocity, options = {}) {
+  return {
+    position: position.clone(),
+    velocity: velocity?.clone() ?? new THREE.Vector3(),
+    mass:     options.mass     ?? 1,
+    radius:   options.radius   ?? 0.05,
+    phase:    options.phase    ?? 0,   // 0=fluid, 1=foam, 2=spray, 3=bubble
+    age:      0,
+    alive:    true,
+  };
+}
+
+// ─── FLIP Fluid Solver ────────────────────────────────────────────────────────
+
+export class FLIPFluidSolver {
+  constructor(options = {}) {
+    this.cellSize   = options.cellSize   ?? 0.1;
+    this.gravity    = options.gravity    ?? new THREE.Vector3(0, -9.8, 0);
+    this.flipRatio  = options.flipRatio  ?? 0.95; // FLIP/PIC blend: 1=full FLIP, 0=full PIC
+    this.viscosity  = options.viscosity  ?? 0;
+    this.density    = options.density    ?? 1000;
+    this.particles  = [];
+    this.bounds     = options.bounds ?? {
+      min: new THREE.Vector3(-1,-1,-1), max: new THREE.Vector3(1,1,1),
+    };
+    this.subSteps   = options.subSteps   ?? 2;
+    this.maxParticles = options.maxParticles ?? 5000;
+    this.foam       = options.foam       ?? false;
+    this.foamThreshold = options.foamThreshold ?? 6;
+    this.enabled    = true;
+
+    // Build grid
+    const size = this.bounds.max.clone().sub(this.bounds.min);
+    this.nx = Math.ceil(size.x / this.cellSize);
+    this.ny = Math.ceil(size.y / this.cellSize);
+    this.nz = Math.ceil(size.z / this.cellSize);
+    this.grid = new MACGrid(this.nx, this.ny, this.nz, this.cellSize);
+    this._prevU = new Float32Array(this.grid.u.length);
+    this._prevV = new Float32Array(this.grid.v.length);
+    this._prevW = new Float32Array(this.grid.w.length);
+  }
+
+  _worldToGrid(pos) {
+    return new THREE.Vector3(
+      (pos.x - this.bounds.min.x) / this.cellSize,
+      (pos.y - this.bounds.min.y) / this.cellSize,
+      (pos.z - this.bounds.min.z) / this.cellSize,
+    );
+  }
+
+  // ─── Particle → Grid (P2G) ─────────────────────────────────────────────
+
+  _particleToGrid() {
+    const g = this.grid;
+    g.clearVelocities();
+    const uWeights = new Float32Array(g.u.length);
+    const vWeights = new Float32Array(g.v.length);
+    const wWeights = new Float32Array(g.w.length);
+
+    this.particles.forEach(p => {
+      if (!p.alive || p.phase !== 0) return;
+      const gp = this._worldToGrid(p.position);
+
+      // Splat velocity to grid using trilinear weights
+      for (let dz = 0; dz <= 1; dz++) for (let dy = 0; dy <= 1; dy++) for (let dx = 0; dx <= 1; dx++) {
+        const xi = Math.floor(gp.x) + dx;
+        const yi = Math.floor(gp.y) + dy;
+        const zi = Math.floor(gp.z) + dz;
+        if (xi < 0 || xi > g.nx || yi < 0 || yi >= g.ny || zi < 0 || zi >= g.nz) continue;
+        const wx = dx === 0 ? (1-(gp.x%1)) : (gp.x%1);
+        const wy = dy === 0 ? (1-(gp.y%1)) : (gp.y%1);
+        const wz = dz === 0 ? (1-(gp.z%1)) : (gp.z%1);
+        const w = wx * wy * wz;
+        const ui = g.uIdx(xi,yi,zi);
+        if (ui < g.u.length) { g.u[ui] += p.velocity.x * w; uWeights[ui] += w; }
+        const vi = g.vIdx(xi,yi,zi);
+        if (vi < g.v.length) { g.v[vi] += p.velocity.y * w; vWeights[vi] += w; }
+        const wi2 = g.wIdx(xi,yi,zi);
+        if (wi2 < g.w.length) { g.w[wi2] += p.velocity.z * w; wWeights[wi2] += w; }
+      }
+    });
+
+    // Normalize
+    for (let i = 0; i < g.u.length; i++) if (uWeights[i] > 0) g.u[i] /= uWeights[i];
+    for (let i = 0; i < g.v.length; i++) if (vWeights[i] > 0) g.v[i] /= vWeights[i];
+    for (let i = 0; i < g.w.length; i++) if (wWeights[i] > 0) g.w[i] /= wWeights[i];
+  }
+
+  // ─── Apply External Forces ──────────────────────────────────────────────
+
+  _applyForces(dt) {
+    const g = this.grid;
+    for (let z = 0; z < g.nz; z++) for (let y = 0; y <= g.ny; y++) for (let x = 0; x < g.nx; x++) {
+      g.v[g.vIdx(x,y,z)] += this.gravity.y * dt;
+    }
+  }
+
+  // ─── Pressure Solve (Jacobi iterations) ────────────────────────────────
+
+  _solvePressure(dt, iterations = 40) {
+    const g = this.grid;
+    const scale = dt / (this.density * this.cellSize * this.cellSize);
+    g.clearPressure();
+
+    // Compute divergence
+    for (let z = 0; z < g.nz; z++) for (let y = 0; y < g.ny; y++) for (let x = 0; x < g.nx; x++) {
+      if (g.type[g.idx(x,y,z)] !== 1) continue;
+      const div = (g.u[g.uIdx(x+1,y,z)] - g.u[g.uIdx(x,y,z)] +
+                   g.v[g.vIdx(x,y+1,z)] - g.v[g.vIdx(x,y,z)] +
+                   g.w[g.wIdx(x,y,z+1)] - g.w[g.wIdx(x,y,z)]) / this.cellSize;
+      g.d[g.idx(x,y,z)] = -div;
+    }
+
+    // Jacobi pressure solve
+    const pNew = new Float32Array(g.p.length);
+    for (let iter = 0; iter < iterations; iter++) {
+      for (let z = 0; z < g.nz; z++) for (let y = 0; y < g.ny; y++) for (let x = 0; x < g.nx; x++) {
+        if (g.type[g.idx(x,y,z)] !== 1) continue;
+        let sum = 0, count = 0;
+        if (x>0)      { sum += g.p[g.idx(x-1,y,z)]; count++; }
+        if (x<g.nx-1) { sum += g.p[g.idx(x+1,y,z)]; count++; }
+        if (y>0)      { sum += g.p[g.idx(x,y-1,z)]; count++; }
+        if (y<g.ny-1) { sum += g.p[g.idx(x,y+1,z)]; count++; }
+        if (z>0)      { sum += g.p[g.idx(x,y,z-1)]; count++; }
+        if (z<g.nz-1) { sum += g.p[g.idx(x,y,z+1)]; count++; }
+        pNew[g.idx(x,y,z)] = (sum - g.d[g.idx(x,y,z)] * this.cellSize * this.cellSize) / (count || 1);
+      }
+      g.p.set(pNew);
+    }
+
+    // Apply pressure gradient
+    for (let z = 0; z < g.nz; z++) for (let y = 0; y < g.ny; y++) for (let x = 0; x <= g.nx; x++) {
+      if (x > 0 && x < g.nx) {
+        g.u[g.uIdx(x,y,z)] -= scale * (g.p[g.idx(x,y,z)] - g.p[g.idx(x-1,y,z)]);
+      }
+    }
+    for (let z = 0; z < g.nz; z++) for (let y = 0; y <= g.ny; y++) for (let x = 0; x < g.nx; x++) {
+      if (y > 0 && y < g.ny) {
+        g.v[g.vIdx(x,y,z)] -= scale * (g.p[g.idx(x,y,z)] - g.p[g.idx(x,y-1,z)]);
+      }
+    }
+  }
+
+  // ─── Grid → Particle (G2P) ─────────────────────────────────────────────
+
+  _gridToParticle(dt) {
+    this.particles.forEach(p => {
+      if (!p.alive || p.phase !== 0) return;
+      const gp = this._worldToGrid(p.position);
+      const picVel  = this.grid.velocityAt(gp.x, gp.y, gp.z);
+      const prevVel = new THREE.Vector3(
+        this._interpU(gp.x, gp.y, gp.z, true),
+        this._interpV(gp.x, gp.y, gp.z, true),
+        this._interpW(gp.x, gp.y, gp.z, true),
+      );
+      const flipVel = p.velocity.clone().add(picVel.clone().sub(prevVel));
+      p.velocity.lerpVectors(picVel, flipVel, this.flipRatio);
+    });
+  }
+
+  _interpU(gx,gy,gz, prev=false) {
+    const arr = prev ? this._prevU : this.grid.u;
+    const xi = Math.floor(gx), yi = Math.floor(gy-0.5), zi = Math.floor(gz-0.5);
+    const xi2 = Math.min(xi+1, this.nx), yi2 = Math.min(yi+1, this.ny-1), zi2 = Math.min(zi+1, this.nz-1);
+    const tx = gx-xi, ty = gy-0.5-yi, tz = gz-0.5-zi;
+    const g = this.grid;
+    return arr[g.uIdx(xi,yi,zi)]*(1-tx)*(1-ty)*(1-tz) + arr[g.uIdx(xi2,yi,zi)]*tx*(1-ty)*(1-tz);
+  }
+  _interpV(gx,gy,gz, prev=false) { return prev ? this._prevV[0] : this.grid.sampleV(gx,gy,gz); }
+  _interpW(gx,gy,gz, prev=false) { return prev ? this._prevW[0] : this.grid.sampleW(gx,gy,gz); }
+
+  // ─── Advect Particles ──────────────────────────────────────────────────
+
+  _advectParticles(dt) {
+    this.particles.forEach(p => {
+      if (!p.alive) return;
+      p.age += dt;
+
+      // RK2 advection
+      const gp = this._worldToGrid(p.position);
+      const v1 = this.grid.velocityAt(gp.x, gp.y, gp.z);
+      const midPos = p.position.clone().addScaledVector(v1, dt*0.5);
+      const gp2 = this._worldToGrid(midPos);
+      const v2 = this.grid.velocityAt(gp2.x, gp2.y, gp2.z);
+
+      p.position.addScaledVector(v2, dt);
+
+      // Boundary collision
+      ['x','y','z'].forEach(axis => {
+        if (p.position[axis] < this.bounds.min[axis] + p.radius) {
+          p.position[axis] = this.bounds.min[axis] + p.radius;
+          p.velocity[axis] *= -0.3;
+        }
+        if (p.position[axis] > this.bounds.max[axis] - p.radius) {
+          p.position[axis] = this.bounds.max[axis] - p.radius;
+          p.velocity[axis] *= -0.3;
+        }
+      });
+
+      // Kill escaped particles
+      if (!p.position.x) p.alive = false;
+    });
+
+    this.particles = this.particles.filter(p => p.alive);
+  }
+
+  // ─── Foam / Spray ──────────────────────────────────────────────────────
+
+  _updateFoamSpray() {
+    if (!this.foam) return;
+    this.particles.forEach(p => {
+      if (p.phase !== 0) return;
+      const speed = p.velocity.length();
+      const trapped = this._countNeighbors(p) < 4;
+      if (speed > this.foamThreshold && trapped) {
+        p.phase = Math.random() < 0.5 ? 1 : 2; // foam or spray
+      }
+    });
+    this.particles.forEach(p => {
+      if (p.phase === 1) { // foam — floats on surface
+        p.velocity.y += 0.1;
+        p.velocity.multiplyScalar(0.95);
+      } else if (p.phase === 2) { // spray — flies through air
+        p.velocity.y += this.gravity.y * 0.01;
+        if (this._countNeighbors(p) > 6) p.phase = 0; // reabsorb
+      }
+    });
+  }
+
+  _countNeighbors(particle) {
+    const radius = this.cellSize * 2;
+    return this.particles.filter(p => p !== particle && p.alive && p.phase === 0 &&
+      p.position.distanceTo(particle.position) < radius).length;
+  }
+
+  // ─── Mark Fluid Cells ──────────────────────────────────────────────────
+
+  _markFluidCells() {
+    this.grid.type.fill(0); // air
+    this.particles.forEach(p => {
+      if (!p.alive || p.phase !== 0) return;
+      const gp = this._worldToGrid(p.position);
+      const xi = Math.floor(gp.x), yi = Math.floor(gp.y), zi = Math.floor(gp.z);
+      if (xi>=0 && xi<this.nx && yi>=0 && yi<this.ny && zi>=0 && zi<this.nz) {
+        this.grid.type[this.grid.idx(xi,yi,zi)] = 1;
+      }
+    });
+    // Solid boundary
+    for (let z=0; z<this.nz; z++) for (let y=0; y<this.ny; y++) for (let x=0; x<this.nx; x++) {
+      if (x===0||x===this.nx-1||y===0||y===this.ny-1||z===0||z===this.nz-1)
+        this.grid.type[this.grid.idx(x,y,z)] = 2;
+    }
+  }
+
+  // ─── Main Step ─────────────────────────────────────────────────────────
+
+  step(dt = 1/60) {
+    if (!this.enabled || !this.particles.length) return;
+    const subDt = dt / this.subSteps;
+
+    for (let sub = 0; sub < this.subSteps; sub++) {
+      this._markFluidCells();
+      this._particleToGrid();
+      this._prevU.set(this.grid.u);
+      this._prevV.set(this.grid.v);
+      this._prevW.set(this.grid.w);
+      this._applyForces(subDt);
+      this._solvePressure(subDt);
+      this._gridToParticle(subDt);
+      this._advectParticles(subDt);
+      if (this.foam) this._updateFoamSpray();
+    }
+  }
+
+  // ─── Public API ────────────────────────────────────────────────────────
+
+  addParticle(position, velocity, options) {
+    if (this.particles.length >= this.maxParticles) return null;
+    const p = createFLIPParticle(position, velocity, options);
+    this.particles.push(p);
+    return p;
+  }
+
+  spawnBox(min, max, count = 200, velocity) {
+    for (let i = 0; i < count; i++) {
+      const pos = new THREE.Vector3(
+        min.x + Math.random()*(max.x-min.x),
+        min.y + Math.random()*(max.y-min.y),
+        min.z + Math.random()*(max.z-min.z),
+      );
+      this.addParticle(pos, velocity?.clone() ?? new THREE.Vector3(), { radius: this.cellSize*0.5 });
+    }
+  }
+
+  buildPointCloud() {
+    const positions = new Float32Array(this.particles.length * 3);
+    const colors    = new Float32Array(this.particles.length * 3);
+    this.particles.forEach((p, i) => {
+      positions[i*3]   = p.position.x;
+      positions[i*3+1] = p.position.y;
+      positions[i*3+2] = p.position.z;
+      // Color by phase
+      if (p.phase === 0) { colors[i*3]=0.2; colors[i*3+1]=0.5; colors[i*3+2]=1.0; } // water=blue
+      else if (p.phase===1) { colors[i*3]=1;colors[i*3+1]=1;colors[i*3+2]=1; }       // foam=white
+      else { colors[i*3]=0.7;colors[i*3+1]=0.9;colors[i*3+2]=1; }                    // spray=light blue
+    });
+    const { THREE: T } = { THREE };
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('color',    new THREE.BufferAttribute(colors, 3));
     return geo;
   }
 

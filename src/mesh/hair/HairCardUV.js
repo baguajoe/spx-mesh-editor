@@ -3,7 +3,68 @@
  * UV packing for hair card atlases: slot assignment, planar unwrap,
  * cylindrical unwrap, and seam marking.
  */
-import * as THREE from 'three';\n\nconst clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));\n\n// ─── UV slot ──────────────────────────────────────────────────────────────────\nexport class UVSlot {\n  constructor(col, row, cols, rows) {\n    this.col   = col;\n    this.row   = row;\n    this.cols  = cols;\n    this.rows  = rows;\n    this.u     = col / cols;\n    this.v     = row / rows;\n    this.uw    = 1 / cols;\n    this.vh    = 1 / rows;\n    this.used  = false;\n    this.cardId = null;\n  }\n  center() { return new THREE.Vector2(this.u + this.uw * 0.5, this.v + this.vh * 0.5); }\n  toArray() { return [this.u, this.v, this.uw, this.vh]; }\n  toJSON()  { return { col: this.col, row: this.row, cardId: this.cardId, u: this.u, v: this.v, uw: this.uw, vh: this.vh }; }\n}\n\n// ─── HairCardUVPacker ─────────────────────────────────────────────────────────\nexport class HairCardUVPacker {\n  constructor(cols = 4, rows = 4, padding = 0.01) {\n    this.cols    = cols;\n    this.rows    = rows;\n    this.padding = padding;\n    this.slots   = [];\n    this._build();\n  }\n\n  _build() {\n    this.slots = [];\n    for (let row = 0; row < this.rows; row++) {\n      for (let col = 0; col < this.cols; col++) {\n        this.slots.push(new UVSlot(col, row, this.cols, this.rows));\n      }\n    }\n  }\n\n  get totalSlots()  { return this.slots.length; }\n  get usedSlots()   { return this.slots.filter(s => s.used).length; }\n  get freeSlots()   { return this.slots.filter(s => !s.used).length; }\n\n  // Allocate a slot for a card, returns slot or null\n  allocate(cardId) {\n    const slot = this.slots.find(s => !s.used);\n    if (!slot) return null;\n    slot.used   = true;\n    slot.cardId = cardId;\n    return slot;\n  }\n\n  free(cardId) {\n    const slot = this.slots.find(s => s.cardId === cardId);\n    if (slot) { slot.used = false; slot.cardId = null; }\n    return this;\n  }\n\n  // Apply UV slot to a card's BufferGeometry
+import * as THREE from 'three';
+
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+// ─── UV slot ──────────────────────────────────────────────────────────────────
+export class UVSlot {
+  constructor(col, row, cols, rows) {
+    this.col   = col;
+    this.row   = row;
+    this.cols  = cols;
+    this.rows  = rows;
+    this.u     = col / cols;
+    this.v     = row / rows;
+    this.uw    = 1 / cols;
+    this.vh    = 1 / rows;
+    this.used  = false;
+    this.cardId = null;
+  }
+  center() { return new THREE.Vector2(this.u + this.uw * 0.5, this.v + this.vh * 0.5); }
+  toArray() { return [this.u, this.v, this.uw, this.vh]; }
+  toJSON()  { return { col: this.col, row: this.row, cardId: this.cardId, u: this.u, v: this.v, uw: this.uw, vh: this.vh }; }
+}
+
+// ─── HairCardUVPacker ─────────────────────────────────────────────────────────
+export class HairCardUVPacker {
+  constructor(cols = 4, rows = 4, padding = 0.01) {
+    this.cols    = cols;
+    this.rows    = rows;
+    this.padding = padding;
+    this.slots   = [];
+    this._build();
+  }
+
+  _build() {
+    this.slots = [];
+    for (let row = 0; row < this.rows; row++) {
+      for (let col = 0; col < this.cols; col++) {
+        this.slots.push(new UVSlot(col, row, this.cols, this.rows));
+      }
+    }
+  }
+
+  get totalSlots()  { return this.slots.length; }
+  get usedSlots()   { return this.slots.filter(s => s.used).length; }
+  get freeSlots()   { return this.slots.filter(s => !s.used).length; }
+
+  // Allocate a slot for a card, returns slot or null
+  allocate(cardId) {
+    const slot = this.slots.find(s => !s.used);
+    if (!slot) return null;
+    slot.used   = true;
+    slot.cardId = cardId;
+    return slot;
+  }
+
+  free(cardId) {
+    const slot = this.slots.find(s => s.cardId === cardId);
+    if (slot) { slot.used = false; slot.cardId = null; }
+    return this;
+  }
+
+  // Apply UV slot to a card's BufferGeometry
   applyToCard(card, slot) {
     if (!card.geometry) return;
     const uv  = card.geometry.attributes.uv;
@@ -45,7 +106,42 @@ import * as THREE from 'three';\n\nconst clamp = (v, lo, hi) => Math.max(lo, Mat
 }
 
 // ─── Planar UV unwrap ─────────────────────────────────────────────────────────
-export function planarUnwrap(geo, axis = 'y') {\n  const pos = geo.attributes.position;\n  const bb  = new THREE.Box3().setFromBufferAttribute(pos);\n  const sz  = bb.getSize(new THREE.Vector3());\n  const uvArr = new Float32Array(pos.count * 2);\n  for (let i = 0; i < pos.count; i++) {\n    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);\n    let u, v;\n    if (axis === 'y') { u = (x - bb.min.x) / (sz.x || 1); v = (z - bb.min.z) / (sz.z || 1); }\n    else if (axis === 'x') { u = (z - bb.min.z) / (sz.z || 1); v = (y - bb.min.y) / (sz.y || 1); }\n    else { u = (x - bb.min.x) / (sz.x || 1); v = (y - bb.min.y) / (sz.y || 1); }\n    uvArr[i * 2] = u; uvArr[i * 2 + 1] = v;\n  }\n  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvArr, 2));\n  return geo;\n}\n\n// ─── Cylindrical UV unwrap ────────────────────────────────────────────────────\nexport function cylindricalUnwrap(geo, axis = 'y') {\n  const pos = geo.attributes.position;\n  const bb  = new THREE.Box3().setFromBufferAttribute(pos);\n  const sz  = bb.getSize(new THREE.Vector3());\n  const uvArr = new Float32Array(pos.count * 2);\n  for (let i = 0; i < pos.count; i++) {\n    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);\n    let u, v;\n    if (axis === 'y') {\n      u = (Math.atan2(z, x) + Math.PI) / (Math.PI * 2);\n      v = (y - bb.min.y) / (sz.y || 1);\n    } else {\n      u = (Math.atan2(z, y) + Math.PI) / (Math.PI * 2);\n      v = (x - bb.min.x) / (sz.x || 1);\n    }\n    uvArr[i * 2] = u; uvArr[i * 2 + 1] = v;\n  }\n  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvArr, 2));
+export function planarUnwrap(geo, axis = 'y') {
+  const pos = geo.attributes.position;
+  const bb  = new THREE.Box3().setFromBufferAttribute(pos);
+  const sz  = bb.getSize(new THREE.Vector3());
+  const uvArr = new Float32Array(pos.count * 2);
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    let u, v;
+    if (axis === 'y') { u = (x - bb.min.x) / (sz.x || 1); v = (z - bb.min.z) / (sz.z || 1); }
+    else if (axis === 'x') { u = (z - bb.min.z) / (sz.z || 1); v = (y - bb.min.y) / (sz.y || 1); }
+    else { u = (x - bb.min.x) / (sz.x || 1); v = (y - bb.min.y) / (sz.y || 1); }
+    uvArr[i * 2] = u; uvArr[i * 2 + 1] = v;
+  }
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvArr, 2));
+  return geo;
+}
+
+// ─── Cylindrical UV unwrap ────────────────────────────────────────────────────
+export function cylindricalUnwrap(geo, axis = 'y') {
+  const pos = geo.attributes.position;
+  const bb  = new THREE.Box3().setFromBufferAttribute(pos);
+  const sz  = bb.getSize(new THREE.Vector3());
+  const uvArr = new Float32Array(pos.count * 2);
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    let u, v;
+    if (axis === 'y') {
+      u = (Math.atan2(z, x) + Math.PI) / (Math.PI * 2);
+      v = (y - bb.min.y) / (sz.y || 1);
+    } else {
+      u = (Math.atan2(z, y) + Math.PI) / (Math.PI * 2);
+      v = (x - bb.min.x) / (sz.x || 1);
+    }
+    uvArr[i * 2] = u; uvArr[i * 2 + 1] = v;
+  }
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvArr, 2));
   return geo;
 }
 

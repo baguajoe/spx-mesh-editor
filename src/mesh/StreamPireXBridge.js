@@ -1,7 +1,82 @@
 // StreamPireXBridge.js — Upload SPX Mesh exports to StreamPireX R2
 // Used by the 3D Mesh Editor to send GLB/OBJ/FBX files to StreamPireX
 
-const BACKEND = import.meta.env.VITE_BACKEND_URL || 'https://streampirex-production.up.railway.app';\n\nfunction getAuthHeaders() {\n  const token = localStorage.getItem('jwt-token') || localStorage.getItem('token') || '';\n  return { 'Authorization': `Bearer ${token}` };\n}\n\n/**\n * Upload a GLB blob to StreamPireX R2 storage\n * @param {Blob} blob - GLB binary blob\n * @param {string} filename - e.g. 'spx_mesh.glb'\n * @param {object} meta - { name, polycount, materials }\n * @returns {Promise<{url, key}>}\n */\nexport async function uploadMeshToStreamPireX(blob, filename = 'spx_mesh.glb', meta = {}) {\n  const formData = new FormData();\n  formData.append('file', blob, filename);\n  formData.append('folder', 'meshes');\n  formData.append('meta', JSON.stringify({ ...meta, source: 'spx-mesh-editor', exportedAt: Date.now() }));\n\n  const res = await fetch(`${BACKEND}/api/r2/upload`, {\n    method: 'POST',\n    headers: getAuthHeaders(),\n    body: formData,\n  });\n\n  if (!res.ok) throw new Error(`Upload failed: ${res.status} ${res.statusText}`);\n  return await res.json(); // { url, key, size }\n}\n\n/**\n * List meshes uploaded by the current user\n * @returns {Promise<Array<{name, url, key, size, uploadedAt}>>}\n */\nexport async function listUserMeshes() {\n  const res = await fetch(`${BACKEND}/api/r2/list?folder=meshes`, {\n    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },\n  });\n  if (!res.ok) throw new Error(`List failed: ${res.status}`);\n  return await res.json();\n}\n\n/**\n * Notify StreamPireX that a mesh is ready for use in the compositor/video editor\n * @param {string} meshUrl - R2 public URL\n * @param {string} meshName - display name\n */\nexport async function notifyStreamPireX(meshUrl, meshName) {\n  try {\n    // Store in localStorage for cross-app communication\n    const existing = JSON.parse(localStorage.getItem('spx_mesh_library') || '[]');\n    existing.unshift({ url: meshUrl, name: meshName, addedAt: Date.now() });\n    localStorage.setItem('spx_mesh_library', JSON.stringify(existing.slice(0, 50)));\n\n    // Also post message for iframe integration\n    if (window.parent && window.parent !== window) {\n      window.parent.postMessage({ type: 'SPX_MESH_READY', url: meshUrl, name: meshName }, '*');\n    }\n  } catch (e) {\n    console.warn('StreamPireX notify failed:', e);\n  }\n}\n\n/**\n * Full pipeline: export GLB → upload to R2 → notify StreamPireX\n * @param {Blob} glbBlob\n * @param {string} name\n * @param {object} meta\n * @param {function} onProgress - (status: string) => void\n */\nexport async function sendMeshToStreamPireX(glbBlob, name = 'My Mesh', meta = {}, onProgress = () => {}) {\n  onProgress('Uploading to StreamPireX...');\n  const filename = name.replace(/[^a-zA-Z0-9_-]/g, '_') + '.glb';\n\n  const result = await uploadMeshToStreamPireX(glbBlob, filename, { name, ...meta });\n  onProgress('Upload complete. Notifying...');
+const BACKEND = import.meta.env.VITE_BACKEND_URL || 'https://streampirex-production.up.railway.app';
+
+function getAuthHeaders() {
+  const token = localStorage.getItem('jwt-token') || localStorage.getItem('token') || '';
+  return { 'Authorization': `Bearer ${token}` };
+}
+
+/**
+ * Upload a GLB blob to StreamPireX R2 storage
+ * @param {Blob} blob - GLB binary blob
+ * @param {string} filename - e.g. 'spx_mesh.glb'
+ * @param {object} meta - { name, polycount, materials }
+ * @returns {Promise<{url, key}>}
+ */
+export async function uploadMeshToStreamPireX(blob, filename = 'spx_mesh.glb', meta = {}) {
+  const formData = new FormData();
+  formData.append('file', blob, filename);
+  formData.append('folder', 'meshes');
+  formData.append('meta', JSON.stringify({ ...meta, source: 'spx-mesh-editor', exportedAt: Date.now() }));
+
+  const res = await fetch(`${BACKEND}/api/r2/upload`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: formData,
+  });
+
+  if (!res.ok) throw new Error(`Upload failed: ${res.status} ${res.statusText}`);
+  return await res.json(); // { url, key, size }
+}
+
+/**
+ * List meshes uploaded by the current user
+ * @returns {Promise<Array<{name, url, key, size, uploadedAt}>>}
+ */
+export async function listUserMeshes() {
+  const res = await fetch(`${BACKEND}/api/r2/list?folder=meshes`, {
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) throw new Error(`List failed: ${res.status}`);
+  return await res.json();
+}
+
+/**
+ * Notify StreamPireX that a mesh is ready for use in the compositor/video editor
+ * @param {string} meshUrl - R2 public URL
+ * @param {string} meshName - display name
+ */
+export async function notifyStreamPireX(meshUrl, meshName) {
+  try {
+    // Store in localStorage for cross-app communication
+    const existing = JSON.parse(localStorage.getItem('spx_mesh_library') || '[]');
+    existing.unshift({ url: meshUrl, name: meshName, addedAt: Date.now() });
+    localStorage.setItem('spx_mesh_library', JSON.stringify(existing.slice(0, 50)));
+
+    // Also post message for iframe integration
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'SPX_MESH_READY', url: meshUrl, name: meshName }, '*');
+    }
+  } catch (e) {
+    console.warn('StreamPireX notify failed:', e);
+  }
+}
+
+/**
+ * Full pipeline: export GLB → upload to R2 → notify StreamPireX
+ * @param {Blob} glbBlob
+ * @param {string} name
+ * @param {object} meta
+ * @param {function} onProgress - (status: string) => void
+ */
+export async function sendMeshToStreamPireX(glbBlob, name = 'My Mesh', meta = {}, onProgress = () => {}) {
+  onProgress('Uploading to StreamPireX...');
+  const filename = name.replace(/[^a-zA-Z0-9_-]/g, '_') + '.glb';
+
+  const result = await uploadMeshToStreamPireX(glbBlob, filename, { name, ...meta });
+  onProgress('Upload complete. Notifying...');
 
   await notifyStreamPireX(result.url, name);
   onProgress(`✅ Sent to StreamPireX: ${name}`);

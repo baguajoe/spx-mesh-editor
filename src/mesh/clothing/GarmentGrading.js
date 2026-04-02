@@ -24,7 +24,42 @@ export const SIZE_CHARTS = {
     XXL:{ chest: 109, waist: 96, hip: 109, height: 185 },
   },
   kids: {
-    '2T': { chest: 53, waist: 52, hip: 55, height: 89 },\n    '3T': { chest: 55, waist: 53, hip: 57, height: 97 },\n    '4T': { chest: 57, waist: 54, hip: 59, height: 104 },\n    '5':  { chest: 59, waist: 55, hip: 61, height: 112 },\n    '6':  { chest: 61, waist: 56, hip: 63, height: 119 },\n    '8':  { chest: 66, waist: 59, hip: 68, height: 128 },\n  },\n};\n\nexport const STANDARD_SIZES = {\n  women: ['XS', 'S', 'M', 'L', 'XL', 'XXL'],\n  men:   ['XS', 'S', 'M', 'L', 'XL', 'XXL'],\n  kids:  ['2T', '3T', '4T', '5', '6', '8'],\n};\n\n// ── Grading rules ─────────────────────────────────────────────────────────────\n\n/**\n * Calculate scale factor between two sizes\n * @param {string} category - 'women' | 'men' | 'kids'\n * @param {string} fromSize - base size\n * @param {string} toSize - target size\n * @param {string} measurement - 'bust'|'waist'|'hip'|'chest'\n */\nexport function getGradingScale(category, fromSize, toSize, measurement = 'bust') {\n  const chart = SIZE_CHARTS[category];\n  if (!chart) return 1;\n  const from = chart[fromSize];\n  const to = chart[toSize];\n  if (!from || !to) return 1;\n  const key = measurement in from ? measurement : Object.keys(from)[0];\n  return to[key] / from[key];\n}\n\n/**\n * Grade a pattern panel's points from one size to another
+    '2T': { chest: 53, waist: 52, hip: 55, height: 89 },
+    '3T': { chest: 55, waist: 53, hip: 57, height: 97 },
+    '4T': { chest: 57, waist: 54, hip: 59, height: 104 },
+    '5':  { chest: 59, waist: 55, hip: 61, height: 112 },
+    '6':  { chest: 61, waist: 56, hip: 63, height: 119 },
+    '8':  { chest: 66, waist: 59, hip: 68, height: 128 },
+  },
+};
+
+export const STANDARD_SIZES = {
+  women: ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
+  men:   ['XS', 'S', 'M', 'L', 'XL', 'XXL'],
+  kids:  ['2T', '3T', '4T', '5', '6', '8'],
+};
+
+// ── Grading rules ─────────────────────────────────────────────────────────────
+
+/**
+ * Calculate scale factor between two sizes
+ * @param {string} category - 'women' | 'men' | 'kids'
+ * @param {string} fromSize - base size
+ * @param {string} toSize - target size
+ * @param {string} measurement - 'bust'|'waist'|'hip'|'chest'
+ */
+export function getGradingScale(category, fromSize, toSize, measurement = 'bust') {
+  const chart = SIZE_CHARTS[category];
+  if (!chart) return 1;
+  const from = chart[fromSize];
+  const to = chart[toSize];
+  if (!from || !to) return 1;
+  const key = measurement in from ? measurement : Object.keys(from)[0];
+  return to[key] / from[key];
+}
+
+/**
+ * Grade a pattern panel's points from one size to another
  * @param {Object} panel - { points: [{x, y}] }
  * @param {string} category
  * @param {string} fromSize
@@ -32,7 +67,28 @@ export const SIZE_CHARTS = {
  * @param {Object} origin - center of scaling {x, y}
  */
 export function gradePanel(panel, category, fromSize, toSize, origin = { x: 0, y: 0 }) {
-  const scaleX = getGradingScale(category, fromSize, toSize, 'bust');\n  const scaleY = getGradingScale(category, fromSize, toSize, 'hip');\n\n  return {\n    ...panel,\n    points: panel.points.map(pt => ({\n      x: origin.x + (pt.x - origin.x) * scaleX,\n      y: origin.y + (pt.y - origin.y) * scaleY,\n    })),\n    graded: true,\n    fromSize,\n    toSize,\n    category,\n  };\n}\n\n/**\n * Generate a full size run from a base pattern\n * @param {Array} panels - base pattern panels\n * @param {string} category\n * @param {string} baseSize - e.g. 'M'\n * @param {Array} targetSizes - e.g. ['XS', 'S', 'L', 'XL']
+  const scaleX = getGradingScale(category, fromSize, toSize, 'bust');
+  const scaleY = getGradingScale(category, fromSize, toSize, 'hip');
+
+  return {
+    ...panel,
+    points: panel.points.map(pt => ({
+      x: origin.x + (pt.x - origin.x) * scaleX,
+      y: origin.y + (pt.y - origin.y) * scaleY,
+    })),
+    graded: true,
+    fromSize,
+    toSize,
+    category,
+  };
+}
+
+/**
+ * Generate a full size run from a base pattern
+ * @param {Array} panels - base pattern panels
+ * @param {string} category
+ * @param {string} baseSize - e.g. 'M'
+ * @param {Array} targetSizes - e.g. ['XS', 'S', 'L', 'XL']
  */
 export function generateSizeRun(panels, category, baseSize, targetSizes) {
   const origin = getPanelCenter(panels);

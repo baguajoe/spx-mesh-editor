@@ -2,5 +2,276 @@
 // SPX Mesh Editor | StreamPireX
 // Features: snap-to-surface, PolyBuild interactive retopo, auto-retopo via voxel remesh
 
-import * as THREE from 'three';\n\n// ─── Voxel-based Auto Retopology ──────────────────────────────────────────────\n\nexport function autoRetopo(sourceMesh, targetPolyCount = 2000) {\n  const geo = sourceMesh.geometry.clone();\n  geo.computeVertexNormals();\n\n  // Build voxel grid from source mesh\n  const bbox = new THREE.Box3().setFromBufferAttribute(geo.attributes.position);\n  const size = new THREE.Vector3();\n  bbox.getSize(size);\n  const maxDim = Math.max(size.x, size.y, size.z);\n  const voxelSize = maxDim / Math.cbrt(targetPolyCount * 6);\n\n  const nx = Math.ceil(size.x / voxelSize);\n  const ny = Math.ceil(size.y / voxelSize);\n  const nz = Math.ceil(size.z / voxelSize);\n\n  const grid = new Uint8Array(nx * ny * nz);\n  const pos = geo.attributes.position;\n\n  // Mark occupied voxels\n  for (let i = 0; i < pos.count; i++) {\n    const x = Math.floor((pos.getX(i) - bbox.min.x) / voxelSize);\n    const y = Math.floor((pos.getY(i) - bbox.min.y) / voxelSize);\n    const z = Math.floor((pos.getZ(i) - bbox.min.z) / voxelSize);\n    if (x >= 0 && x < nx && y >= 0 && y < ny && z >= 0 && z < nz) {\n      grid[x + y * nx + z * nx * ny] = 1;\n    }\n  }\n\n  // Extract surface quads from voxel grid (naive surface nets)\n  const vertices = [];\n  const indices = [];\n\n  for (let x = 0; x < nx - 1; x++) {\n    for (let y = 0; y < ny - 1; y++) {\n      for (let z = 0; z < nz - 1; z++) {\n        const v = grid[x + y * nx + z * nx * ny];\n        const vx = grid[(x+1) + y * nx + z * nx * ny];\n        const vy = grid[x + (y+1) * nx + z * nx * ny];\n        const vz = grid[x + y * nx + (z+1) * nx * ny];\n\n        if (v !== vx) {\n          const wx = bbox.min.x + (x + 0.5) * voxelSize;\n          const wy = bbox.min.y + (y + 0.5) * voxelSize;\n          const wz = bbox.min.z + (z + 0.5) * voxelSize;\n          const vi = vertices.length / 3;\n          vertices.push(wx, wy, wz, wx, wy + voxelSize, wz, wx, wy + voxelSize, wz + voxelSize, wx, wy, wz + voxelSize);\n          indices.push(vi, vi+1, vi+2, vi, vi+2, vi+3);\n        }\n      }\n    }\n  }\n\n  if (vertices.length === 0) {\n    console.warn('[AutoRetopo] No surface found — returning original');\n    return geo;\n  }\n\n  const newGeo = new THREE.BufferGeometry();\n  newGeo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));\n  newGeo.setIndex(indices);\n  newGeo.computeVertexNormals();\n\n  // Project vertices back onto original surface\n  projectToSurface(newGeo, sourceMesh);\n\n  return newGeo;\n}\n\n// ─── Snap-to-Surface ─────────────────────────────────────────────────────────\n\nexport function projectToSurface(retopGeo, targetMesh) {\n  const raycaster = new THREE.Raycaster();\n  const pos = retopGeo.attributes.position;\n  const norm = retopGeo.attributes.normal;\n\n  if (!norm) { retopGeo.computeVertexNormals(); }\n\n  for (let i = 0; i < pos.count; i++) {\n    const origin = new THREE.Vector3().fromBufferAttribute(pos, i);\n    const normal = new THREE.Vector3().fromBufferAttribute(retopGeo.attributes.normal, i).normalize();\n\n    // Cast ray both ways along normal\n    for (const dir of [normal, normal.clone().negate()]) {\n      raycaster.set(origin, dir);\n      const hits = raycaster.intersectObject(targetMesh, false);\n      if (hits.length > 0 && hits[0].distance < 2) {\n        const hp = hits[0].point;\n        pos.setXYZ(i, hp.x, hp.y, hp.z);\n        break;\n      }\n    }\n  }\n\n  pos.needsUpdate = true;\n  retopGeo.computeVertexNormals();\n}\n\n// ─── PolyBuild Interactive Retopo ─────────────────────────────────────────────\n\nexport class PolyBuildTool {\n  constructor(scene, camera, renderer, targetMesh) {\n    this.scene = scene;\n    this.camera = camera;\n    this.renderer = renderer;\n    this.targetMesh = targetMesh;\n    this.raycaster = new THREE.Raycaster();\n    this.vertices = [];\n    this.faces = [];\n    this.previewMesh = null;\n    this.snapRadius = 0.05;\n    this.active = false;\n    this._onPointerDown = this._onPointerDown.bind(this);\n  }\n\n  enable() {\n    this.active = true;\n    this.renderer.domElement.addEventListener('pointerdown', this._onPointerDown);\n    this._initPreviewMesh();\n  }\n\n  disable() {\n    this.active = false;\n    this.renderer.domElement.removeEventListener('pointerdown', this._onPointerDown);\n  }\n\n  _initPreviewMesh() {\n    const geo = new THREE.BufferGeometry();\n    geo.setAttribute('position', new THREE.Float32BufferAttribute([], 3));\n    const mat = new THREE.MeshBasicMaterial({ color: 0x00ffc8, wireframe: true, side: THREE.DoubleSide });\n    this.previewMesh = new THREE.Mesh(geo, mat);\n    this.scene.add(this.previewMesh);\n  }\n\n  _onPointerDown(event) {\n    if (!this.active) return;\n    const rect = this.renderer.domElement.getBoundingClientRect();\n    const ndc = new THREE.Vector2(\n      ((event.clientX - rect.left) / rect.width) * 2 - 1,\n      -((event.clientY - rect.top) / rect.height) * 2 + 1,\n    );\n\n    this.raycaster.setFromCamera(ndc, this.camera);\n    const hits = this.raycaster.intersectObject(this.targetMesh, false);\n    if (!hits.length) return;\n\n    const point = hits[0].point.clone();\n\n    // Snap to existing vertex if close enough\n    const snapped = this._snapToExisting(point);\n    const vertIdx = snapped !== null ? snapped : this._addVertex(point);\n\n    if (this.vertices.length >= 3) {\n      // Auto-complete quad on 4th vertex\n      if (this._pendingVerts && this._pendingVerts.length === 3) {\n        this._pendingVerts.push(vertIdx);\n        this._addFace(...this._pendingVerts);\n        this._pendingVerts = [];\n      } else {\n        this._pendingVerts = [vertIdx];\n      }\n    } else {\n      this._pendingVerts = this._pendingVerts ?? [];\n      this._pendingVerts.push(vertIdx);\n    }\n\n    this._updatePreview();\n  }\n\n  _addVertex(point) {\n    this.vertices.push(point.clone());\n    return this.vertices.length - 1;\n  }\n\n  _snapToExisting(point) {\n    for (let i = 0; i < this.vertices.length; i++) {\n      if (this.vertices[i].distanceTo(point) < this.snapRadius) return i;\n    }\n    return null;\n  }\n\n  _addFace(a, b, c, d) {\n    if (d !== undefined) {\n      this.faces.push([a, b, c], [a, c, d]); // quad as 2 tris\n    } else {\n      this.faces.push([a, b, c]);\n    }\n    this._updatePreview();\n  }\n\n  _updatePreview() {\n    if (!this.previewMesh) return;\n    const positions = this.vertices.flatMap(v => [v.x, v.y, v.z]);\n    const indices = this.faces.flat();\n    const geo = new THREE.BufferGeometry();\n    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));\n    if (indices.length) geo.setIndex(indices);\n    geo.computeVertexNormals();\n    this.previewMesh.geometry.dispose();\n    this.previewMesh.geometry = geo;\n  }\n\n  extractGeometry() {\n    const positions = this.vertices.flatMap(v => [v.x, v.y, v.z]);\n    const indices = this.faces.flat();\n    const geo = new THREE.BufferGeometry();\n    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));\n    if (indices.length) geo.setIndex(indices);\n    geo.computeVertexNormals();\n    return geo;\n  }\n\n  clear() {\n    this.vertices = [];\n    this.faces = [];\n    this._pendingVerts = [];\n    this._updatePreview();\n  }\n\n  dispose() {\n    this.disable();\n    if (this.previewMesh) {\n      this.scene.remove(this.previewMesh);\n      this.previewMesh.geometry.dispose();\n    }\n  }\n}\n\nexport default { autoRetopo, projectToSurface, PolyBuildTool };\n\n\n// ─── Legacy functional exports (App.jsx compat) ───────────────────────────────\n\nexport function quadDominantRetopo(sourceMesh, targetPolyCount = 2000) {\n  return autoRetopo(sourceMesh, targetPolyCount);\n}\n\nexport function detectHardEdges(geometry, angleThreshold = Math.PI / 4) {\n  const { SeamManager } = require('./UVUnwrap.js');\n  const sm = new SeamManager();\n  sm.markSharpEdgesAsSeams(geometry, angleThreshold);\n  return Array.from(sm.seams);\n}\n\nexport function applySymmetryRetopo(geometry, axis = 'x') {\n  const geo = geometry.clone();\n  const pos = geo.attributes.position;\n  for (let i = 0; i < pos.count; i++) {\n    if (axis === 'x' && pos.getX(i) < 0) pos.setX(i, Math.abs(pos.getX(i)));\n    if (axis === 'y' && pos.getY(i) < 0) pos.setY(i, Math.abs(pos.getY(i)));\n    if (axis === 'z' && pos.getZ(i) < 0) pos.setZ(i, Math.abs(pos.getZ(i)));\n  }\n  pos.needsUpdate = true;\n  geo.computeVertexNormals();\n  return geo;\n}\n\nexport function getRetopoStats(geometry) {\n  const pos = geometry?.attributes?.position;\n  const idx = geometry?.index;\n  return {\n    vertices: pos?.count ?? 0,\n    faces: idx ? idx.count / 3 : (pos?.count ?? 0) / 3,\n    edges: idx ? idx.count / 2 : 0,\n  };\n}\n\nexport function createRetopoSettings(options = {}) {\n  return { targetPolyCount: 2000, axis: 'x', snapToSurface: true, usePolyBuild: false, ...options };
+import * as THREE from 'three';
+
+// ─── Voxel-based Auto Retopology ──────────────────────────────────────────────
+
+export function autoRetopo(sourceMesh, targetPolyCount = 2000) {
+  const geo = sourceMesh.geometry.clone();
+  geo.computeVertexNormals();
+
+  // Build voxel grid from source mesh
+  const bbox = new THREE.Box3().setFromBufferAttribute(geo.attributes.position);
+  const size = new THREE.Vector3();
+  bbox.getSize(size);
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const voxelSize = maxDim / Math.cbrt(targetPolyCount * 6);
+
+  const nx = Math.ceil(size.x / voxelSize);
+  const ny = Math.ceil(size.y / voxelSize);
+  const nz = Math.ceil(size.z / voxelSize);
+
+  const grid = new Uint8Array(nx * ny * nz);
+  const pos = geo.attributes.position;
+
+  // Mark occupied voxels
+  for (let i = 0; i < pos.count; i++) {
+    const x = Math.floor((pos.getX(i) - bbox.min.x) / voxelSize);
+    const y = Math.floor((pos.getY(i) - bbox.min.y) / voxelSize);
+    const z = Math.floor((pos.getZ(i) - bbox.min.z) / voxelSize);
+    if (x >= 0 && x < nx && y >= 0 && y < ny && z >= 0 && z < nz) {
+      grid[x + y * nx + z * nx * ny] = 1;
+    }
+  }
+
+  // Extract surface quads from voxel grid (naive surface nets)
+  const vertices = [];
+  const indices = [];
+
+  for (let x = 0; x < nx - 1; x++) {
+    for (let y = 0; y < ny - 1; y++) {
+      for (let z = 0; z < nz - 1; z++) {
+        const v = grid[x + y * nx + z * nx * ny];
+        const vx = grid[(x+1) + y * nx + z * nx * ny];
+        const vy = grid[x + (y+1) * nx + z * nx * ny];
+        const vz = grid[x + y * nx + (z+1) * nx * ny];
+
+        if (v !== vx) {
+          const wx = bbox.min.x + (x + 0.5) * voxelSize;
+          const wy = bbox.min.y + (y + 0.5) * voxelSize;
+          const wz = bbox.min.z + (z + 0.5) * voxelSize;
+          const vi = vertices.length / 3;
+          vertices.push(wx, wy, wz, wx, wy + voxelSize, wz, wx, wy + voxelSize, wz + voxelSize, wx, wy, wz + voxelSize);
+          indices.push(vi, vi+1, vi+2, vi, vi+2, vi+3);
+        }
+      }
+    }
+  }
+
+  if (vertices.length === 0) {
+    console.warn('[AutoRetopo] No surface found — returning original');
+    return geo;
+  }
+
+  const newGeo = new THREE.BufferGeometry();
+  newGeo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+  newGeo.setIndex(indices);
+  newGeo.computeVertexNormals();
+
+  // Project vertices back onto original surface
+  projectToSurface(newGeo, sourceMesh);
+
+  return newGeo;
+}
+
+// ─── Snap-to-Surface ─────────────────────────────────────────────────────────
+
+export function projectToSurface(retopGeo, targetMesh) {
+  const raycaster = new THREE.Raycaster();
+  const pos = retopGeo.attributes.position;
+  const norm = retopGeo.attributes.normal;
+
+  if (!norm) { retopGeo.computeVertexNormals(); }
+
+  for (let i = 0; i < pos.count; i++) {
+    const origin = new THREE.Vector3().fromBufferAttribute(pos, i);
+    const normal = new THREE.Vector3().fromBufferAttribute(retopGeo.attributes.normal, i).normalize();
+
+    // Cast ray both ways along normal
+    for (const dir of [normal, normal.clone().negate()]) {
+      raycaster.set(origin, dir);
+      const hits = raycaster.intersectObject(targetMesh, false);
+      if (hits.length > 0 && hits[0].distance < 2) {
+        const hp = hits[0].point;
+        pos.setXYZ(i, hp.x, hp.y, hp.z);
+        break;
+      }
+    }
+  }
+
+  pos.needsUpdate = true;
+  retopGeo.computeVertexNormals();
+}
+
+// ─── PolyBuild Interactive Retopo ─────────────────────────────────────────────
+
+export class PolyBuildTool {
+  constructor(scene, camera, renderer, targetMesh) {
+    this.scene = scene;
+    this.camera = camera;
+    this.renderer = renderer;
+    this.targetMesh = targetMesh;
+    this.raycaster = new THREE.Raycaster();
+    this.vertices = [];
+    this.faces = [];
+    this.previewMesh = null;
+    this.snapRadius = 0.05;
+    this.active = false;
+    this._onPointerDown = this._onPointerDown.bind(this);
+  }
+
+  enable() {
+    this.active = true;
+    this.renderer.domElement.addEventListener('pointerdown', this._onPointerDown);
+    this._initPreviewMesh();
+  }
+
+  disable() {
+    this.active = false;
+    this.renderer.domElement.removeEventListener('pointerdown', this._onPointerDown);
+  }
+
+  _initPreviewMesh() {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute([], 3));
+    const mat = new THREE.MeshBasicMaterial({ color: 0x00ffc8, wireframe: true, side: THREE.DoubleSide });
+    this.previewMesh = new THREE.Mesh(geo, mat);
+    this.scene.add(this.previewMesh);
+  }
+
+  _onPointerDown(event) {
+    if (!this.active) return;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -((event.clientY - rect.top) / rect.height) * 2 + 1,
+    );
+
+    this.raycaster.setFromCamera(ndc, this.camera);
+    const hits = this.raycaster.intersectObject(this.targetMesh, false);
+    if (!hits.length) return;
+
+    const point = hits[0].point.clone();
+
+    // Snap to existing vertex if close enough
+    const snapped = this._snapToExisting(point);
+    const vertIdx = snapped !== null ? snapped : this._addVertex(point);
+
+    if (this.vertices.length >= 3) {
+      // Auto-complete quad on 4th vertex
+      if (this._pendingVerts && this._pendingVerts.length === 3) {
+        this._pendingVerts.push(vertIdx);
+        this._addFace(...this._pendingVerts);
+        this._pendingVerts = [];
+      } else {
+        this._pendingVerts = [vertIdx];
+      }
+    } else {
+      this._pendingVerts = this._pendingVerts ?? [];
+      this._pendingVerts.push(vertIdx);
+    }
+
+    this._updatePreview();
+  }
+
+  _addVertex(point) {
+    this.vertices.push(point.clone());
+    return this.vertices.length - 1;
+  }
+
+  _snapToExisting(point) {
+    for (let i = 0; i < this.vertices.length; i++) {
+      if (this.vertices[i].distanceTo(point) < this.snapRadius) return i;
+    }
+    return null;
+  }
+
+  _addFace(a, b, c, d) {
+    if (d !== undefined) {
+      this.faces.push([a, b, c], [a, c, d]); // quad as 2 tris
+    } else {
+      this.faces.push([a, b, c]);
+    }
+    this._updatePreview();
+  }
+
+  _updatePreview() {
+    if (!this.previewMesh) return;
+    const positions = this.vertices.flatMap(v => [v.x, v.y, v.z]);
+    const indices = this.faces.flat();
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    if (indices.length) geo.setIndex(indices);
+    geo.computeVertexNormals();
+    this.previewMesh.geometry.dispose();
+    this.previewMesh.geometry = geo;
+  }
+
+  extractGeometry() {
+    const positions = this.vertices.flatMap(v => [v.x, v.y, v.z]);
+    const indices = this.faces.flat();
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    if (indices.length) geo.setIndex(indices);
+    geo.computeVertexNormals();
+    return geo;
+  }
+
+  clear() {
+    this.vertices = [];
+    this.faces = [];
+    this._pendingVerts = [];
+    this._updatePreview();
+  }
+
+  dispose() {
+    this.disable();
+    if (this.previewMesh) {
+      this.scene.remove(this.previewMesh);
+      this.previewMesh.geometry.dispose();
+    }
+  }
+}
+
+export default { autoRetopo, projectToSurface, PolyBuildTool };
+
+
+// ─── Legacy functional exports (App.jsx compat) ───────────────────────────────
+
+export function quadDominantRetopo(sourceMesh, targetPolyCount = 2000) {
+  return autoRetopo(sourceMesh, targetPolyCount);
+}
+
+export function detectHardEdges(geometry, angleThreshold = Math.PI / 4) {
+  const { SeamManager } = require('./UVUnwrap.js');
+  const sm = new SeamManager();
+  sm.markSharpEdgesAsSeams(geometry, angleThreshold);
+  return Array.from(sm.seams);
+}
+
+export function applySymmetryRetopo(geometry, axis = 'x') {
+  const geo = geometry.clone();
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    if (axis === 'x' && pos.getX(i) < 0) pos.setX(i, Math.abs(pos.getX(i)));
+    if (axis === 'y' && pos.getY(i) < 0) pos.setY(i, Math.abs(pos.getY(i)));
+    if (axis === 'z' && pos.getZ(i) < 0) pos.setZ(i, Math.abs(pos.getZ(i)));
+  }
+  pos.needsUpdate = true;
+  geo.computeVertexNormals();
+  return geo;
+}
+
+export function getRetopoStats(geometry) {
+  const pos = geometry?.attributes?.position;
+  const idx = geometry?.index;
+  return {
+    vertices: pos?.count ?? 0,
+    faces: idx ? idx.count / 3 : (pos?.count ?? 0) / 3,
+    edges: idx ? idx.count / 2 : 0,
+  };
+}
+
+export function createRetopoSettings(options = {}) {
+  return { targetPolyCount: 2000, axis: 'x', snapToSurface: true, usePolyBuild: false, ...options };
 }

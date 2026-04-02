@@ -3,7 +3,25 @@
  * Fits hair cards to a scalp mesh using BVH-accelerated triangle sampling,
  * barycentric projection, and shrink-wrap snapping.
  */
-import * as THREE from 'three';\n\nconst clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));\n\n// ─── Simple BVH node for triangle acceleration ────────────────────────────────\nclass BVHNode {\n  constructor(tris, depth = 0) {\n    this.bbox  = new THREE.Box3();\n    this.left  = null;\n    this.right = null;\n    this.tris  = null;\n    tris.forEach(t => {\n      this.bbox.expandByPoint(t.a);\n      this.bbox.expandByPoint(t.b);\n      this.bbox.expandByPoint(t.c);\n    });\n    if (tris.length <= 4 || depth > 16) { this.tris = tris; return; }\n    const sz   = this.bbox.getSize(new THREE.Vector3());\n    const axis = sz.x > sz.y && sz.x > sz.z ? 'x' : sz.y > sz.z ? 'y' : 'z';
+import * as THREE from 'three';
+
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+// ─── Simple BVH node for triangle acceleration ────────────────────────────────
+class BVHNode {
+  constructor(tris, depth = 0) {
+    this.bbox  = new THREE.Box3();
+    this.left  = null;
+    this.right = null;
+    this.tris  = null;
+    tris.forEach(t => {
+      this.bbox.expandByPoint(t.a);
+      this.bbox.expandByPoint(t.b);
+      this.bbox.expandByPoint(t.c);
+    });
+    if (tris.length <= 4 || depth > 16) { this.tris = tris; return; }
+    const sz   = this.bbox.getSize(new THREE.Vector3());
+    const axis = sz.x > sz.y && sz.x > sz.z ? 'x' : sz.y > sz.z ? 'y' : 'z';
     const mid  = (this.bbox.min[axis] + this.bbox.max[axis]) * 0.5;
     const L    = tris.filter(t => t.centroid[axis] <= mid);
     const R    = tris.filter(t => t.centroid[axis] >  mid);

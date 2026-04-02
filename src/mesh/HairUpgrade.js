@@ -9,5 +9,428 @@ const CURRENT_VERSION = 4;
 // ─── Version schemas ──────────────────────────────────────────────────────
 const SCHEMAS = {
   1: {
-    required: ['cards','rootColor','tipColor'],\n    optional: ['density','stiffness'],\n  },\n  2: {\n    required: ['cards','rootColor','tipColor','density','stiffness','damping'],\n    optional: ['windStr','gravity','shaderType'],\n  },\n  3: {\n    required: ['version','cards','rootColor','tipColor','density','stiffness','damping','windStr','gravity','shaderType'],\n    optional: ['layers','lod','physics'],\n  },\n  4: {\n    required: ['version','cards','rootColor','tipColor','density','stiffness','damping','windStr','gravity','shaderType','layers','lod'],\n    optional: ['physics','grooming','accessories'],\n  },\n};\n\n// ─── Migrations ───────────────────────────────────────────────────────────\nconst MIGRATIONS = {\n\n  '1→2': (data) => ({\n    ...data,\n    density:    data.density    ?? 0.75,\n    stiffness:  data.stiffness  ?? 0.70,\n    damping:    data.damping    ?? 0.85,\n  }),\n\n  '2→3': (data) => ({\n    ...data,\n    version:    3,\n    windStr:    data.windStr    ?? 0.40,\n    gravity:    data.gravity    ?? 0.50,\n    shaderType: data.shaderType ?? 'Kajiya-Kay',\n    layers:     data.layers     ?? [\n      { type:'Base', density:1.0, opacity:1.0, enabled:true },\n      { type:'Top',  density:0.5, opacity:1.0, enabled:true },\n    ],\n    lod: data.lod ?? { enabled:true, distances:[0,3,8,20,50] },\n  }),\n\n  '3→4': (data) => ({\n    ...data,\n    version: 4,\n    layers: (data.layers ?? []).map(layer => ({\n      ...layer,\n      length:      layer.length      ?? 1.0,\n      width:       layer.width       ?? 1.0,\n      color:       layer.color       ?? data.rootColor,\n      tipColor:    layer.tipColor    ?? data.tipColor,\n      stiffness:   layer.stiffness   ?? data.stiffness,\n    })),\n    lod: {\n      ...data.lod,\n      fractions: data.lod?.fractions ?? [1.0, 0.6, 0.3, 0.1, 0],\n      hysteresis: 0.5,\n    },\n    physics: data.physics ?? {\n      enabled:    true,\n      iterations: 4,\n      substeps:   2,\n    },\n    grooming: data.grooming ?? { strokes:[], historyLength:32 },\n  }),\n};\n\n// ─── Core API ─────────────────────────────────────────────────────────────\nexport function detectVersion(data) {\n  if (!data || typeof data !== 'object') return 0;\n  if (data.version) return data.version;\n  if (data.layers && data.lod) return 3;\n  if (data.damping !== undefined) return 2;\n  if (data.cards)   return 1;\n  return 0;\n}\n\nexport function migrate(data, targetVersion = CURRENT_VERSION) {\n  let current = detectVersion(data);\n  let result  = { ...data };\n  while (current < targetVersion) {\n    const key = `${current}→${current+1}`;\n    const fn  = MIGRATIONS[key];\n    if (!fn) throw new Error(`No migration found: ${key}`);\n    result  = fn(result);\n    current = detectVersion(result);\n    if (current === 0) current++;\n  }\n  return result;\n}\n\nexport function validateHairData(data) {\n  const version = detectVersion(data);\n  if (version === 0) return { valid:false, errors:['Cannot detect version'], warnings:[] };\n  const schema   = SCHEMAS[Math.min(version, CURRENT_VERSION)];\n  const errors   = [];\n  const warnings = [];\n  schema.required.forEach(key => {\n    if (!(key in data)) errors.push(`Missing required field: ${key}`);\n  });\n  if (data.density   !== undefined && (data.density   < 0 || data.density   > 1)) errors.push('density out of range 0-1');\n  if (data.stiffness !== undefined && (data.stiffness < 0 || data.stiffness > 1)) errors.push('stiffness out of range 0-1');\n  if (data.damping   !== undefined && (data.damping   < 0 || data.damping   > 1)) errors.push('damping out of range 0-1');\n  if (version < CURRENT_VERSION) warnings.push(`Schema v${version} — upgrade to v${CURRENT_VERSION} recommended`);\n  if (data.cards > 5000) warnings.push('High card count — may impact performance');\n  return { valid: errors.length === 0, errors, warnings, version };\n}\n\nexport function repairHairData(data) {\n  const repaired = { ...data };\n  repaired.density    = Math.max(0, Math.min(1, repaired.density    ?? 0.75));\n  repaired.stiffness  = Math.max(0, Math.min(1, repaired.stiffness  ?? 0.70));\n  repaired.damping    = Math.max(0, Math.min(1, repaired.damping    ?? 0.85));\n  repaired.windStr    = Math.max(0, Math.min(5, repaired.windStr    ?? 0.40));\n  repaired.gravity    = Math.max(0, Math.min(2, repaired.gravity    ?? 0.50));\n  repaired.cards      = Math.max(1, Math.min(10000, repaired.cards  ?? 300));\n  repaired.rootColor  = repaired.rootColor  ?? '#2a1808';\n  repaired.tipColor   = repaired.tipColor   ?? '#8a5020';\n  repaired.shaderType = repaired.shaderType ?? 'Kajiya-Kay';\n  if (!Array.isArray(repaired.layers)) repaired.layers = [];\n  return repaired;\n}\n\nexport function diffHairData(before, after) {\n  const changed = {};\n  const allKeys = new Set([...Object.keys(before), ...Object.keys(after)]);\n  allKeys.forEach(k => {\n    const bv = JSON.stringify(before[k]);\n    const av = JSON.stringify(after[k]);\n    if (bv !== av) changed[k] = { from: before[k], to: after[k] };\n  });\n  return changed;\n}\n\nexport function stampVersion(data, version = CURRENT_VERSION) {\n  return { ...data, version, updatedAt: Date.now() };\n}\n\nexport function exportHairToJSON(data) {\n  const upgraded = migrate(data);\n  const valid    = validateHairData(upgraded);\n  return JSON.stringify({ ...upgraded, exportedAt: new Date().toISOString(), valid: valid.valid }, null, 2);\n}\n\nexport function importHairFromJSON(json) {\n  try {\n    const parsed  = JSON.parse(json);\n    const migrated = migrate(parsed);\n    const validation = validateHairData(migrated);\n    return { data: validation.valid ? migrated : repairHairData(migrated), validation };\n  } catch (e) {\n    return { data: null, validation: { valid:false, errors:[e.message], warnings:[] } };\n  }\n}\n\nexport function batchUpgrade(dataArray) {\n  return dataArray.map(data => {\n    try { return { success:true, data: stampVersion(migrate(data)) }; }\n    catch (e) { return { success:false, error: e.message, data: repairHairData(data) }; }\n  });\n}\n\nexport function getUpgradePath(fromVersion, toVersion = CURRENT_VERSION) {\n  const path = [];\n  for (let v = fromVersion; v < toVersion; v++) path.push(`v${v} → v${v+1}`);\n  return path;\n}\n\nexport default {\n  detectVersion, migrate, validateHairData, repairHairData,\n  diffHairData, stampVersion, exportHairToJSON, importHairFromJSON,\n  batchUpgrade, getUpgradePath, CURRENT_VERSION,\n};\n\nexport function compareVersions(a, b) {\n  if (a < b) return -1;\n  if (a > b) return 1;\n  return 0;\n}\n\nexport function needsUpgrade(data) {\n  return detectVersion(data) < CURRENT_VERSION;\n}\n\nexport function safeUpgrade(data) {\n  try {\n    const migrated = migrate(data);\n    const repaired = repairHairData(migrated);\n    return { success:true, data: stampVersion(repaired) };\n  } catch (e) {\n    return { success:false, error: e.message, data: repairHairData(data) };\n  }\n}\n\nexport function buildUpgradeReport(data) {\n  const fromVersion = detectVersion(data);\n  const path        = getUpgradePath(fromVersion);\n  const validation  = validateHairData(data);\n  return {\n    currentVersion: fromVersion,\n    targetVersion:  CURRENT_VERSION,\n    needsUpgrade:   fromVersion < CURRENT_VERSION,\n    upgradePath:    path,\n    validation,\n    fieldCount:     Object.keys(data).length,\n    estimatedSafety: validation.errors.length === 0 ? 'Safe' : 'Needs Repair',\n  };\n}\n\nexport function createVersionedSnapshot(data, label) {\n  return {\n    label,\n    version:     detectVersion(data),\n    data:        JSON.parse(JSON.stringify(data)),\n    createdAt:   new Date().toISOString(),\n    fingerprint: JSON.stringify(data).length,\n  };\n}\n\nexport function mergeHairConfigs(base, override) {\n  const merged = { ...repairHairData(base) };\n  Object.entries(override).forEach(([k, v]) => {\n    if (v !== undefined && v !== null) merged[k] = v;\n  });\n  return repairHairData(merged);\n}\n\nexport const DEFAULT_HAIR_DATA = {\n  version:    CURRENT_VERSION,\n  cards:      300,\n  density:    0.75,\n  rootColor:  '#2a1808',\n  tipColor:   '#8a5020',\n  stiffness:  0.70,\n  damping:    0.85,\n  windStr:    0.40,\n  gravity:    0.50,\n  shaderType: 'Kajiya-Kay',\n  layers:     [\n    { type:'Base',     density:1.0, opacity:1.0, enabled:true, length:1.0, width:1.0 },\n    { type:'Flyaway',  density:0.15,opacity:1.0, enabled:true, length:0.7, width:0.5 },\n  ],\n  lod: { enabled:true, distances:[0,3,8,20,50], fractions:[1,0.6,0.3,0.1,0], hysteresis:0.5 },\n  physics: { enabled:true, iterations:4, substeps:2 },\n  grooming: { strokes:[], historyLength:32 },\n};\n\nexport function createDefaultHairData() { return JSON.parse(JSON.stringify(DEFAULT_HAIR_DATA)); }\n\nexport function canMigrate(data) {\n  const v = detectVersion(data);\n  return v > 0 && v <= CURRENT_VERSION;\n}\nexport function getSchemaFields(version) {\n  const v = Math.min(version, CURRENT_VERSION);\n  const schemas = {\n    1:['cards','rootColor','tipColor'],\n    2:['cards','rootColor','tipColor','density','stiffness','damping'],\n    3:['version','cards','rootColor','tipColor','density','stiffness','damping','windStr','gravity','shaderType'],\n    4:['version','cards','rootColor','tipColor','density','stiffness','damping','windStr','gravity','shaderType','layers','lod','physics','grooming'],\n  };\n  return schemas[v] ?? schemas[1];\n}\nexport function summarizeHairData(data) {\n  return {\n    version: detectVersion(data), cards: data.cards,\n    rootColor: data.rootColor, tipColor: data.tipColor,\n    hasLayers: Array.isArray(data.layers) && data.layers.length > 0,\n    hasPhysics: !!data.physics?.enabled, hasLOD: !!data.lod?.enabled,\n    hasGrooming: Array.isArray(data.grooming?.strokes),\n    fieldCount: Object.keys(data).length,\n  };\n}\nexport function isCompatibleVersion(data, minVersion=1, maxVersion=CURRENT_VERSION) {\n  const v = detectVersion(data);\n  return v >= minVersion && v <= maxVersion;\n}\nexport function getUpgradeSizeEstimate(data) {\n  const from = detectVersion(data);\n  const additions = { '1→2':3, '2→3':5, '3→4':8 };\n  let fields = 0;\n  for (let v=from; v<CURRENT_VERSION; v++) fields += additions[`${v}→${v+1}`]??2;\n  return { additionalFields:fields, estimatedBytes: fields * 20 };\n}\nexport function autoUpgradeIfNeeded(data) {\n  if (!needsUpgrade(data)) return { data, upgraded:false };\n  const result = safeUpgrade(data);\n  return { data: result.data, upgraded:result.success, error: result.error };\n}\n\nexport function buildMigrationLog(data) {\n  const fromV  = detectVersion(data);\n  const log    = [];\n  let current  = { ...data };\n  for (let v = fromV; v < CURRENT_VERSION; v++) {\n    const key = `${v}→${v+1}`;\n    const fn  = { '1→2': d=>({...d,density:0.75,stiffness:0.70,damping:0.85}),\n                  '2→3': d=>({...d,version:3,windStr:0.40,gravity:0.50,shaderType:'Kajiya-Kay'}),\n                  '3→4': d=>({...d,version:4,lod:{enabled:true},physics:{enabled:true},grooming:{strokes:[]}}) }[key];\n    if (fn) { const before=JSON.stringify(current); current=fn(current); log.push({step:key,addedFields:Object.keys(current).filter(k=>!(k in JSON.parse(before)))}); }\n  }\n  return { fromVersion:fromV, toVersion:CURRENT_VERSION, steps:log };\n}\nexport function stripUnknownFields(data) {\n  const known = getSchemaFields(CURRENT_VERSION);\n  const extra = ['physics','grooming','accessories','lod','layers'];\n  const allowed = [...known, ...extra];\n  return Object.fromEntries(Object.entries(data).filter(([k])=>allowed.includes(k)));\n}\nexport function computeDataFingerprint(data) {\n  const str = JSON.stringify(data, Object.keys(data).sort());\n  let h = 0;\n  for (const c of str) h = (Math.imul(31,h) + c.charCodeAt(0)) | 0;\n  return (h >>> 0).toString(16).padStart(8,'0');\n}\nexport function isHairDataStale(data, maxAgeMs=86400000) {\n  const age = data.updatedAt ? Date.now() - data.updatedAt : Infinity;\n  return age > maxAgeMs;\n}\nexport function buildDataDiff(before, after) {\n  const added   = Object.keys(after).filter(k=>!(k in before));\n  const removed = Object.keys(before).filter(k=>!(k in after));\n  const changed = Object.keys(after).filter(k=>k in before && JSON.stringify(before[k])!==JSON.stringify(after[k]));\n  return { added, removed, changed, hasChanges: added.length+removed.length+changed.length > 0 };\n}\nexport function cloneHairData(data) { return JSON.parse(JSON.stringify(data)); }\nexport function mergeDefaults(data) { return { ...DEFAULT_HAIR_DATA, ...data }; }\nexport function getVersionHistory() {\n  return [\n    { version:1, description:'Initial format: cards, rootColor, tipColor' },\n    { version:2, description:'Added density, stiffness, damping' },\n    { version:3, description:'Added windStr, gravity, shaderType, layers, LOD' },\n    { version:4, description:'Added physics, grooming history, accessories, full layer schema' },\n  ];\n}\n\nexport function generateUpgradeScript(fromVersion, toVersion=CURRENT_VERSION) {\n  const path=getUpgradePath(fromVersion,toVersion);\n  return [`// Auto-generated upgrade script v${fromVersion} → v${toVersion}`,\n    `// Run: importHairFromJSON(json)`,\n    `// Steps: ${path.join(' → ')}`,\n    `module.exports={migrate,validateHairData,repairHairData,stampVersion};`,\n  ].join('\n');\n}\nexport function compareHairData(a, b) {\n  const va=detectVersion(a), vb=detectVersion(b);\n  const diff=buildDataDiff(a,b);\n  return {versionMatch:va===vb,versionA:va,versionB:vb,...diff,\n    fingerprintA:computeDataFingerprint(a), fingerprintB:computeDataFingerprint(b),\n    identical:!diff.hasChanges&&va===vb};\n}\nexport function sanitizeHairData(data) {\n  const clean={...repairHairData(data)};\n  delete clean.exportedAt; delete clean.valid;\n  if(Array.isArray(clean.layers)) clean.layers=clean.layers.filter(l=>l&&l.type);\n  return clean;\n}\nexport function buildVersionBadge(data) {\n  const v=detectVersion(data);\n  return {version:v,current:CURRENT_VERSION,upToDate:v>=CURRENT_VERSION,\n    label:`v${v}${v>=CURRENT_VERSION?' ✓':' (upgrade available)'}`,\n    color:v>=CURRENT_VERSION?'#00ffc8':v>=2?'#f0c040':'#FF6600'};\n}\n\nexport function buildSchemaDocumentation() {\n  return {\n    v1:{required:['cards','rootColor','tipColor'],description:'Minimal hair definition'},\n    v2:{required:['density','stiffness','damping'],description:'Added physics params'},\n    v3:{required:['windStr','gravity','shaderType','layers','lod'],description:'Full feature set'},\n    v4:{required:['physics','grooming'],description:'Current — physics + grooming history'},\n  };\n}\nexport function getFieldDescription(fieldName) {\n  const docs={\n    cards:'Number of hair card strands', density:'Fraction of cards actually placed (0-1)',\n    rootColor:'Hex color at strand root', tipColor:'Hex color at strand tip',\n    stiffness:'How rigidly strands return to rest pose (0-1)',\n    damping:'Velocity reduction per frame (0-1)', windStr:'Wind force multiplier',\n    gravity:'Gravity scale (0=none, 1=full)', shaderType:'Rendering shader type',\n    layers:'Array of hair layer configs', lod:'Level-of-detail settings',\n    physics:'Simulation settings', grooming:'Groom stroke history',\n  };\n  return docs[fieldName]??'No description available';\n}\nexport function validateLayerConfig(layer) {\n  const errors=[];\n  if(!layer.type) errors.push('Missing layer type');\n  if(layer.density<0||layer.density>1) errors.push('Layer density out of range');\n  if(layer.opacity<0||layer.opacity>1) errors.push('Layer opacity out of range');\n  return {valid:errors.length===0,errors};\n}\nexport function computeUpgradeRisk(data) {\n  const v=detectVersion(data);\n  if(v===CURRENT_VERSION) return {risk:'none',score:0};\n  if(v>=3) return {risk:'low',score:1};\n  if(v>=2) return {risk:'medium',score:2};\n  return {risk:'high',score:3,note:'Old format — backup before upgrading'};\n}\n\nexport function createUpgradePipeline(validators=[],migrators=[],postProcessors=[]) {\n  return function run(data) {\n    let result={...data};\n    for(const v of validators) {\n      const r=v(result);\n      if(!r.valid) return {success:false,data:result,errors:r.errors};\n    }\n    for(const m of migrators) { result=m(result); }\n    for(const p of postProcessors) { result=p(result); }\n    return {success:true,data:result};\n  };\n}\nexport function buildDefaultPipeline() {\n  return createUpgradePipeline(\n    [d=>validateHairData(d)],\n    [d=>needsUpgrade(d)?migrate(d):d],\n    [d=>repairHairData(d),d=>stampVersion(d)]\n  );\n}\nexport function runPipelineOnBatch(pipeline, dataArray) {\n  return dataArray.map((d,i)=>({index:i,...pipeline(d)}));\n}\nexport function getUpgradeStatsSummary(results) {\n  const ok=results.filter(r=>r.success).length;\n  return {total:results.length,success:ok,failed:results.length-ok,\n    rate:(ok/Math.max(1,results.length)*100).toFixed(1)+'%'};
+    required: ['cards','rootColor','tipColor'],
+    optional: ['density','stiffness'],
+  },
+  2: {
+    required: ['cards','rootColor','tipColor','density','stiffness','damping'],
+    optional: ['windStr','gravity','shaderType'],
+  },
+  3: {
+    required: ['version','cards','rootColor','tipColor','density','stiffness','damping','windStr','gravity','shaderType'],
+    optional: ['layers','lod','physics'],
+  },
+  4: {
+    required: ['version','cards','rootColor','tipColor','density','stiffness','damping','windStr','gravity','shaderType','layers','lod'],
+    optional: ['physics','grooming','accessories'],
+  },
+};
+
+// ─── Migrations ───────────────────────────────────────────────────────────
+const MIGRATIONS = {
+
+  '1→2': (data) => ({
+    ...data,
+    density:    data.density    ?? 0.75,
+    stiffness:  data.stiffness  ?? 0.70,
+    damping:    data.damping    ?? 0.85,
+  }),
+
+  '2→3': (data) => ({
+    ...data,
+    version:    3,
+    windStr:    data.windStr    ?? 0.40,
+    gravity:    data.gravity    ?? 0.50,
+    shaderType: data.shaderType ?? 'Kajiya-Kay',
+    layers:     data.layers     ?? [
+      { type:'Base', density:1.0, opacity:1.0, enabled:true },
+      { type:'Top',  density:0.5, opacity:1.0, enabled:true },
+    ],
+    lod: data.lod ?? { enabled:true, distances:[0,3,8,20,50] },
+  }),
+
+  '3→4': (data) => ({
+    ...data,
+    version: 4,
+    layers: (data.layers ?? []).map(layer => ({
+      ...layer,
+      length:      layer.length      ?? 1.0,
+      width:       layer.width       ?? 1.0,
+      color:       layer.color       ?? data.rootColor,
+      tipColor:    layer.tipColor    ?? data.tipColor,
+      stiffness:   layer.stiffness   ?? data.stiffness,
+    })),
+    lod: {
+      ...data.lod,
+      fractions: data.lod?.fractions ?? [1.0, 0.6, 0.3, 0.1, 0],
+      hysteresis: 0.5,
+    },
+    physics: data.physics ?? {
+      enabled:    true,
+      iterations: 4,
+      substeps:   2,
+    },
+    grooming: data.grooming ?? { strokes:[], historyLength:32 },
+  }),
+};
+
+// ─── Core API ─────────────────────────────────────────────────────────────
+export function detectVersion(data) {
+  if (!data || typeof data !== 'object') return 0;
+  if (data.version) return data.version;
+  if (data.layers && data.lod) return 3;
+  if (data.damping !== undefined) return 2;
+  if (data.cards)   return 1;
+  return 0;
+}
+
+export function migrate(data, targetVersion = CURRENT_VERSION) {
+  let current = detectVersion(data);
+  let result  = { ...data };
+  while (current < targetVersion) {
+    const key = `${current}→${current+1}`;
+    const fn  = MIGRATIONS[key];
+    if (!fn) throw new Error(`No migration found: ${key}`);
+    result  = fn(result);
+    current = detectVersion(result);
+    if (current === 0) current++;
+  }
+  return result;
+}
+
+export function validateHairData(data) {
+  const version = detectVersion(data);
+  if (version === 0) return { valid:false, errors:['Cannot detect version'], warnings:[] };
+  const schema   = SCHEMAS[Math.min(version, CURRENT_VERSION)];
+  const errors   = [];
+  const warnings = [];
+  schema.required.forEach(key => {
+    if (!(key in data)) errors.push(`Missing required field: ${key}`);
+  });
+  if (data.density   !== undefined && (data.density   < 0 || data.density   > 1)) errors.push('density out of range 0-1');
+  if (data.stiffness !== undefined && (data.stiffness < 0 || data.stiffness > 1)) errors.push('stiffness out of range 0-1');
+  if (data.damping   !== undefined && (data.damping   < 0 || data.damping   > 1)) errors.push('damping out of range 0-1');
+  if (version < CURRENT_VERSION) warnings.push(`Schema v${version} — upgrade to v${CURRENT_VERSION} recommended`);
+  if (data.cards > 5000) warnings.push('High card count — may impact performance');
+  return { valid: errors.length === 0, errors, warnings, version };
+}
+
+export function repairHairData(data) {
+  const repaired = { ...data };
+  repaired.density    = Math.max(0, Math.min(1, repaired.density    ?? 0.75));
+  repaired.stiffness  = Math.max(0, Math.min(1, repaired.stiffness  ?? 0.70));
+  repaired.damping    = Math.max(0, Math.min(1, repaired.damping    ?? 0.85));
+  repaired.windStr    = Math.max(0, Math.min(5, repaired.windStr    ?? 0.40));
+  repaired.gravity    = Math.max(0, Math.min(2, repaired.gravity    ?? 0.50));
+  repaired.cards      = Math.max(1, Math.min(10000, repaired.cards  ?? 300));
+  repaired.rootColor  = repaired.rootColor  ?? '#2a1808';
+  repaired.tipColor   = repaired.tipColor   ?? '#8a5020';
+  repaired.shaderType = repaired.shaderType ?? 'Kajiya-Kay';
+  if (!Array.isArray(repaired.layers)) repaired.layers = [];
+  return repaired;
+}
+
+export function diffHairData(before, after) {
+  const changed = {};
+  const allKeys = new Set([...Object.keys(before), ...Object.keys(after)]);
+  allKeys.forEach(k => {
+    const bv = JSON.stringify(before[k]);
+    const av = JSON.stringify(after[k]);
+    if (bv !== av) changed[k] = { from: before[k], to: after[k] };
+  });
+  return changed;
+}
+
+export function stampVersion(data, version = CURRENT_VERSION) {
+  return { ...data, version, updatedAt: Date.now() };
+}
+
+export function exportHairToJSON(data) {
+  const upgraded = migrate(data);
+  const valid    = validateHairData(upgraded);
+  return JSON.stringify({ ...upgraded, exportedAt: new Date().toISOString(), valid: valid.valid }, null, 2);
+}
+
+export function importHairFromJSON(json) {
+  try {
+    const parsed  = JSON.parse(json);
+    const migrated = migrate(parsed);
+    const validation = validateHairData(migrated);
+    return { data: validation.valid ? migrated : repairHairData(migrated), validation };
+  } catch (e) {
+    return { data: null, validation: { valid:false, errors:[e.message], warnings:[] } };
+  }
+}
+
+export function batchUpgrade(dataArray) {
+  return dataArray.map(data => {
+    try { return { success:true, data: stampVersion(migrate(data)) }; }
+    catch (e) { return { success:false, error: e.message, data: repairHairData(data) }; }
+  });
+}
+
+export function getUpgradePath(fromVersion, toVersion = CURRENT_VERSION) {
+  const path = [];
+  for (let v = fromVersion; v < toVersion; v++) path.push(`v${v} → v${v+1}`);
+  return path;
+}
+
+export default {
+  detectVersion, migrate, validateHairData, repairHairData,
+  diffHairData, stampVersion, exportHairToJSON, importHairFromJSON,
+  batchUpgrade, getUpgradePath, CURRENT_VERSION,
+};
+
+export function compareVersions(a, b) {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
+
+export function needsUpgrade(data) {
+  return detectVersion(data) < CURRENT_VERSION;
+}
+
+export function safeUpgrade(data) {
+  try {
+    const migrated = migrate(data);
+    const repaired = repairHairData(migrated);
+    return { success:true, data: stampVersion(repaired) };
+  } catch (e) {
+    return { success:false, error: e.message, data: repairHairData(data) };
+  }
+}
+
+export function buildUpgradeReport(data) {
+  const fromVersion = detectVersion(data);
+  const path        = getUpgradePath(fromVersion);
+  const validation  = validateHairData(data);
+  return {
+    currentVersion: fromVersion,
+    targetVersion:  CURRENT_VERSION,
+    needsUpgrade:   fromVersion < CURRENT_VERSION,
+    upgradePath:    path,
+    validation,
+    fieldCount:     Object.keys(data).length,
+    estimatedSafety: validation.errors.length === 0 ? 'Safe' : 'Needs Repair',
+  };
+}
+
+export function createVersionedSnapshot(data, label) {
+  return {
+    label,
+    version:     detectVersion(data),
+    data:        JSON.parse(JSON.stringify(data)),
+    createdAt:   new Date().toISOString(),
+    fingerprint: JSON.stringify(data).length,
+  };
+}
+
+export function mergeHairConfigs(base, override) {
+  const merged = { ...repairHairData(base) };
+  Object.entries(override).forEach(([k, v]) => {
+    if (v !== undefined && v !== null) merged[k] = v;
+  });
+  return repairHairData(merged);
+}
+
+export const DEFAULT_HAIR_DATA = {
+  version:    CURRENT_VERSION,
+  cards:      300,
+  density:    0.75,
+  rootColor:  '#2a1808',
+  tipColor:   '#8a5020',
+  stiffness:  0.70,
+  damping:    0.85,
+  windStr:    0.40,
+  gravity:    0.50,
+  shaderType: 'Kajiya-Kay',
+  layers:     [
+    { type:'Base',     density:1.0, opacity:1.0, enabled:true, length:1.0, width:1.0 },
+    { type:'Flyaway',  density:0.15,opacity:1.0, enabled:true, length:0.7, width:0.5 },
+  ],
+  lod: { enabled:true, distances:[0,3,8,20,50], fractions:[1,0.6,0.3,0.1,0], hysteresis:0.5 },
+  physics: { enabled:true, iterations:4, substeps:2 },
+  grooming: { strokes:[], historyLength:32 },
+};
+
+export function createDefaultHairData() { return JSON.parse(JSON.stringify(DEFAULT_HAIR_DATA)); }
+
+export function canMigrate(data) {
+  const v = detectVersion(data);
+  return v > 0 && v <= CURRENT_VERSION;
+}
+export function getSchemaFields(version) {
+  const v = Math.min(version, CURRENT_VERSION);
+  const schemas = {
+    1:['cards','rootColor','tipColor'],
+    2:['cards','rootColor','tipColor','density','stiffness','damping'],
+    3:['version','cards','rootColor','tipColor','density','stiffness','damping','windStr','gravity','shaderType'],
+    4:['version','cards','rootColor','tipColor','density','stiffness','damping','windStr','gravity','shaderType','layers','lod','physics','grooming'],
+  };
+  return schemas[v] ?? schemas[1];
+}
+export function summarizeHairData(data) {
+  return {
+    version: detectVersion(data), cards: data.cards,
+    rootColor: data.rootColor, tipColor: data.tipColor,
+    hasLayers: Array.isArray(data.layers) && data.layers.length > 0,
+    hasPhysics: !!data.physics?.enabled, hasLOD: !!data.lod?.enabled,
+    hasGrooming: Array.isArray(data.grooming?.strokes),
+    fieldCount: Object.keys(data).length,
+  };
+}
+export function isCompatibleVersion(data, minVersion=1, maxVersion=CURRENT_VERSION) {
+  const v = detectVersion(data);
+  return v >= minVersion && v <= maxVersion;
+}
+export function getUpgradeSizeEstimate(data) {
+  const from = detectVersion(data);
+  const additions = { '1→2':3, '2→3':5, '3→4':8 };
+  let fields = 0;
+  for (let v=from; v<CURRENT_VERSION; v++) fields += additions[`${v}→${v+1}`]??2;
+  return { additionalFields:fields, estimatedBytes: fields * 20 };
+}
+export function autoUpgradeIfNeeded(data) {
+  if (!needsUpgrade(data)) return { data, upgraded:false };
+  const result = safeUpgrade(data);
+  return { data: result.data, upgraded:result.success, error: result.error };
+}
+
+export function buildMigrationLog(data) {
+  const fromV  = detectVersion(data);
+  const log    = [];
+  let current  = { ...data };
+  for (let v = fromV; v < CURRENT_VERSION; v++) {
+    const key = `${v}→${v+1}`;
+    const fn  = { '1→2': d=>({...d,density:0.75,stiffness:0.70,damping:0.85}),
+                  '2→3': d=>({...d,version:3,windStr:0.40,gravity:0.50,shaderType:'Kajiya-Kay'}),
+                  '3→4': d=>({...d,version:4,lod:{enabled:true},physics:{enabled:true},grooming:{strokes:[]}}) }[key];
+    if (fn) { const before=JSON.stringify(current); current=fn(current); log.push({step:key,addedFields:Object.keys(current).filter(k=>!(k in JSON.parse(before)))}); }
+  }
+  return { fromVersion:fromV, toVersion:CURRENT_VERSION, steps:log };
+}
+export function stripUnknownFields(data) {
+  const known = getSchemaFields(CURRENT_VERSION);
+  const extra = ['physics','grooming','accessories','lod','layers'];
+  const allowed = [...known, ...extra];
+  return Object.fromEntries(Object.entries(data).filter(([k])=>allowed.includes(k)));
+}
+export function computeDataFingerprint(data) {
+  const str = JSON.stringify(data, Object.keys(data).sort());
+  let h = 0;
+  for (const c of str) h = (Math.imul(31,h) + c.charCodeAt(0)) | 0;
+  return (h >>> 0).toString(16).padStart(8,'0');
+}
+export function isHairDataStale(data, maxAgeMs=86400000) {
+  const age = data.updatedAt ? Date.now() - data.updatedAt : Infinity;
+  return age > maxAgeMs;
+}
+export function buildDataDiff(before, after) {
+  const added   = Object.keys(after).filter(k=>!(k in before));
+  const removed = Object.keys(before).filter(k=>!(k in after));
+  const changed = Object.keys(after).filter(k=>k in before && JSON.stringify(before[k])!==JSON.stringify(after[k]));
+  return { added, removed, changed, hasChanges: added.length+removed.length+changed.length > 0 };
+}
+export function cloneHairData(data) { return JSON.parse(JSON.stringify(data)); }
+export function mergeDefaults(data) { return { ...DEFAULT_HAIR_DATA, ...data }; }
+export function getVersionHistory() {
+  return [
+    { version:1, description:'Initial format: cards, rootColor, tipColor' },
+    { version:2, description:'Added density, stiffness, damping' },
+    { version:3, description:'Added windStr, gravity, shaderType, layers, LOD' },
+    { version:4, description:'Added physics, grooming history, accessories, full layer schema' },
+  ];
+}
+
+export function generateUpgradeScript(fromVersion, toVersion=CURRENT_VERSION) {
+  const path=getUpgradePath(fromVersion,toVersion);
+  return [`// Auto-generated upgrade script v${fromVersion} → v${toVersion}`,
+    `// Run: importHairFromJSON(json)`,
+    `// Steps: ${path.join(' → ')}`,
+    `module.exports={migrate,validateHairData,repairHairData,stampVersion};`,
+  ].join('
+');
+}
+export function compareHairData(a, b) {
+  const va=detectVersion(a), vb=detectVersion(b);
+  const diff=buildDataDiff(a,b);
+  return {versionMatch:va===vb,versionA:va,versionB:vb,...diff,
+    fingerprintA:computeDataFingerprint(a), fingerprintB:computeDataFingerprint(b),
+    identical:!diff.hasChanges&&va===vb};
+}
+export function sanitizeHairData(data) {
+  const clean={...repairHairData(data)};
+  delete clean.exportedAt; delete clean.valid;
+  if(Array.isArray(clean.layers)) clean.layers=clean.layers.filter(l=>l&&l.type);
+  return clean;
+}
+export function buildVersionBadge(data) {
+  const v=detectVersion(data);
+  return {version:v,current:CURRENT_VERSION,upToDate:v>=CURRENT_VERSION,
+    label:`v${v}${v>=CURRENT_VERSION?' ✓':' (upgrade available)'}`,
+    color:v>=CURRENT_VERSION?'#00ffc8':v>=2?'#f0c040':'#FF6600'};
+}
+
+export function buildSchemaDocumentation() {
+  return {
+    v1:{required:['cards','rootColor','tipColor'],description:'Minimal hair definition'},
+    v2:{required:['density','stiffness','damping'],description:'Added physics params'},
+    v3:{required:['windStr','gravity','shaderType','layers','lod'],description:'Full feature set'},
+    v4:{required:['physics','grooming'],description:'Current — physics + grooming history'},
+  };
+}
+export function getFieldDescription(fieldName) {
+  const docs={
+    cards:'Number of hair card strands', density:'Fraction of cards actually placed (0-1)',
+    rootColor:'Hex color at strand root', tipColor:'Hex color at strand tip',
+    stiffness:'How rigidly strands return to rest pose (0-1)',
+    damping:'Velocity reduction per frame (0-1)', windStr:'Wind force multiplier',
+    gravity:'Gravity scale (0=none, 1=full)', shaderType:'Rendering shader type',
+    layers:'Array of hair layer configs', lod:'Level-of-detail settings',
+    physics:'Simulation settings', grooming:'Groom stroke history',
+  };
+  return docs[fieldName]??'No description available';
+}
+export function validateLayerConfig(layer) {
+  const errors=[];
+  if(!layer.type) errors.push('Missing layer type');
+  if(layer.density<0||layer.density>1) errors.push('Layer density out of range');
+  if(layer.opacity<0||layer.opacity>1) errors.push('Layer opacity out of range');
+  return {valid:errors.length===0,errors};
+}
+export function computeUpgradeRisk(data) {
+  const v=detectVersion(data);
+  if(v===CURRENT_VERSION) return {risk:'none',score:0};
+  if(v>=3) return {risk:'low',score:1};
+  if(v>=2) return {risk:'medium',score:2};
+  return {risk:'high',score:3,note:'Old format — backup before upgrading'};
+}
+
+export function createUpgradePipeline(validators=[],migrators=[],postProcessors=[]) {
+  return function run(data) {
+    let result={...data};
+    for(const v of validators) {
+      const r=v(result);
+      if(!r.valid) return {success:false,data:result,errors:r.errors};
+    }
+    for(const m of migrators) { result=m(result); }
+    for(const p of postProcessors) { result=p(result); }
+    return {success:true,data:result};
+  };
+}
+export function buildDefaultPipeline() {
+  return createUpgradePipeline(
+    [d=>validateHairData(d)],
+    [d=>needsUpgrade(d)?migrate(d):d],
+    [d=>repairHairData(d),d=>stampVersion(d)]
+  );
+}
+export function runPipelineOnBatch(pipeline, dataArray) {
+  return dataArray.map((d,i)=>({index:i,...pipeline(d)}));
+}
+export function getUpgradeStatsSummary(results) {
+  const ok=results.filter(r=>r.success).length;
+  return {total:results.length,success:ok,failed:results.length-ok,
+    rate:(ok/Math.max(1,results.length)*100).toFixed(1)+'%'};
 }

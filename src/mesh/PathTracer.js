@@ -3,7 +3,302 @@
 // Features: BVH acceleration, Monte Carlo sampling, subsurface scattering,
 //           volumetrics, caustics, BRDF materials, denoising
 
-import * as THREE from 'three';\n\n// ─── BVH Node ─────────────────────────────────────────────────────────────────\n\nclass BVHNode {\n  constructor() {\n    this.bbox   = new THREE.Box3();\n    this.left   = null;\n    this.right  = null;\n    this.tris   = []; // leaf triangles\n    this.isLeaf = false;\n  }\n}\n\nfunction buildBVH(triangles, depth = 0, maxDepth = 20, leafSize = 4) {\n  const node = new BVHNode();\n  const bbox = new THREE.Box3();\n  triangles.forEach(t => { bbox.expandByPoint(t.a); bbox.expandByPoint(t.b); bbox.expandByPoint(t.c); });\n  node.bbox = bbox;\n\n  if (triangles.length <= leafSize || depth >= maxDepth) {\n    node.isLeaf = true;\n    node.tris = triangles;\n    return node;\n  }\n\n  // Split along longest axis\n  const size = bbox.getSize(new THREE.Vector3());\n  const axis = size.x > size.y ? (size.x > size.z ? 'x' : 'z') : (size.y > size.z ? 'y' : 'z');\n  const mid = (bbox.min[axis] + bbox.max[axis]) * 0.5;\n\n  const left  = triangles.filter(t => (t.a[axis] + t.b[axis] + t.c[axis]) / 3 <= mid);\n  const right = triangles.filter(t => (t.a[axis] + t.b[axis] + t.c[axis]) / 3 > mid);\n\n  if (!left.length || !right.length) {\n    node.isLeaf = true; node.tris = triangles; return node;\n  }\n\n  node.left  = buildBVH(left,  depth+1, maxDepth, leafSize);\n  node.right = buildBVH(right, depth+1, maxDepth, leafSize);\n  return node;\n}\n\nfunction intersectBVH(node, ray, tMin = 0.001, tMax = Infinity) {\n  if (!ray.intersectsBox(node.bbox)) return null;\n  if (node.isLeaf) {\n    let nearest = null;\n    node.tris.forEach(tri => {\n      const hit = intersectTriangle(ray, tri.a, tri.b, tri.c);\n      if (hit && hit.t > tMin && hit.t < tMax) {\n        tMax = hit.t;\n        nearest = { ...hit, tri };\n      }\n    });\n    return nearest;\n  }\n  const hitL = intersectBVH(node.left,  ray, tMin, tMax);\n  const hitR = intersectBVH(node.right, ray, tMin, hitL?.t ?? tMax);\n  return hitR ?? hitL;\n}\n\nfunction intersectTriangle(ray, a, b, c) {\n  const e1 = b.clone().sub(a), e2 = c.clone().sub(a);\n  const h = new THREE.Vector3().crossVectors(ray.direction, e2);\n  const det = e1.dot(h);\n  if (Math.abs(det) < 1e-8) return null;\n  const f = 1 / det;\n  const s = ray.origin.clone().sub(a);\n  const u = f * s.dot(h);\n  if (u < 0 || u > 1) return null;\n  const q = new THREE.Vector3().crossVectors(s, e1);\n  const v = f * ray.direction.dot(q);\n  if (v < 0 || u + v > 1) return null;\n  const t = f * e2.dot(q);\n  if (t < 0.001) return null;\n  const point = ray.origin.clone().addScaledVector(ray.direction, t);\n  const normal = e1.clone().cross(e2).normalize();\n  return { t, point, normal, u, v };\n}\n\n// ─── BRDF Materials ───────────────────────────────────────────────────────────\n\nfunction lambertBRDF(normal, wo, wi) {\n  return Math.max(0, normal.dot(wi)) / Math.PI;\n}\n\nfunction ggxBRDF(normal, wo, wi, roughness, metalness) {\n  const h = wi.clone().add(wo).normalize();\n  const NdotH = Math.max(0, normal.dot(h));\n  const NdotL = Math.max(0, normal.dot(wi));\n  const NdotV = Math.max(0, normal.dot(wo));\n  const a = roughness * roughness;\n  const a2 = a * a;\n  const denom = NdotH * NdotH * (a2 - 1) + 1;\n  const D = a2 / (Math.PI * denom * denom);\n  const k = a / 2;\n  const G = (NdotL / (NdotL * (1-k) + k)) * (NdotV / (NdotV * (1-k) + k));\n  const F0 = new THREE.Color(0.04, 0.04, 0.04).lerp(new THREE.Color(1,1,1), metalness);\n  const VdotH = Math.max(0, wo.dot(h));\n  const F = F0.clone().multiplyScalar(1 - Math.pow(1 - VdotH, 5)).addScalar(Math.pow(1-VdotH, 5));\n  return D * G / Math.max(4 * NdotL * NdotV, 0.001);\n}\n\n// ─── Sampling Utilities ───────────────────────────────────────────────────────\n\nfunction cosineWeightedHemisphere(normal) {\n  const u1 = Math.random(), u2 = Math.random();\n  const r = Math.sqrt(u1), theta = 2 * Math.PI * u2;\n  const x = r * Math.cos(theta), z = r * Math.sin(theta), y = Math.sqrt(1 - u1);\n  const tangent = new THREE.Vector3(1, 0, 0);\n  if (Math.abs(normal.dot(tangent)) > 0.9) tangent.set(0, 1, 0);\n  const bitangent = tangent.clone().cross(normal).normalize();\n  tangent.crossVectors(normal, bitangent).normalize();\n  return new THREE.Vector3()\n    .addScaledVector(tangent, x)\n    .addScaledVector(normal, y)\n    .addScaledVector(bitangent, z)\n    .normalize();\n}\n\nfunction sampleGGX(normal, roughness) {\n  const u1 = Math.random(), u2 = Math.random();\n  const a = roughness * roughness;\n  const theta = Math.acos(Math.sqrt((1 - u1) / (u1 * (a*a - 1) + 1)));\n  const phi = 2 * Math.PI * u2;\n  const h = new THREE.Vector3(\n    Math.sin(theta) * Math.cos(phi),\n    Math.cos(theta),\n    Math.sin(theta) * Math.sin(phi),\n  );\n  const tangent = new THREE.Vector3(1, 0, 0);\n  if (Math.abs(normal.dot(tangent)) > 0.9) tangent.set(0, 1, 0);\n  const bitangent = tangent.clone().cross(normal).normalize();\n  tangent.crossVectors(normal, bitangent).normalize();\n  return new THREE.Vector3()\n    .addScaledVector(tangent, h.x)\n    .addScaledVector(normal, h.y)\n    .addScaledVector(bitangent, h.z)\n    .normalize();\n}\n\n// ─── Subsurface Scattering ────────────────────────────────────────────────────\n\nfunction subsurfaceScatter(point, normal, material, bvh, depth) {\n  if (!material.subsurface || depth > 2) return new THREE.Color(0, 0, 0);\n  const scatterColor = material.subsurfaceColor ?? new THREE.Color(1, 0.3, 0.2);\n  const scatterDist  = material.subsurfaceRadius ?? 0.1;\n  let result = new THREE.Color(0, 0, 0);\n  const samples = 4;\n  for (let i = 0; i < samples; i++) {\n    const dir = cosineWeightedHemisphere(normal.clone().negate());\n    const ray = new THREE.Ray(point.clone().addScaledVector(normal, -0.001), dir);\n    const hit = intersectBVH(bvh, ray);\n    if (hit && hit.t < scatterDist) {\n      const scatter = Math.exp(-hit.t / scatterDist);\n      result.add(scatterColor.clone().multiplyScalar(scatter / samples));\n    }\n  }\n  return result;\n}\n\n// ─── Volume Rendering ─────────────────────────────────────────────────────────\n\nfunction marchVolume(ray, volume, steps = 32) {\n  if (!volume) return { color: new THREE.Color(0,0,0), transmittance: 1 };\n  const stepSize = volume.density * 0.1;\n  let transmittance = 1, r = 0, g = 0, b = 0;\n  const stepVec = ray.direction.clone().multiplyScalar(stepSize);\n  const pos = ray.origin.clone();\n  for (let i = 0; i < steps; i++) {\n    pos.add(stepVec);\n    if (!volume.bbox.containsPoint(pos)) continue;\n    const absorption = volume.absorptionCoeff ?? 0.1;\n    const scattering = volume.scatteringCoeff ?? 0.05;\n    const extinction = absorption + scattering;\n    const sampleT = Math.exp(-extinction * stepSize);\n    const emission = volume.emissionColor ?? new THREE.Color(0.1, 0.05, 0);\n    r += transmittance * emission.r * (1 - sampleT);\n    g += transmittance * emission.g * (1 - sampleT);\n    b += transmittance * emission.b * (1 - sampleT);\n    transmittance *= sampleT;\n    if (transmittance < 0.001) break;\n  }\n  return { color: new THREE.Color(r, g, b), transmittance };\n}\n\n// ─── Path Tracer ──────────────────────────────────────────────────────────────\n\nexport class PathTracer {\n  constructor(options = {}) {\n    this.maxBounces  = options.maxBounces  ?? 6;\n    this.samples     = options.samples     ?? 16;\n    this.width       = options.width       ?? 512;\n    this.height      = options.height      ?? 512;\n    this.exposure    = options.exposure    ?? 1.0;\n    this.gamma       = options.gamma       ?? 2.2;\n    this.denoise     = options.denoise     ?? true;\n    this.bvh         = null;\n    this.lights      = [];\n    this.volume      = null;\n    this.environment = null;\n    this._canvas     = null;\n    this._ctx        = null;\n    this._buffer     = null;\n    this._sampleCount = 0;\n  }\n\n  buildBVH(scene) {\n    const triangles = [];\n    scene.traverse(obj => {\n      if (!obj.isMesh) return;\n      const geo = obj.geometry;\n      const pos = geo.attributes.position;\n      const idx = geo.index;\n      const mat = obj.material;\n      if (!pos) return;\n      const toWorld = obj.matrixWorld;\n      if (idx) {\n        for (let i = 0; i < idx.count; i += 3) {\n          const a = new THREE.Vector3(pos.getX(idx.getX(i)),   pos.getY(idx.getX(i)),   pos.getZ(idx.getX(i))).applyMatrix4(toWorld);\n          const b = new THREE.Vector3(pos.getX(idx.getX(i+1)), pos.getY(idx.getX(i+1)), pos.getZ(idx.getX(i+1))).applyMatrix4(toWorld);\n          const c = new THREE.Vector3(pos.getX(idx.getX(i+2)), pos.getY(idx.getX(i+2)), pos.getZ(idx.getX(i+2))).applyMatrix4(toWorld);\n          triangles.push({ a, b, c, material: mat });\n        }\n      }\n    });\n    this.bvh = buildBVH(triangles);\n    return this;\n  }\n\n  trace(ray, depth = 0) {\n    if (depth > this.maxBounces) return new THREE.Color(0, 0, 0);\n    if (!this.bvh) return this._sampleEnvironment(ray);\n\n    // Volume march\n    if (this.volume) {\n      const vol = marchVolume(ray, this.volume);\n      if (vol.transmittance < 0.01) return vol.color;\n    }\n\n    const hit = intersectBVH(this.bvh, ray);\n    if (!hit) return this._sampleEnvironment(ray);\n\n    const mat = hit.tri?.material;\n    const color     = mat?.color         ?? new THREE.Color(0.8, 0.8, 0.8);\n    const emission  = mat?.emissiveIntensity > 0 ? mat.emissive?.clone().multiplyScalar(mat.emissiveIntensity) : null;\n    if (emission) return emission;\n\n    const roughness = mat?.roughness ?? 0.5;\n    const metalness = mat?.metalness ?? 0;\n    const normal    = hit.normal;\n    const wo        = ray.direction.clone().negate();\n\n    let result = new THREE.Color(0, 0, 0);\n\n    // Direct lighting\n    this.lights.forEach(light => {\n      const toLight = light.position.clone().sub(hit.point).normalize();\n      const shadowRay = new THREE.Ray(hit.point.clone().addScaledVector(normal, 0.001), toLight);\n      const shadow = intersectBVH(this.bvh, shadowRay);\n      if (!shadow || shadow.t > light.position.distanceTo(hit.point)) {\n        const NdotL = Math.max(0, normal.dot(toLight));\n        const brdf = roughness > 0.8\n          ? lambertBRDF(normal, wo, toLight)\n          : ggxBRDF(normal, wo, toLight, roughness, metalness);\n        result.add(color.clone().multiplyScalar(NdotL * brdf * light.intensity));\n      }\n    });\n\n    // Indirect bounce\n    const wi = roughness > 0.8\n      ? cosineWeightedHemisphere(normal)\n      : sampleGGX(normal, roughness);\n    const bounceRay = new THREE.Ray(hit.point.clone().addScaledVector(normal, 0.001), wi);\n    const indirect = this.trace(bounceRay, depth + 1);\n    const NdotL = Math.max(0, normal.dot(wi));\n    result.add(color.clone().multiply(indirect).multiplyScalar(NdotL * 2));\n\n    // Subsurface\n    if (mat?.subsurface) {\n      const sss = subsurfaceScatter(hit.point, normal, mat, this.bvh, depth);\n      result.add(sss);\n    }\n\n    return result;\n  }\n\n  _sampleEnvironment(ray) {\n    if (this.environment) return this.environment;\n    const t = (ray.direction.y + 1) * 0.5;\n    return new THREE.Color(0.1, 0.1, 0.2).lerp(new THREE.Color(0.5, 0.7, 1.0), t);\n  }\n\n  render(camera, canvas) {\n    this._canvas = canvas;\n    this._ctx = canvas.getContext('2d');
+import * as THREE from 'three';
+
+// ─── BVH Node ─────────────────────────────────────────────────────────────────
+
+class BVHNode {
+  constructor() {
+    this.bbox   = new THREE.Box3();
+    this.left   = null;
+    this.right  = null;
+    this.tris   = []; // leaf triangles
+    this.isLeaf = false;
+  }
+}
+
+function buildBVH(triangles, depth = 0, maxDepth = 20, leafSize = 4) {
+  const node = new BVHNode();
+  const bbox = new THREE.Box3();
+  triangles.forEach(t => { bbox.expandByPoint(t.a); bbox.expandByPoint(t.b); bbox.expandByPoint(t.c); });
+  node.bbox = bbox;
+
+  if (triangles.length <= leafSize || depth >= maxDepth) {
+    node.isLeaf = true;
+    node.tris = triangles;
+    return node;
+  }
+
+  // Split along longest axis
+  const size = bbox.getSize(new THREE.Vector3());
+  const axis = size.x > size.y ? (size.x > size.z ? 'x' : 'z') : (size.y > size.z ? 'y' : 'z');
+  const mid = (bbox.min[axis] + bbox.max[axis]) * 0.5;
+
+  const left  = triangles.filter(t => (t.a[axis] + t.b[axis] + t.c[axis]) / 3 <= mid);
+  const right = triangles.filter(t => (t.a[axis] + t.b[axis] + t.c[axis]) / 3 > mid);
+
+  if (!left.length || !right.length) {
+    node.isLeaf = true; node.tris = triangles; return node;
+  }
+
+  node.left  = buildBVH(left,  depth+1, maxDepth, leafSize);
+  node.right = buildBVH(right, depth+1, maxDepth, leafSize);
+  return node;
+}
+
+function intersectBVH(node, ray, tMin = 0.001, tMax = Infinity) {
+  if (!ray.intersectsBox(node.bbox)) return null;
+  if (node.isLeaf) {
+    let nearest = null;
+    node.tris.forEach(tri => {
+      const hit = intersectTriangle(ray, tri.a, tri.b, tri.c);
+      if (hit && hit.t > tMin && hit.t < tMax) {
+        tMax = hit.t;
+        nearest = { ...hit, tri };
+      }
+    });
+    return nearest;
+  }
+  const hitL = intersectBVH(node.left,  ray, tMin, tMax);
+  const hitR = intersectBVH(node.right, ray, tMin, hitL?.t ?? tMax);
+  return hitR ?? hitL;
+}
+
+function intersectTriangle(ray, a, b, c) {
+  const e1 = b.clone().sub(a), e2 = c.clone().sub(a);
+  const h = new THREE.Vector3().crossVectors(ray.direction, e2);
+  const det = e1.dot(h);
+  if (Math.abs(det) < 1e-8) return null;
+  const f = 1 / det;
+  const s = ray.origin.clone().sub(a);
+  const u = f * s.dot(h);
+  if (u < 0 || u > 1) return null;
+  const q = new THREE.Vector3().crossVectors(s, e1);
+  const v = f * ray.direction.dot(q);
+  if (v < 0 || u + v > 1) return null;
+  const t = f * e2.dot(q);
+  if (t < 0.001) return null;
+  const point = ray.origin.clone().addScaledVector(ray.direction, t);
+  const normal = e1.clone().cross(e2).normalize();
+  return { t, point, normal, u, v };
+}
+
+// ─── BRDF Materials ───────────────────────────────────────────────────────────
+
+function lambertBRDF(normal, wo, wi) {
+  return Math.max(0, normal.dot(wi)) / Math.PI;
+}
+
+function ggxBRDF(normal, wo, wi, roughness, metalness) {
+  const h = wi.clone().add(wo).normalize();
+  const NdotH = Math.max(0, normal.dot(h));
+  const NdotL = Math.max(0, normal.dot(wi));
+  const NdotV = Math.max(0, normal.dot(wo));
+  const a = roughness * roughness;
+  const a2 = a * a;
+  const denom = NdotH * NdotH * (a2 - 1) + 1;
+  const D = a2 / (Math.PI * denom * denom);
+  const k = a / 2;
+  const G = (NdotL / (NdotL * (1-k) + k)) * (NdotV / (NdotV * (1-k) + k));
+  const F0 = new THREE.Color(0.04, 0.04, 0.04).lerp(new THREE.Color(1,1,1), metalness);
+  const VdotH = Math.max(0, wo.dot(h));
+  const F = F0.clone().multiplyScalar(1 - Math.pow(1 - VdotH, 5)).addScalar(Math.pow(1-VdotH, 5));
+  return D * G / Math.max(4 * NdotL * NdotV, 0.001);
+}
+
+// ─── Sampling Utilities ───────────────────────────────────────────────────────
+
+function cosineWeightedHemisphere(normal) {
+  const u1 = Math.random(), u2 = Math.random();
+  const r = Math.sqrt(u1), theta = 2 * Math.PI * u2;
+  const x = r * Math.cos(theta), z = r * Math.sin(theta), y = Math.sqrt(1 - u1);
+  const tangent = new THREE.Vector3(1, 0, 0);
+  if (Math.abs(normal.dot(tangent)) > 0.9) tangent.set(0, 1, 0);
+  const bitangent = tangent.clone().cross(normal).normalize();
+  tangent.crossVectors(normal, bitangent).normalize();
+  return new THREE.Vector3()
+    .addScaledVector(tangent, x)
+    .addScaledVector(normal, y)
+    .addScaledVector(bitangent, z)
+    .normalize();
+}
+
+function sampleGGX(normal, roughness) {
+  const u1 = Math.random(), u2 = Math.random();
+  const a = roughness * roughness;
+  const theta = Math.acos(Math.sqrt((1 - u1) / (u1 * (a*a - 1) + 1)));
+  const phi = 2 * Math.PI * u2;
+  const h = new THREE.Vector3(
+    Math.sin(theta) * Math.cos(phi),
+    Math.cos(theta),
+    Math.sin(theta) * Math.sin(phi),
+  );
+  const tangent = new THREE.Vector3(1, 0, 0);
+  if (Math.abs(normal.dot(tangent)) > 0.9) tangent.set(0, 1, 0);
+  const bitangent = tangent.clone().cross(normal).normalize();
+  tangent.crossVectors(normal, bitangent).normalize();
+  return new THREE.Vector3()
+    .addScaledVector(tangent, h.x)
+    .addScaledVector(normal, h.y)
+    .addScaledVector(bitangent, h.z)
+    .normalize();
+}
+
+// ─── Subsurface Scattering ────────────────────────────────────────────────────
+
+function subsurfaceScatter(point, normal, material, bvh, depth) {
+  if (!material.subsurface || depth > 2) return new THREE.Color(0, 0, 0);
+  const scatterColor = material.subsurfaceColor ?? new THREE.Color(1, 0.3, 0.2);
+  const scatterDist  = material.subsurfaceRadius ?? 0.1;
+  let result = new THREE.Color(0, 0, 0);
+  const samples = 4;
+  for (let i = 0; i < samples; i++) {
+    const dir = cosineWeightedHemisphere(normal.clone().negate());
+    const ray = new THREE.Ray(point.clone().addScaledVector(normal, -0.001), dir);
+    const hit = intersectBVH(bvh, ray);
+    if (hit && hit.t < scatterDist) {
+      const scatter = Math.exp(-hit.t / scatterDist);
+      result.add(scatterColor.clone().multiplyScalar(scatter / samples));
+    }
+  }
+  return result;
+}
+
+// ─── Volume Rendering ─────────────────────────────────────────────────────────
+
+function marchVolume(ray, volume, steps = 32) {
+  if (!volume) return { color: new THREE.Color(0,0,0), transmittance: 1 };
+  const stepSize = volume.density * 0.1;
+  let transmittance = 1, r = 0, g = 0, b = 0;
+  const stepVec = ray.direction.clone().multiplyScalar(stepSize);
+  const pos = ray.origin.clone();
+  for (let i = 0; i < steps; i++) {
+    pos.add(stepVec);
+    if (!volume.bbox.containsPoint(pos)) continue;
+    const absorption = volume.absorptionCoeff ?? 0.1;
+    const scattering = volume.scatteringCoeff ?? 0.05;
+    const extinction = absorption + scattering;
+    const sampleT = Math.exp(-extinction * stepSize);
+    const emission = volume.emissionColor ?? new THREE.Color(0.1, 0.05, 0);
+    r += transmittance * emission.r * (1 - sampleT);
+    g += transmittance * emission.g * (1 - sampleT);
+    b += transmittance * emission.b * (1 - sampleT);
+    transmittance *= sampleT;
+    if (transmittance < 0.001) break;
+  }
+  return { color: new THREE.Color(r, g, b), transmittance };
+}
+
+// ─── Path Tracer ──────────────────────────────────────────────────────────────
+
+export class PathTracer {
+  constructor(options = {}) {
+    this.maxBounces  = options.maxBounces  ?? 6;
+    this.samples     = options.samples     ?? 16;
+    this.width       = options.width       ?? 512;
+    this.height      = options.height      ?? 512;
+    this.exposure    = options.exposure    ?? 1.0;
+    this.gamma       = options.gamma       ?? 2.2;
+    this.denoise     = options.denoise     ?? true;
+    this.bvh         = null;
+    this.lights      = [];
+    this.volume      = null;
+    this.environment = null;
+    this._canvas     = null;
+    this._ctx        = null;
+    this._buffer     = null;
+    this._sampleCount = 0;
+  }
+
+  buildBVH(scene) {
+    const triangles = [];
+    scene.traverse(obj => {
+      if (!obj.isMesh) return;
+      const geo = obj.geometry;
+      const pos = geo.attributes.position;
+      const idx = geo.index;
+      const mat = obj.material;
+      if (!pos) return;
+      const toWorld = obj.matrixWorld;
+      if (idx) {
+        for (let i = 0; i < idx.count; i += 3) {
+          const a = new THREE.Vector3(pos.getX(idx.getX(i)),   pos.getY(idx.getX(i)),   pos.getZ(idx.getX(i))).applyMatrix4(toWorld);
+          const b = new THREE.Vector3(pos.getX(idx.getX(i+1)), pos.getY(idx.getX(i+1)), pos.getZ(idx.getX(i+1))).applyMatrix4(toWorld);
+          const c = new THREE.Vector3(pos.getX(idx.getX(i+2)), pos.getY(idx.getX(i+2)), pos.getZ(idx.getX(i+2))).applyMatrix4(toWorld);
+          triangles.push({ a, b, c, material: mat });
+        }
+      }
+    });
+    this.bvh = buildBVH(triangles);
+    return this;
+  }
+
+  trace(ray, depth = 0) {
+    if (depth > this.maxBounces) return new THREE.Color(0, 0, 0);
+    if (!this.bvh) return this._sampleEnvironment(ray);
+
+    // Volume march
+    if (this.volume) {
+      const vol = marchVolume(ray, this.volume);
+      if (vol.transmittance < 0.01) return vol.color;
+    }
+
+    const hit = intersectBVH(this.bvh, ray);
+    if (!hit) return this._sampleEnvironment(ray);
+
+    const mat = hit.tri?.material;
+    const color     = mat?.color         ?? new THREE.Color(0.8, 0.8, 0.8);
+    const emission  = mat?.emissiveIntensity > 0 ? mat.emissive?.clone().multiplyScalar(mat.emissiveIntensity) : null;
+    if (emission) return emission;
+
+    const roughness = mat?.roughness ?? 0.5;
+    const metalness = mat?.metalness ?? 0;
+    const normal    = hit.normal;
+    const wo        = ray.direction.clone().negate();
+
+    let result = new THREE.Color(0, 0, 0);
+
+    // Direct lighting
+    this.lights.forEach(light => {
+      const toLight = light.position.clone().sub(hit.point).normalize();
+      const shadowRay = new THREE.Ray(hit.point.clone().addScaledVector(normal, 0.001), toLight);
+      const shadow = intersectBVH(this.bvh, shadowRay);
+      if (!shadow || shadow.t > light.position.distanceTo(hit.point)) {
+        const NdotL = Math.max(0, normal.dot(toLight));
+        const brdf = roughness > 0.8
+          ? lambertBRDF(normal, wo, toLight)
+          : ggxBRDF(normal, wo, toLight, roughness, metalness);
+        result.add(color.clone().multiplyScalar(NdotL * brdf * light.intensity));
+      }
+    });
+
+    // Indirect bounce
+    const wi = roughness > 0.8
+      ? cosineWeightedHemisphere(normal)
+      : sampleGGX(normal, roughness);
+    const bounceRay = new THREE.Ray(hit.point.clone().addScaledVector(normal, 0.001), wi);
+    const indirect = this.trace(bounceRay, depth + 1);
+    const NdotL = Math.max(0, normal.dot(wi));
+    result.add(color.clone().multiply(indirect).multiplyScalar(NdotL * 2));
+
+    // Subsurface
+    if (mat?.subsurface) {
+      const sss = subsurfaceScatter(hit.point, normal, mat, this.bvh, depth);
+      result.add(sss);
+    }
+
+    return result;
+  }
+
+  _sampleEnvironment(ray) {
+    if (this.environment) return this.environment;
+    const t = (ray.direction.y + 1) * 0.5;
+    return new THREE.Color(0.1, 0.1, 0.2).lerp(new THREE.Color(0.5, 0.7, 1.0), t);
+  }
+
+  render(camera, canvas) {
+    this._canvas = canvas;
+    this._ctx = canvas.getContext('2d');
     if (!this._buffer || this._buffer.width !== canvas.width) {
       this._buffer = this._ctx.createImageData(canvas.width, canvas.height);
       this._sampleCount = 0;

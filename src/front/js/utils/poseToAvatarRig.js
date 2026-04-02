@@ -1,7 +1,289 @@
 // src/front/utils/poseToAvatarRig.js
 // Applies MediaPipe pose landmarks to a 3D avatar skeleton
 
-import * as THREE from 'three';\nimport { POSE_LANDMARKS, BONE_CONNECTIONS, STANDARD_BONES } from './poseConstants';\n\n// Smoothing factor for rotation interpolation (0 = no smoothing, 1 = no movement)\nconst SMOOTHING_FACTOR = 0.3;\n\n// Store previous rotations for smoothing\nconst previousRotations = {};\n\n/**\n * Calculate rotation from two 3D points (bone direction)\n * @param {Object} from - Start point {x, y, z}\n * @param {Object} to - End point {x, y, z}\n * @returns {THREE.Euler} - Rotation euler angles\n */\nconst calculateBoneRotation = (from, to) => {\n  // Create direction vector\n  const direction = new THREE.Vector3(\n    to.x - from.x,\n    -(to.y - from.y), // Flip Y (MediaPipe Y is inverted)\n    -(to.z - from.z)  // Flip Z for proper depth\n  );\n\n  direction.normalize();\n\n  // Calculate rotation from default pose (pointing down for arms, etc.)\n  const quaternion = new THREE.Quaternion();\n  const defaultDir = new THREE.Vector3(0, -1, 0); // Default bone direction (down)\n  \n  quaternion.setFromUnitVectors(defaultDir, direction);\n  \n  const euler = new THREE.Euler();\n  euler.setFromQuaternion(quaternion);\n  \n  return euler;\n};\n\n/**\n * Smooth rotation transition\n * @param {string} boneName - Name of the bone\n * @param {THREE.Euler} newRotation - Target rotation\n * @returns {THREE.Euler} - Smoothed rotation\n */\nconst smoothRotation = (boneName, newRotation) => {\n  if (!previousRotations[boneName]) {\n    previousRotations[boneName] = newRotation.clone();\n    return newRotation;\n  }\n\n  const prev = previousRotations[boneName];\n  const smoothed = new THREE.Euler(\n    THREE.MathUtils.lerp(prev.x, newRotation.x, 1 - SMOOTHING_FACTOR),\n    THREE.MathUtils.lerp(prev.y, newRotation.y, 1 - SMOOTHING_FACTOR),\n    THREE.MathUtils.lerp(prev.z, newRotation.z, 1 - SMOOTHING_FACTOR)\n  );\n\n  previousRotations[boneName] = smoothed;\n  return smoothed;\n};\n\n/**\n * Find a bone in the avatar by name (handles different naming conventions)\n * @param {THREE.Object3D} avatar - The avatar scene/model\n * @param {string} boneName - Standard bone name\n * @returns {THREE.Bone|null} - The bone object or null\n */\nconst findBone = (avatar, boneName) => {\n  // Try exact match first\n  let bone = avatar.getObjectByName(boneName);\n  if (bone) return bone;\n\n  // Try common variations\n  const variations = [\n    boneName,\n    `mixamorig:${boneName}`,\n    `mixamorig${boneName}`,\n    boneName.replace('Upper', ''),\n    boneName.replace('Lower', 'Fore'),\n    boneName.replace('UpperArm', 'Arm'),\n    boneName.replace('LowerArm', 'ForeArm'),\n    boneName.replace('UpperLeg', 'UpLeg'),\n    boneName.replace('LowerLeg', 'Leg'),\n  ];\n\n  for (const name of variations) {\n    bone = avatar.getObjectByName(name);\n    if (bone) return bone;\n  }\n\n  return null;\n};\n\n/**\n * Calculate hip/root position from landmarks\n * @param {Array} landmarks - MediaPipe landmarks array\n * @returns {THREE.Vector3} - Hip center position\n */\nconst calculateHipPosition = (landmarks) => {\n  const leftHip = landmarks[POSE_LANDMARKS.LEFT_HIP];\n  const rightHip = landmarks[POSE_LANDMARKS.RIGHT_HIP];\n\n  return new THREE.Vector3(\n    ((leftHip.x + rightHip.x) / 2 - 0.5) * 2,  // Center and scale\n    -((leftHip.y + rightHip.y) / 2 - 0.5) * 2, // Flip and center Y\n    -((leftHip.z + rightHip.z) / 2) * 2         // Scale Z\n  );\n};\n\n/**\n * Calculate spine rotation from shoulders and hips\n * @param {Array} landmarks - MediaPipe landmarks array\n * @returns {THREE.Euler} - Spine rotation\n */\nconst calculateSpineRotation = (landmarks) => {\n  const leftShoulder = landmarks[POSE_LANDMARKS.LEFT_SHOULDER];\n  const rightShoulder = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER];\n  const leftHip = landmarks[POSE_LANDMARKS.LEFT_HIP];\n  const rightHip = landmarks[POSE_LANDMARKS.RIGHT_HIP];\n\n  // Shoulder center\n  const shoulderCenter = {\n    x: (leftShoulder.x + rightShoulder.x) / 2,\n    y: (leftShoulder.y + rightShoulder.y) / 2,\n    z: (leftShoulder.z + rightShoulder.z) / 2,\n  };\n\n  // Hip center\n  const hipCenter = {\n    x: (leftHip.x + rightHip.x) / 2,\n    y: (leftHip.y + rightHip.y) / 2,\n    z: (leftHip.z + rightHip.z) / 2,\n  };\n\n  // Calculate spine tilt\n  const spineDir = new THREE.Vector3(\n    shoulderCenter.x - hipCenter.x,\n    -(shoulderCenter.y - hipCenter.y),\n    -(shoulderCenter.z - hipCenter.z)\n  ).normalize();\n\n  // Calculate twist from shoulder line\n  const shoulderDir = new THREE.Vector3(\n    rightShoulder.x - leftShoulder.x,\n    -(rightShoulder.y - leftShoulder.y),\n    -(rightShoulder.z - leftShoulder.z)\n  ).normalize();\n\n  return new THREE.Euler(\n    Math.asin(spineDir.z) * 0.5,           // Forward/back lean\n    Math.atan2(shoulderDir.z, shoulderDir.x), // Twist\n    Math.asin(-spineDir.x) * 0.5           // Side lean\n  );\n};\n\n/**\n * Main function: Apply pose landmarks to avatar\n * @param {Array} landmarks - MediaPipe pose landmarks (33 points)\n * @param {THREE.Object3D} avatar - The 3D avatar model/scene\n * @param {Object} options - Optional configuration\n */\nexport const applyPoseToAvatar = (landmarks, avatar, options = {}) => {\n  if (!landmarks || !avatar) {\n    console.warn('applyPoseToAvatar: Missing landmarks or avatar');\n    return;\n  }\n\n  if (landmarks.length < 33) {\n    console.warn('applyPoseToAvatar: Incomplete landmarks data');\n    return;\n  }\n\n  const {\n    applyPosition = true,  // Move root/hips\n    applyRotation = true,  // Rotate bones\n    scale = 1.0,           // Position scale multiplier\n  } = options;\n\n  // Apply hip/root position\n  if (applyPosition) {\n    const hips = findBone(avatar, STANDARD_BONES.HIPS);\n    if (hips) {\n      const hipPos = calculateHipPosition(landmarks);\n      hips.position.lerp(hipPos.multiplyScalar(scale), 0.3);\n    }\n  }\n\n  // Apply spine rotation\n  if (applyRotation) {\n    const spine = findBone(avatar, STANDARD_BONES.SPINE);\n    if (spine) {\n      const spineRot = calculateSpineRotation(landmarks);\n      const smoothedRot = smoothRotation(STANDARD_BONES.SPINE, spineRot);\n      spine.rotation.copy(smoothedRot);\n    }\n  }\n\n  // Apply bone rotations based on connections\n  if (applyRotation) {\n    BONE_CONNECTIONS.forEach(({ bone, from, to }) => {\n      const boneObj = findBone(avatar, bone);\n      \n      if (boneObj && landmarks[from] && landmarks[to]) {\n        const fromPoint = landmarks[from];\n        const toPoint = landmarks[to];\n\n        // Skip if landmarks have low visibility\n        if (fromPoint.visibility < 0.5 || toPoint.visibility < 0.5) {\n          return;\n        }\n\n        const rotation = calculateBoneRotation(fromPoint, toPoint);\n        const smoothedRotation = smoothRotation(bone, rotation);\n\n        // Apply rotation with limits to prevent unnatural poses\n        boneObj.rotation.x = THREE.MathUtils.clamp(smoothedRotation.x, -Math.PI, Math.PI);\n        boneObj.rotation.y = THREE.MathUtils.clamp(smoothedRotation.y, -Math.PI / 2, Math.PI / 2);\n        boneObj.rotation.z = THREE.MathUtils.clamp(smoothedRotation.z, -Math.PI, Math.PI);\n      }\n    });\n  }\n\n  // Apply head rotation\n  const head = findBone(avatar, STANDARD_BONES.HEAD);\n  if (head && applyRotation) {\n    const nose = landmarks[POSE_LANDMARKS.NOSE];\n    const leftEar = landmarks[POSE_LANDMARKS.LEFT_EAR];\n    const rightEar = landmarks[POSE_LANDMARKS.RIGHT_EAR];\n\n    if (nose && leftEar && rightEar) {\n      // Head turn (Y rotation)\n      const earDiff = rightEar.z - leftEar.z;\n      const headY = earDiff * Math.PI;\n\n      // Head tilt (Z rotation)\n      const earTilt = rightEar.y - leftEar.y;\n      const headZ = earTilt * Math.PI * 0.5;\n\n      // Head nod (X rotation) - based on nose position relative to ears\n      const earCenterY = (leftEar.y + rightEar.y) / 2;\n      const headX = (nose.y - earCenterY) * Math.PI * 0.5;\n\n      const headRot = new THREE.Euler(headX, headY, headZ);\n      const smoothedHead = smoothRotation(STANDARD_BONES.HEAD, headRot);\n      head.rotation.copy(smoothedHead);\n    }\n  }\n};\n\n/**\n * Reset all bone rotations to default pose\n * @param {THREE.Object3D} avatar - The 3D avatar model\n */\nexport const resetPose = (avatar) => {\n  if (!avatar) return;\n\n  Object.values(STANDARD_BONES).forEach((boneName) => {\n    const bone = findBone(avatar, boneName);\n    if (bone) {\n      bone.rotation.set(0, 0, 0);\n    }\n  });\n\n  // Clear previous rotations cache\n  Object.keys(previousRotations).forEach((key) => {\n    delete previousRotations[key];\n  });\n};\n\n/**\n * Debug function: List all bones in avatar\n * @param {THREE.Object3D} avatar - The avatar model\n * @returns {Array} - List of bone names\n */\nexport const listAvatarBones = (avatar) => {\n  const bones = [];\n  \n  avatar.traverse((child) => {\n    if (child.isBone) {\n      bones.push(child.name);\n    }\n  });\n\n  console.log('Avatar bones:', bones);
+import * as THREE from 'three';
+import { POSE_LANDMARKS, BONE_CONNECTIONS, STANDARD_BONES } from './poseConstants';
+
+// Smoothing factor for rotation interpolation (0 = no smoothing, 1 = no movement)
+const SMOOTHING_FACTOR = 0.3;
+
+// Store previous rotations for smoothing
+const previousRotations = {};
+
+/**
+ * Calculate rotation from two 3D points (bone direction)
+ * @param {Object} from - Start point {x, y, z}
+ * @param {Object} to - End point {x, y, z}
+ * @returns {THREE.Euler} - Rotation euler angles
+ */
+const calculateBoneRotation = (from, to) => {
+  // Create direction vector
+  const direction = new THREE.Vector3(
+    to.x - from.x,
+    -(to.y - from.y), // Flip Y (MediaPipe Y is inverted)
+    -(to.z - from.z)  // Flip Z for proper depth
+  );
+
+  direction.normalize();
+
+  // Calculate rotation from default pose (pointing down for arms, etc.)
+  const quaternion = new THREE.Quaternion();
+  const defaultDir = new THREE.Vector3(0, -1, 0); // Default bone direction (down)
+  
+  quaternion.setFromUnitVectors(defaultDir, direction);
+  
+  const euler = new THREE.Euler();
+  euler.setFromQuaternion(quaternion);
+  
+  return euler;
+};
+
+/**
+ * Smooth rotation transition
+ * @param {string} boneName - Name of the bone
+ * @param {THREE.Euler} newRotation - Target rotation
+ * @returns {THREE.Euler} - Smoothed rotation
+ */
+const smoothRotation = (boneName, newRotation) => {
+  if (!previousRotations[boneName]) {
+    previousRotations[boneName] = newRotation.clone();
+    return newRotation;
+  }
+
+  const prev = previousRotations[boneName];
+  const smoothed = new THREE.Euler(
+    THREE.MathUtils.lerp(prev.x, newRotation.x, 1 - SMOOTHING_FACTOR),
+    THREE.MathUtils.lerp(prev.y, newRotation.y, 1 - SMOOTHING_FACTOR),
+    THREE.MathUtils.lerp(prev.z, newRotation.z, 1 - SMOOTHING_FACTOR)
+  );
+
+  previousRotations[boneName] = smoothed;
+  return smoothed;
+};
+
+/**
+ * Find a bone in the avatar by name (handles different naming conventions)
+ * @param {THREE.Object3D} avatar - The avatar scene/model
+ * @param {string} boneName - Standard bone name
+ * @returns {THREE.Bone|null} - The bone object or null
+ */
+const findBone = (avatar, boneName) => {
+  // Try exact match first
+  let bone = avatar.getObjectByName(boneName);
+  if (bone) return bone;
+
+  // Try common variations
+  const variations = [
+    boneName,
+    `mixamorig:${boneName}`,
+    `mixamorig${boneName}`,
+    boneName.replace('Upper', ''),
+    boneName.replace('Lower', 'Fore'),
+    boneName.replace('UpperArm', 'Arm'),
+    boneName.replace('LowerArm', 'ForeArm'),
+    boneName.replace('UpperLeg', 'UpLeg'),
+    boneName.replace('LowerLeg', 'Leg'),
+  ];
+
+  for (const name of variations) {
+    bone = avatar.getObjectByName(name);
+    if (bone) return bone;
+  }
+
+  return null;
+};
+
+/**
+ * Calculate hip/root position from landmarks
+ * @param {Array} landmarks - MediaPipe landmarks array
+ * @returns {THREE.Vector3} - Hip center position
+ */
+const calculateHipPosition = (landmarks) => {
+  const leftHip = landmarks[POSE_LANDMARKS.LEFT_HIP];
+  const rightHip = landmarks[POSE_LANDMARKS.RIGHT_HIP];
+
+  return new THREE.Vector3(
+    ((leftHip.x + rightHip.x) / 2 - 0.5) * 2,  // Center and scale
+    -((leftHip.y + rightHip.y) / 2 - 0.5) * 2, // Flip and center Y
+    -((leftHip.z + rightHip.z) / 2) * 2         // Scale Z
+  );
+};
+
+/**
+ * Calculate spine rotation from shoulders and hips
+ * @param {Array} landmarks - MediaPipe landmarks array
+ * @returns {THREE.Euler} - Spine rotation
+ */
+const calculateSpineRotation = (landmarks) => {
+  const leftShoulder = landmarks[POSE_LANDMARKS.LEFT_SHOULDER];
+  const rightShoulder = landmarks[POSE_LANDMARKS.RIGHT_SHOULDER];
+  const leftHip = landmarks[POSE_LANDMARKS.LEFT_HIP];
+  const rightHip = landmarks[POSE_LANDMARKS.RIGHT_HIP];
+
+  // Shoulder center
+  const shoulderCenter = {
+    x: (leftShoulder.x + rightShoulder.x) / 2,
+    y: (leftShoulder.y + rightShoulder.y) / 2,
+    z: (leftShoulder.z + rightShoulder.z) / 2,
+  };
+
+  // Hip center
+  const hipCenter = {
+    x: (leftHip.x + rightHip.x) / 2,
+    y: (leftHip.y + rightHip.y) / 2,
+    z: (leftHip.z + rightHip.z) / 2,
+  };
+
+  // Calculate spine tilt
+  const spineDir = new THREE.Vector3(
+    shoulderCenter.x - hipCenter.x,
+    -(shoulderCenter.y - hipCenter.y),
+    -(shoulderCenter.z - hipCenter.z)
+  ).normalize();
+
+  // Calculate twist from shoulder line
+  const shoulderDir = new THREE.Vector3(
+    rightShoulder.x - leftShoulder.x,
+    -(rightShoulder.y - leftShoulder.y),
+    -(rightShoulder.z - leftShoulder.z)
+  ).normalize();
+
+  return new THREE.Euler(
+    Math.asin(spineDir.z) * 0.5,           // Forward/back lean
+    Math.atan2(shoulderDir.z, shoulderDir.x), // Twist
+    Math.asin(-spineDir.x) * 0.5           // Side lean
+  );
+};
+
+/**
+ * Main function: Apply pose landmarks to avatar
+ * @param {Array} landmarks - MediaPipe pose landmarks (33 points)
+ * @param {THREE.Object3D} avatar - The 3D avatar model/scene
+ * @param {Object} options - Optional configuration
+ */
+export const applyPoseToAvatar = (landmarks, avatar, options = {}) => {
+  if (!landmarks || !avatar) {
+    console.warn('applyPoseToAvatar: Missing landmarks or avatar');
+    return;
+  }
+
+  if (landmarks.length < 33) {
+    console.warn('applyPoseToAvatar: Incomplete landmarks data');
+    return;
+  }
+
+  const {
+    applyPosition = true,  // Move root/hips
+    applyRotation = true,  // Rotate bones
+    scale = 1.0,           // Position scale multiplier
+  } = options;
+
+  // Apply hip/root position
+  if (applyPosition) {
+    const hips = findBone(avatar, STANDARD_BONES.HIPS);
+    if (hips) {
+      const hipPos = calculateHipPosition(landmarks);
+      hips.position.lerp(hipPos.multiplyScalar(scale), 0.3);
+    }
+  }
+
+  // Apply spine rotation
+  if (applyRotation) {
+    const spine = findBone(avatar, STANDARD_BONES.SPINE);
+    if (spine) {
+      const spineRot = calculateSpineRotation(landmarks);
+      const smoothedRot = smoothRotation(STANDARD_BONES.SPINE, spineRot);
+      spine.rotation.copy(smoothedRot);
+    }
+  }
+
+  // Apply bone rotations based on connections
+  if (applyRotation) {
+    BONE_CONNECTIONS.forEach(({ bone, from, to }) => {
+      const boneObj = findBone(avatar, bone);
+      
+      if (boneObj && landmarks[from] && landmarks[to]) {
+        const fromPoint = landmarks[from];
+        const toPoint = landmarks[to];
+
+        // Skip if landmarks have low visibility
+        if (fromPoint.visibility < 0.5 || toPoint.visibility < 0.5) {
+          return;
+        }
+
+        const rotation = calculateBoneRotation(fromPoint, toPoint);
+        const smoothedRotation = smoothRotation(bone, rotation);
+
+        // Apply rotation with limits to prevent unnatural poses
+        boneObj.rotation.x = THREE.MathUtils.clamp(smoothedRotation.x, -Math.PI, Math.PI);
+        boneObj.rotation.y = THREE.MathUtils.clamp(smoothedRotation.y, -Math.PI / 2, Math.PI / 2);
+        boneObj.rotation.z = THREE.MathUtils.clamp(smoothedRotation.z, -Math.PI, Math.PI);
+      }
+    });
+  }
+
+  // Apply head rotation
+  const head = findBone(avatar, STANDARD_BONES.HEAD);
+  if (head && applyRotation) {
+    const nose = landmarks[POSE_LANDMARKS.NOSE];
+    const leftEar = landmarks[POSE_LANDMARKS.LEFT_EAR];
+    const rightEar = landmarks[POSE_LANDMARKS.RIGHT_EAR];
+
+    if (nose && leftEar && rightEar) {
+      // Head turn (Y rotation)
+      const earDiff = rightEar.z - leftEar.z;
+      const headY = earDiff * Math.PI;
+
+      // Head tilt (Z rotation)
+      const earTilt = rightEar.y - leftEar.y;
+      const headZ = earTilt * Math.PI * 0.5;
+
+      // Head nod (X rotation) - based on nose position relative to ears
+      const earCenterY = (leftEar.y + rightEar.y) / 2;
+      const headX = (nose.y - earCenterY) * Math.PI * 0.5;
+
+      const headRot = new THREE.Euler(headX, headY, headZ);
+      const smoothedHead = smoothRotation(STANDARD_BONES.HEAD, headRot);
+      head.rotation.copy(smoothedHead);
+    }
+  }
+};
+
+/**
+ * Reset all bone rotations to default pose
+ * @param {THREE.Object3D} avatar - The 3D avatar model
+ */
+export const resetPose = (avatar) => {
+  if (!avatar) return;
+
+  Object.values(STANDARD_BONES).forEach((boneName) => {
+    const bone = findBone(avatar, boneName);
+    if (bone) {
+      bone.rotation.set(0, 0, 0);
+    }
+  });
+
+  // Clear previous rotations cache
+  Object.keys(previousRotations).forEach((key) => {
+    delete previousRotations[key];
+  });
+};
+
+/**
+ * Debug function: List all bones in avatar
+ * @param {THREE.Object3D} avatar - The avatar model
+ * @returns {Array} - List of bone names
+ */
+export const listAvatarBones = (avatar) => {
+  const bones = [];
+  
+  avatar.traverse((child) => {
+    if (child.isBone) {
+      bones.push(child.name);
+    }
+  });
+
+  console.log('Avatar bones:', bones);
   return bones;
 };
 

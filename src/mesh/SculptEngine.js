@@ -3,7 +3,335 @@
 // Features: 15 brush types, ZBrush-quality falloffs, dynamic topology,
 //           symmetry, lazy mouse, stabilizer, mask, layers
 
-import * as THREE from 'three';\n\n// ─── Falloff Library ─────────────────────────────────────────────────────────\n\nfunction smoothFalloff(t)   { const u=1-t; return u*u*(3-2*u); }\nfunction linearFalloff(t)   { return 1-t; }\nfunction sharpFalloff(t)    { return Math.pow(1-t, 4); }\nfunction sphereFalloff(t)   { return Math.sqrt(Math.max(0, 1-t*t)); }\nfunction rootFalloff(t)     { return 1-Math.sqrt(t); }\nfunction constFalloff()     { return 1; }\nfunction cubicFalloff(t)    { return 1-t*t*t; }\nfunction sineFalloff(t)     { return Math.sin((1-t) * Math.PI * 0.5); }\nfunction spikeFalloff(t)    { return t < 0.1 ? 1 : 1 - (t-0.1)/0.9; }\n\nexport function getFalloff(type, t) {\n  if (t >= 1) return 0;\n  switch (type) {\n    case 'linear':   return linearFalloff(t);\n    case 'sharp':    return sharpFalloff(t);\n    case 'sphere':   return sphereFalloff(t);\n    case 'root':     return rootFalloff(t);\n    case 'constant': return constFalloff();\n    case 'cubic':    return cubicFalloff(t);\n    case 'sine':     return sineFalloff(t);\n    case 'spike':    return spikeFalloff(t);\n    default:         return smoothFalloff(t);\n  }\n}\n\n// ─── Brush Settings ───────────────────────────────────────────────────────────\n\nexport function createBrushSettings(options = {}) {\n  return {\n    type:         options.type      ?? 'draw',\n    radius:       options.radius    ?? 0.3,\n    strength:     options.strength  ?? 0.5,\n    falloff:      options.falloff   ?? 'smooth',\n    direction:    options.direction ?? 1,      // 1=add, -1=subtract\n    symmetry:     options.symmetry  ?? false,\n    symmetryAxis: options.symmetryAxis ?? 'x',\n    lazyMouse:    options.lazyMouse ?? false,\n    lazyRadius:   options.lazyRadius ?? 0.1,\n    stabilizer:   options.stabilizer ?? 0,    // 0-1\n    accumulate:   options.accumulate ?? false,\n    backfaceCull: options.backfaceCull ?? true,\n    alphaTexture: options.alphaTexture ?? null,\n    spacing:      options.spacing   ?? 0.1,\n    jitter:       options.jitter    ?? 0,\n  };\n}\n\n// ─── Brush Types ──────────────────────────────────────────────────────────────\n\nexport const BRUSH_TYPES = {\n  draw:      'draw',       // Standard sculpt\n  flatten:   'flatten',   // Flatten to plane\n  smooth:    'smooth',    // Smooth/blur vertices\n  pinch:     'pinch',     // Pull vertices together\n  inflate:   'inflate',   // Push along normals\n  grab:      'grab',      // Move vertices freely\n  snake:     'snake',     // Snake hook\n  clay:      'clay',      // Clay buildup\n  trim:      'trim',      // Trim dynamic topology\n  crease:    'crease',    // Sharp crease\n  polish:    'polish',    // Polish/relax\n  scrape:    'scrape',    // Scrape high areas\n  fill:      'fill',      // Fill low areas\n  nudge:     'nudge',     // Nudge along surface\n  mask:      'mask',      // Paint mask\n};\n\n// ─── Sculpt Operations ────────────────────────────────────────────────────────\n\nexport function applySculpt(geometry, hitPoint, hitNormal, brush, options = {}) {\n  const pos = geometry.attributes.position;\n  const norm = geometry.attributes.normal;\n  if (!pos) return false;\n\n  const { type, radius, strength, falloff, direction, symmetry, symmetryAxis, backfaceCull } = brush;\n  const dt = options.dt ?? 1/60;\n  let modified = false;\n\n  for (let i = 0; i < pos.count; i++) {\n    const vp = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));\n    const dist = vp.distanceTo(hitPoint);\n    if (dist > radius) continue;\n\n    // Backface culling\n    if (backfaceCull && norm) {\n      const vn = new THREE.Vector3(norm.getX(i), norm.getY(i), norm.getZ(i));\n      if (vn.dot(hitNormal) < 0) continue;\n    }\n\n    const t = dist / radius;\n    const influence = getFalloff(falloff, t) * strength * direction * dt * 60;\n\n    _applyBrushType(type, pos, norm, i, vp, hitPoint, hitNormal, influence, brush);\n    modified = true;\n  }\n\n  // Symmetry\n  if (symmetry) {\n    const mirrorHit = hitPoint.clone();\n    const axisIdx = { x:0, y:1, z:2 }[symmetryAxis] ?? 0;\n    mirrorHit.setComponent(axisIdx, -mirrorHit.getComponent(axisIdx));\n    const mirrorNormal = hitNormal.clone();\n    mirrorNormal.setComponent(axisIdx, -mirrorNormal.getComponent(axisIdx));\n\n    for (let i = 0; i < pos.count; i++) {\n      const vp = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));\n      const dist = vp.distanceTo(mirrorHit);\n      if (dist > radius) continue;\n      const t = dist / radius;\n      const influence = getFalloff(falloff, t) * strength * direction * dt * 60;\n      _applyBrushType(type, pos, norm, i, vp, mirrorHit, mirrorNormal, influence, brush);\n    }\n  }\n\n  if (modified) {\n    pos.needsUpdate = true;\n    geometry.computeVertexNormals();\n  }\n\n  return modified;\n}\n\nfunction _applyBrushType(type, pos, norm, i, vp, hitPoint, hitNormal, influence, brush) {\n  switch (type) {\n    case 'draw':\n    case 'clay': {\n      pos.setXYZ(i,\n        vp.x + hitNormal.x * influence,\n        vp.y + hitNormal.y * influence,\n        vp.z + hitNormal.z * influence,\n      );\n      break;\n    }\n    case 'inflate': {\n      if (!norm) break;\n      const vn = new THREE.Vector3(norm.getX(i), norm.getY(i), norm.getZ(i)).normalize();\n      pos.setXYZ(i, vp.x + vn.x * influence, vp.y + vn.y * influence, vp.z + vn.z * influence);\n      break;\n    }\n    case 'flatten': {\n      const toPlane = vp.clone().sub(hitPoint);\n      const dist = toPlane.dot(hitNormal);\n      const rate = Math.min(1, Math.abs(influence) * 0.5);\n      pos.setXYZ(i,\n        vp.x - hitNormal.x * dist * rate,\n        vp.y - hitNormal.y * dist * rate,\n        vp.z - hitNormal.z * dist * rate,\n      );\n      break;\n    }\n    case 'pinch': {\n      const toCenter = hitPoint.clone().sub(vp);\n      pos.setXYZ(i,\n        vp.x + toCenter.x * Math.abs(influence) * 0.5,\n        vp.y + toCenter.y * Math.abs(influence) * 0.5,\n        vp.z + toCenter.z * Math.abs(influence) * 0.5,\n      );\n      break;\n    }\n    case 'grab': {\n      if (brush._grabDelta) {\n        pos.setXYZ(i, vp.x + brush._grabDelta.x * influence * 2, vp.y + brush._grabDelta.y * influence * 2, vp.z + brush._grabDelta.z * influence * 2);\n      }\n      break;\n    }\n    case 'smooth': {\n      // Handled separately in smoothVertices\n      break;\n    }\n    case 'crease': {\n      const toCenter = hitPoint.clone().sub(vp);\n      const perp = toCenter.clone().cross(hitNormal).normalize();\n      pos.setXYZ(i,\n        vp.x + perp.x * influence * 0.5,\n        vp.y + perp.y * influence * 0.5 + hitNormal.y * influence * 0.3,\n        vp.z + perp.z * influence * 0.5,\n      );\n      break;\n    }\n    case 'scrape': {\n      if (vp.dot(hitNormal) > hitPoint.dot(hitNormal)) {\n        pos.setXYZ(i, vp.x - hitNormal.x * Math.abs(influence) * 0.5, vp.y - hitNormal.y * Math.abs(influence) * 0.5, vp.z - hitNormal.z * Math.abs(influence) * 0.5);\n      }\n      break;\n    }\n    case 'fill': {\n      if (vp.dot(hitNormal) < hitPoint.dot(hitNormal)) {\n        pos.setXYZ(i, vp.x + hitNormal.x * Math.abs(influence) * 0.5, vp.y + hitNormal.y * Math.abs(influence) * 0.5, vp.z + hitNormal.z * Math.abs(influence) * 0.5);\n      }\n      break;\n    }\n    case 'nudge': {\n      if (brush._nudgeDir) {\n        pos.setXYZ(i, vp.x + brush._nudgeDir.x * influence, vp.y + brush._nudgeDir.y * influence, vp.z + brush._nudgeDir.z * influence);\n      }\n      break;\n    }\n    default: break;\n  }\n}\n\n// ─── Smooth ───────────────────────────────────────────────────────────────────\n\nexport function smoothVertices(geometry, hitPoint, radius, strength, iterations = 2) {\n  const pos = geometry.attributes.position;\n  const idx = geometry.index;\n  if (!pos || !idx) return;\n\n  // Build adjacency\n  const adj = Array.from({ length: pos.count }, () => new Set());\n  for (let i = 0; i < idx.count; i += 3) {\n    const a = idx.getX(i), b = idx.getX(i+1), c = idx.getX(i+2);\n    adj[a].add(b); adj[a].add(c);\n    adj[b].add(a); adj[b].add(c);\n    adj[c].add(a); adj[c].add(b);\n  }\n\n  for (let iter = 0; iter < iterations; iter++) {\n    for (let i = 0; i < pos.count; i++) {\n      const vp = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));\n      const dist = vp.distanceTo(hitPoint);\n      if (dist > radius) continue;\n\n      const t = dist / radius;\n      const influence = getFalloff('smooth', t) * strength;\n      const neighbors = Array.from(adj[i]);\n      if (!neighbors.length) continue;\n\n      const avg = new THREE.Vector3();\n      neighbors.forEach(n => avg.add(new THREE.Vector3(pos.getX(n), pos.getY(n), pos.getZ(n))));\n      avg.divideScalar(neighbors.length);\n\n      pos.setXYZ(i,\n        vp.x + (avg.x - vp.x) * influence,\n        vp.y + (avg.y - vp.y) * influence,\n        vp.z + (avg.z - vp.z) * influence,\n      );\n    }\n  }\n\n  pos.needsUpdate = true;\n  geometry.computeVertexNormals();\n}\n\n// ─── Mask ─────────────────────────────────────────────────────────────────────\n\nexport function createMask(vertexCount) {\n  return new Float32Array(vertexCount).fill(0);\n}\n\nexport function paintMask(mask, geometry, hitPoint, radius, value = 1, falloffType = 'smooth') {\n  const pos = geometry.attributes.position;\n  for (let i = 0; i < pos.count; i++) {\n    const vp = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));\n    const dist = vp.distanceTo(hitPoint);\n    if (dist > radius) continue;\n    const t = dist / radius;\n    const influence = getFalloff(falloffType, t);\n    mask[i] = Math.max(0, Math.min(1, mask[i] + value * influence));\n  }\n}\n\nexport function invertMask(mask) {\n  for (let i = 0; i < mask.length; i++) mask[i] = 1 - mask[i];\n}\n\nexport function clearMask(mask) { mask.fill(0); }\n\n// ─── Sculpt Layers ────────────────────────────────────────────────────────────\n\nexport function createSculptLayer(name, geometry) {\n  const pos = geometry.attributes.position;\n  return {\n    id:       Math.random().toString(36).slice(2),\n    name,\n    data:     new Float32Array(pos.array),\n    strength: 1.0,\n    visible:  true,\n  };\n}\n\nexport function mergeSculptLayers(geometry, layers) {\n  const pos = geometry.attributes.position;\n  const basis = layers[0];\n  if (!basis) return;\n  pos.array.set(basis.data);\n  for (let li = 1; li < layers.length; li++) {\n    const layer = layers[li];\n    if (!layer.visible) continue;\n    for (let i = 0; i < pos.array.length; i++) {\n      pos.array[i] += (layer.data[i] - basis.data[i]) * layer.strength;\n    }\n  }\n  pos.needsUpdate = true;\n  geometry.computeVertexNormals();\n}\n\n// ─── Lazy Mouse ───────────────────────────────────────────────────────────────\n\nexport class LazyMouse {\n  constructor(radius = 0.05) {\n    this.radius = radius;\n    this.position = null;\n  }\n  update(target) {\n    if (!this.position) { this.position = target.clone(); return this.position; }\n    const dist = this.position.distanceTo(target);\n    if (dist > this.radius) {\n      const dir = target.clone().sub(this.position).normalize();\n      this.position.addScaledVector(dir, dist - this.radius);\n    }\n    return this.position.clone();\n  }\n  reset() { this.position = null; }\n}\n\nexport default {\n  getFalloff, createBrushSettings, applySculpt, smoothVertices,\n  createMask, paintMask, invertMask, clearMask,\n  createSculptLayer, mergeSculptLayers, LazyMouse,\n  BRUSH_TYPES,\n};\n\nexport function applySculptStroke(geometry, hitPoint, hitNormal, brush, options) {\n  if (brush.type === 'smooth') {
+import * as THREE from 'three';
+
+// ─── Falloff Library ─────────────────────────────────────────────────────────
+
+function smoothFalloff(t)   { const u=1-t; return u*u*(3-2*u); }
+function linearFalloff(t)   { return 1-t; }
+function sharpFalloff(t)    { return Math.pow(1-t, 4); }
+function sphereFalloff(t)   { return Math.sqrt(Math.max(0, 1-t*t)); }
+function rootFalloff(t)     { return 1-Math.sqrt(t); }
+function constFalloff()     { return 1; }
+function cubicFalloff(t)    { return 1-t*t*t; }
+function sineFalloff(t)     { return Math.sin((1-t) * Math.PI * 0.5); }
+function spikeFalloff(t)    { return t < 0.1 ? 1 : 1 - (t-0.1)/0.9; }
+
+export function getFalloff(type, t) {
+  if (t >= 1) return 0;
+  switch (type) {
+    case 'linear':   return linearFalloff(t);
+    case 'sharp':    return sharpFalloff(t);
+    case 'sphere':   return sphereFalloff(t);
+    case 'root':     return rootFalloff(t);
+    case 'constant': return constFalloff();
+    case 'cubic':    return cubicFalloff(t);
+    case 'sine':     return sineFalloff(t);
+    case 'spike':    return spikeFalloff(t);
+    default:         return smoothFalloff(t);
+  }
+}
+
+// ─── Brush Settings ───────────────────────────────────────────────────────────
+
+export function createBrushSettings(options = {}) {
+  return {
+    type:         options.type      ?? 'draw',
+    radius:       options.radius    ?? 0.3,
+    strength:     options.strength  ?? 0.5,
+    falloff:      options.falloff   ?? 'smooth',
+    direction:    options.direction ?? 1,      // 1=add, -1=subtract
+    symmetry:     options.symmetry  ?? false,
+    symmetryAxis: options.symmetryAxis ?? 'x',
+    lazyMouse:    options.lazyMouse ?? false,
+    lazyRadius:   options.lazyRadius ?? 0.1,
+    stabilizer:   options.stabilizer ?? 0,    // 0-1
+    accumulate:   options.accumulate ?? false,
+    backfaceCull: options.backfaceCull ?? true,
+    alphaTexture: options.alphaTexture ?? null,
+    spacing:      options.spacing   ?? 0.1,
+    jitter:       options.jitter    ?? 0,
+  };
+}
+
+// ─── Brush Types ──────────────────────────────────────────────────────────────
+
+export const BRUSH_TYPES = {
+  draw:      'draw',       // Standard sculpt
+  flatten:   'flatten',   // Flatten to plane
+  smooth:    'smooth',    // Smooth/blur vertices
+  pinch:     'pinch',     // Pull vertices together
+  inflate:   'inflate',   // Push along normals
+  grab:      'grab',      // Move vertices freely
+  snake:     'snake',     // Snake hook
+  clay:      'clay',      // Clay buildup
+  trim:      'trim',      // Trim dynamic topology
+  crease:    'crease',    // Sharp crease
+  polish:    'polish',    // Polish/relax
+  scrape:    'scrape',    // Scrape high areas
+  fill:      'fill',      // Fill low areas
+  nudge:     'nudge',     // Nudge along surface
+  mask:      'mask',      // Paint mask
+};
+
+// ─── Sculpt Operations ────────────────────────────────────────────────────────
+
+export function applySculpt(geometry, hitPoint, hitNormal, brush, options = {}) {
+  const pos = geometry.attributes.position;
+  const norm = geometry.attributes.normal;
+  if (!pos) return false;
+
+  const { type, radius, strength, falloff, direction, symmetry, symmetryAxis, backfaceCull } = brush;
+  const dt = options.dt ?? 1/60;
+  let modified = false;
+
+  for (let i = 0; i < pos.count; i++) {
+    const vp = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+    const dist = vp.distanceTo(hitPoint);
+    if (dist > radius) continue;
+
+    // Backface culling
+    if (backfaceCull && norm) {
+      const vn = new THREE.Vector3(norm.getX(i), norm.getY(i), norm.getZ(i));
+      if (vn.dot(hitNormal) < 0) continue;
+    }
+
+    const t = dist / radius;
+    const influence = getFalloff(falloff, t) * strength * direction * dt * 60;
+
+    _applyBrushType(type, pos, norm, i, vp, hitPoint, hitNormal, influence, brush);
+    modified = true;
+  }
+
+  // Symmetry
+  if (symmetry) {
+    const mirrorHit = hitPoint.clone();
+    const axisIdx = { x:0, y:1, z:2 }[symmetryAxis] ?? 0;
+    mirrorHit.setComponent(axisIdx, -mirrorHit.getComponent(axisIdx));
+    const mirrorNormal = hitNormal.clone();
+    mirrorNormal.setComponent(axisIdx, -mirrorNormal.getComponent(axisIdx));
+
+    for (let i = 0; i < pos.count; i++) {
+      const vp = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+      const dist = vp.distanceTo(mirrorHit);
+      if (dist > radius) continue;
+      const t = dist / radius;
+      const influence = getFalloff(falloff, t) * strength * direction * dt * 60;
+      _applyBrushType(type, pos, norm, i, vp, mirrorHit, mirrorNormal, influence, brush);
+    }
+  }
+
+  if (modified) {
+    pos.needsUpdate = true;
+    geometry.computeVertexNormals();
+  }
+
+  return modified;
+}
+
+function _applyBrushType(type, pos, norm, i, vp, hitPoint, hitNormal, influence, brush) {
+  switch (type) {
+    case 'draw':
+    case 'clay': {
+      pos.setXYZ(i,
+        vp.x + hitNormal.x * influence,
+        vp.y + hitNormal.y * influence,
+        vp.z + hitNormal.z * influence,
+      );
+      break;
+    }
+    case 'inflate': {
+      if (!norm) break;
+      const vn = new THREE.Vector3(norm.getX(i), norm.getY(i), norm.getZ(i)).normalize();
+      pos.setXYZ(i, vp.x + vn.x * influence, vp.y + vn.y * influence, vp.z + vn.z * influence);
+      break;
+    }
+    case 'flatten': {
+      const toPlane = vp.clone().sub(hitPoint);
+      const dist = toPlane.dot(hitNormal);
+      const rate = Math.min(1, Math.abs(influence) * 0.5);
+      pos.setXYZ(i,
+        vp.x - hitNormal.x * dist * rate,
+        vp.y - hitNormal.y * dist * rate,
+        vp.z - hitNormal.z * dist * rate,
+      );
+      break;
+    }
+    case 'pinch': {
+      const toCenter = hitPoint.clone().sub(vp);
+      pos.setXYZ(i,
+        vp.x + toCenter.x * Math.abs(influence) * 0.5,
+        vp.y + toCenter.y * Math.abs(influence) * 0.5,
+        vp.z + toCenter.z * Math.abs(influence) * 0.5,
+      );
+      break;
+    }
+    case 'grab': {
+      if (brush._grabDelta) {
+        pos.setXYZ(i, vp.x + brush._grabDelta.x * influence * 2, vp.y + brush._grabDelta.y * influence * 2, vp.z + brush._grabDelta.z * influence * 2);
+      }
+      break;
+    }
+    case 'smooth': {
+      // Handled separately in smoothVertices
+      break;
+    }
+    case 'crease': {
+      const toCenter = hitPoint.clone().sub(vp);
+      const perp = toCenter.clone().cross(hitNormal).normalize();
+      pos.setXYZ(i,
+        vp.x + perp.x * influence * 0.5,
+        vp.y + perp.y * influence * 0.5 + hitNormal.y * influence * 0.3,
+        vp.z + perp.z * influence * 0.5,
+      );
+      break;
+    }
+    case 'scrape': {
+      if (vp.dot(hitNormal) > hitPoint.dot(hitNormal)) {
+        pos.setXYZ(i, vp.x - hitNormal.x * Math.abs(influence) * 0.5, vp.y - hitNormal.y * Math.abs(influence) * 0.5, vp.z - hitNormal.z * Math.abs(influence) * 0.5);
+      }
+      break;
+    }
+    case 'fill': {
+      if (vp.dot(hitNormal) < hitPoint.dot(hitNormal)) {
+        pos.setXYZ(i, vp.x + hitNormal.x * Math.abs(influence) * 0.5, vp.y + hitNormal.y * Math.abs(influence) * 0.5, vp.z + hitNormal.z * Math.abs(influence) * 0.5);
+      }
+      break;
+    }
+    case 'nudge': {
+      if (brush._nudgeDir) {
+        pos.setXYZ(i, vp.x + brush._nudgeDir.x * influence, vp.y + brush._nudgeDir.y * influence, vp.z + brush._nudgeDir.z * influence);
+      }
+      break;
+    }
+    default: break;
+  }
+}
+
+// ─── Smooth ───────────────────────────────────────────────────────────────────
+
+export function smoothVertices(geometry, hitPoint, radius, strength, iterations = 2) {
+  const pos = geometry.attributes.position;
+  const idx = geometry.index;
+  if (!pos || !idx) return;
+
+  // Build adjacency
+  const adj = Array.from({ length: pos.count }, () => new Set());
+  for (let i = 0; i < idx.count; i += 3) {
+    const a = idx.getX(i), b = idx.getX(i+1), c = idx.getX(i+2);
+    adj[a].add(b); adj[a].add(c);
+    adj[b].add(a); adj[b].add(c);
+    adj[c].add(a); adj[c].add(b);
+  }
+
+  for (let iter = 0; iter < iterations; iter++) {
+    for (let i = 0; i < pos.count; i++) {
+      const vp = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+      const dist = vp.distanceTo(hitPoint);
+      if (dist > radius) continue;
+
+      const t = dist / radius;
+      const influence = getFalloff('smooth', t) * strength;
+      const neighbors = Array.from(adj[i]);
+      if (!neighbors.length) continue;
+
+      const avg = new THREE.Vector3();
+      neighbors.forEach(n => avg.add(new THREE.Vector3(pos.getX(n), pos.getY(n), pos.getZ(n))));
+      avg.divideScalar(neighbors.length);
+
+      pos.setXYZ(i,
+        vp.x + (avg.x - vp.x) * influence,
+        vp.y + (avg.y - vp.y) * influence,
+        vp.z + (avg.z - vp.z) * influence,
+      );
+    }
+  }
+
+  pos.needsUpdate = true;
+  geometry.computeVertexNormals();
+}
+
+// ─── Mask ─────────────────────────────────────────────────────────────────────
+
+export function createMask(vertexCount) {
+  return new Float32Array(vertexCount).fill(0);
+}
+
+export function paintMask(mask, geometry, hitPoint, radius, value = 1, falloffType = 'smooth') {
+  const pos = geometry.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const vp = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+    const dist = vp.distanceTo(hitPoint);
+    if (dist > radius) continue;
+    const t = dist / radius;
+    const influence = getFalloff(falloffType, t);
+    mask[i] = Math.max(0, Math.min(1, mask[i] + value * influence));
+  }
+}
+
+export function invertMask(mask) {
+  for (let i = 0; i < mask.length; i++) mask[i] = 1 - mask[i];
+}
+
+export function clearMask(mask) { mask.fill(0); }
+
+// ─── Sculpt Layers ────────────────────────────────────────────────────────────
+
+export function createSculptLayer(name, geometry) {
+  const pos = geometry.attributes.position;
+  return {
+    id:       Math.random().toString(36).slice(2),
+    name,
+    data:     new Float32Array(pos.array),
+    strength: 1.0,
+    visible:  true,
+  };
+}
+
+export function mergeSculptLayers(geometry, layers) {
+  const pos = geometry.attributes.position;
+  const basis = layers[0];
+  if (!basis) return;
+  pos.array.set(basis.data);
+  for (let li = 1; li < layers.length; li++) {
+    const layer = layers[li];
+    if (!layer.visible) continue;
+    for (let i = 0; i < pos.array.length; i++) {
+      pos.array[i] += (layer.data[i] - basis.data[i]) * layer.strength;
+    }
+  }
+  pos.needsUpdate = true;
+  geometry.computeVertexNormals();
+}
+
+// ─── Lazy Mouse ───────────────────────────────────────────────────────────────
+
+export class LazyMouse {
+  constructor(radius = 0.05) {
+    this.radius = radius;
+    this.position = null;
+  }
+  update(target) {
+    if (!this.position) { this.position = target.clone(); return this.position; }
+    const dist = this.position.distanceTo(target);
+    if (dist > this.radius) {
+      const dir = target.clone().sub(this.position).normalize();
+      this.position.addScaledVector(dir, dist - this.radius);
+    }
+    return this.position.clone();
+  }
+  reset() { this.position = null; }
+}
+
+export default {
+  getFalloff, createBrushSettings, applySculpt, smoothVertices,
+  createMask, paintMask, invertMask, clearMask,
+  createSculptLayer, mergeSculptLayers, LazyMouse,
+  BRUSH_TYPES,
+};
+
+export function applySculptStroke(geometry, hitPoint, hitNormal, brush, options) {
+  if (brush.type === 'smooth') {
     smoothVertices(geometry, hitPoint, brush.radius, brush.strength);
     return true;
   }

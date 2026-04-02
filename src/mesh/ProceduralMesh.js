@@ -1,7 +1,289 @@
 // ProceduralMesh.js — UPGRADE: Extended Procedural Mesh Generators
 // SPX Mesh Editor | StreamPireX
 
-import * as THREE from 'three';\n\n// ─── Basic Primitives ─────────────────────────────────────────────────────────\n\nexport function createBox(w=1, h=1, d=1, wSeg=1, hSeg=1, dSeg=1) {\n  return new THREE.BoxGeometry(w, h, d, wSeg, hSeg, dSeg);\n}\nexport function createSphere(r=1, w=32, h=16) {\n  return new THREE.SphereGeometry(r, w, h);\n}\nexport function createCylinder(rTop=1, rBot=1, h=2, seg=32, open=false) {\n  return new THREE.CylinderGeometry(rTop, rBot, h, seg, 1, open);\n}\nexport function createCone(r=1, h=2, seg=32) {\n  return new THREE.ConeGeometry(r, h, seg);\n}\nexport function createTorus(r=1, tube=0.4, rSeg=16, tSeg=100) {\n  return new THREE.TorusGeometry(r, tube, rSeg, tSeg);\n}\nexport function createPlane(w=1, h=1, wSeg=1, hSeg=1) {\n  return new THREE.PlaneGeometry(w, h, wSeg, hSeg);\n}\n\n// ─── Advanced Primitives ──────────────────────────────────────────────────────\n\nexport function createTorusKnot(r=1, tube=0.4, tSeg=128, rSeg=16, p=2, q=3) {\n  return new THREE.TorusKnotGeometry(r, tube, tSeg, rSeg, p, q);\n}\n\nexport function createIcosphere(radius=1, detail=2) {\n  return new THREE.IcosahedronGeometry(radius, detail);\n}\n\nexport function createCapsule(r=0.5, length=1, capSeg=8, radSeg=16) {\n  // Manual capsule: cylinder + two hemispheres\n  const parts = [];\n  const cyl = new THREE.CylinderGeometry(r, r, length, radSeg, 1, true);\n  const topHemi = new THREE.SphereGeometry(r, radSeg, capSeg, 0, Math.PI*2, 0, Math.PI/2);\n  const botHemi = new THREE.SphereGeometry(r, radSeg, capSeg, 0, Math.PI*2, Math.PI/2, Math.PI/2);\n\n  // Offset hemisphere positions\n  topHemi.translate(0,  length/2, 0);\n  botHemi.translate(0, -length/2, 0);\n\n  return mergeGeometries([cyl, topHemi, botHemi]);\n}\n\nexport function createArrow(length=2, headLen=0.4, headRadius=0.2, shaftRadius=0.05) {\n  const shaft = new THREE.CylinderGeometry(shaftRadius, shaftRadius, length-headLen, 8);\n  shaft.translate(0, (length-headLen)/2, 0);\n  const head = new THREE.ConeGeometry(headRadius, headLen, 8);\n  head.translate(0, length - headLen/2, 0);\n  return mergeGeometries([shaft, head]);\n}\n\nexport function createStar(outerR=1, innerR=0.4, points=5, depth=0.2) {\n  const shape = new THREE.Shape();\n  const step = Math.PI / points;\n  for (let i = 0; i < points * 2; i++) {\n    const angle = i * step - Math.PI/2;\n    const r = i % 2 === 0 ? outerR : innerR;\n    const x = Math.cos(angle) * r, y = Math.sin(angle) * r;\n    i === 0 ? shape.moveTo(x, y) : shape.lineTo(x, y);\n  }\n  shape.closePath();\n  return new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false });\n}\n\nexport function createSpring(coils=5, radius=0.5, tubeRadius=0.05, height=2, seg=256) {\n  const points = [];\n  for (let i = 0; i <= seg; i++) {\n    const t = i / seg;\n    const angle = t * Math.PI * 2 * coils;\n    points.push(new THREE.Vector3(\n      Math.cos(angle) * radius,\n      t * height - height/2,\n      Math.sin(angle) * radius,\n    ));\n  }\n  const path = new THREE.CatmullRomCurve3(points);\n  return new THREE.TubeGeometry(path, seg, tubeRadius, 8, false);\n}\n\n// ─── Terrain / Landscape ──────────────────────────────────────────────────────\n\nexport function createTerrain(width=10, depth=10, wSeg=64, dSeg=64, heightScale=2, seed=42) {\n  const geo = new THREE.PlaneGeometry(width, depth, wSeg, dSeg);\n  geo.rotateX(-Math.PI/2);\n  const pos = geo.attributes.position;\n  const rng = seededRandom(seed);\n\n  for (let i = 0; i < pos.count; i++) {\n    const x = pos.getX(i), z = pos.getZ(i);\n    const h = fbmNoise(x * 0.3, z * 0.3, rng) * heightScale;\n    pos.setY(i, h);\n  }\n  pos.needsUpdate = true;\n  geo.computeVertexNormals();\n  return geo;\n}\n\nexport function createMountains(width=20, depth=20, peaks=5, height=4, seed=0) {\n  const geo = createTerrain(width, depth, 128, 128, height, seed);\n  return geo;\n}\n\n// ─── Organic Shapes ───────────────────────────────────────────────────────────\n\nexport function createBlob(radius=1, detail=3, noiseScale=0.5, noiseMag=0.3, seed=0) {\n  const geo = new THREE.IcosahedronGeometry(radius, detail);\n  const pos = geo.attributes.position;\n  const rng = seededRandom(seed);\n\n  for (let i = 0; i < pos.count; i++) {\n    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);\n    const noise = simpleNoise3(x*noiseScale, y*noiseScale, z*noiseScale) * noiseMag;\n    const len = Math.sqrt(x*x + y*y + z*z) + noise;\n    const scale = len / Math.sqrt(x*x + y*y + z*z);\n    pos.setXYZ(i, x*scale, y*scale, z*scale);\n  }\n  pos.needsUpdate = true;\n  geo.computeVertexNormals();\n  return geo;\n}\n\nexport function createRock(seed=42) {\n  return createBlob(1, 2, 0.8, 0.4, seed);\n}\n\nexport function createCloud(layers=5, seed=0) {\n  const geos = [];\n  const rng = seededRandom(seed);\n  for (let i = 0; i < layers; i++) {\n    const r = 0.4 + rng() * 0.6;\n    const g = new THREE.SphereGeometry(r, 8, 6);\n    g.translate((rng()-0.5)*1.5, (rng()-0.5)*0.4, (rng()-0.5)*0.8);\n    geos.push(g);\n  }\n  return mergeGeometries(geos);\n}\n\n// ─── Architectural ────────────────────────────────────────────────────────────\n\nexport function createWall(width=4, height=3, thickness=0.2, bricks=true) {\n  const geo = new THREE.BoxGeometry(width, height, thickness, bricks?Math.round(width*2):1, bricks?Math.round(height*1.5):1, 1);\n  if (bricks) {\n    // Displace brick rows slightly for mortar effect\n    const pos = geo.attributes.position;\n    for (let i = 0; i < pos.count; i++) {\n      const y = pos.getY(i);\n      const row = Math.round(y / 0.4);\n      if (Math.abs(y - row * 0.4) < 0.02) pos.setZ(i, pos.getZ(i) * 0.98);\n    }\n    pos.needsUpdate = true;\n  }\n  return geo;\n}\n\nexport function createStairs(steps=10, stepW=2, stepH=0.2, stepD=0.3) {\n  const geos = [];\n  for (let i = 0; i < steps; i++) {\n    const g = new THREE.BoxGeometry(stepW, stepH, stepD);\n    g.translate(0, i * stepH + stepH/2, i * stepD + stepD/2);\n    geos.push(g);\n  }\n  return mergeGeometries(geos);\n}\n\nexport function createPillar(radius=0.3, height=4, fluted=true, segments=16) {\n  if (fluted) {\n    // Fluted column — vary radius at different angles\n    const shape = new THREE.Shape();\n    for (let i = 0; i <= segments; i++) {\n      const angle = (i / segments) * Math.PI * 2;\n      const r = radius + Math.cos(angle * 8) * radius * 0.08;\n      const x = Math.cos(angle) * r, y = Math.sin(angle) * r;\n      i === 0 ? shape.moveTo(x, y) : shape.lineTo(x, y);\n    }\n    shape.closePath();\n    return new THREE.ExtrudeGeometry(shape, { depth: height, bevelEnabled: false });\n  }\n  return createCylinder(radius, radius * 1.1, height, segments);\n}\n\n// ─── Nature ───────────────────────────────────────────────────────────────────\n\nexport function createTree(trunkHeight=2, trunkRadius=0.15, canopyRadius=1.2, canopyLayers=3, seed=0) {\n  const geos = [];\n  const rng = seededRandom(seed);\n\n  // Trunk\n  const trunk = createCylinder(trunkRadius*0.7, trunkRadius, trunkHeight, 8);\n  trunk.translate(0, trunkHeight/2, 0);\n  geos.push(trunk);\n\n  // Canopy layers\n  for (let i = 0; i < canopyLayers; i++) {\n    const t = i / (canopyLayers - 1);\n    const r = canopyRadius * (1 - t * 0.5) + rng() * 0.2;\n    const h = canopyRadius * 0.8 + rng() * 0.4;\n    const y = trunkHeight + i * (h * 0.4);\n    const layer = new THREE.ConeGeometry(r, h, 7 + i);\n    layer.translate(0, y + h/2, 0);\n    geos.push(layer);\n  }\n\n  return mergeGeometries(geos);\n}\n\nexport function createGrass(blades=20, width=0.05, height=0.8, spread=1, seed=0) {\n  const geos = [];\n  const rng = seededRandom(seed);\n  for (let i = 0; i < blades; i++) {\n    const bx = (rng()-0.5)*spread*2, bz = (rng()-0.5)*spread*2;\n    const bh = height * (0.7 + rng()*0.6);\n    const tilt = (rng()-0.5)*0.4;\n    const g = new THREE.PlaneGeometry(width, bh);\n    g.rotateY(rng()*Math.PI*2);\n    g.translate(bx + tilt*bh*0.5, bh/2, bz);\n    geos.push(g);\n  }\n  return mergeGeometries(geos);\n}\n\n// ─── Text / Logo ──────────────────────────────────────────────────────────────\n\nexport function createTextGeometry(text, font, options = {}) {\n  if (!font || !window.THREE?.TextGeometry) return createBox(1, 0.3, 0.1);\n  const { size=0.5, depth=0.1, bevelEnabled=true, bevelSize=0.02 } = options;\n  return new window.THREE.TextGeometry(text, { font, size, depth, bevelEnabled, bevelSize, bevelThickness: 0.01 });\n}\n\n// ─── Merge Utility ────────────────────────────────────────────────────────────\n\nexport function mergeGeometries(geos) {\n  let totalVerts = 0;\n  geos.forEach(g => { totalVerts += g.attributes.position.count; });\n  const positions = new Float32Array(totalVerts * 3);\n  const indices = [];\n  let offset = 0;\n  geos.forEach(g => {\n    const pos = g.attributes.position;\n    for (let i = 0; i < pos.count; i++) {\n      positions[(offset+i)*3]   = pos.getX(i);\n      positions[(offset+i)*3+1] = pos.getY(i);\n      positions[(offset+i)*3+2] = pos.getZ(i);\n    }\n    if (g.index) Array.from(g.index.array).forEach(i => indices.push(i+offset));\n    offset += pos.count;\n  });\n  const merged = new THREE.BufferGeometry();\n  merged.setAttribute('position', new THREE.BufferAttribute(positions, 3));\n  if (indices.length) merged.setIndex(indices);\n  merged.computeVertexNormals();\n  return merged;\n}\n\n// ─── Helpers ──────────────────────────────────────────────────────────────────\n\nfunction seededRandom(seed) {\n  let s = seed;\n  return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };\n}\n\nfunction simpleNoise3(x, y, z) {\n  return Math.sin(x*1.7+y*2.3)*Math.cos(y*1.1+z*3.7)*Math.sin(z*2.9+x*1.3);\n}\n\nfunction fbmNoise(x, z, rng, octaves=4) {\n  let v=0, amp=0.5, freq=1;\n  for (let i=0; i<octaves; i++) {\n    v += simpleNoise3(x*freq+rng()*10, 0, z*freq+rng()*10)*amp;\n    amp*=0.5; freq*=2;\n  }\n  return v;\n}\n\nexport const PROCEDURAL_TYPES = {\n  PRIMITIVES:    ['box','sphere','cylinder','cone','torus','plane','torusKnot','icosphere','capsule','arrow','star','spring'],\n  TERRAIN:       ['terrain','mountains'],\n  ORGANIC:       ['blob','rock','cloud'],\n  ARCHITECTURAL: ['wall','stairs','pillar'],\n  NATURE:        ['tree','grass'],
+import * as THREE from 'three';
+
+// ─── Basic Primitives ─────────────────────────────────────────────────────────
+
+export function createBox(w=1, h=1, d=1, wSeg=1, hSeg=1, dSeg=1) {
+  return new THREE.BoxGeometry(w, h, d, wSeg, hSeg, dSeg);
+}
+export function createSphere(r=1, w=32, h=16) {
+  return new THREE.SphereGeometry(r, w, h);
+}
+export function createCylinder(rTop=1, rBot=1, h=2, seg=32, open=false) {
+  return new THREE.CylinderGeometry(rTop, rBot, h, seg, 1, open);
+}
+export function createCone(r=1, h=2, seg=32) {
+  return new THREE.ConeGeometry(r, h, seg);
+}
+export function createTorus(r=1, tube=0.4, rSeg=16, tSeg=100) {
+  return new THREE.TorusGeometry(r, tube, rSeg, tSeg);
+}
+export function createPlane(w=1, h=1, wSeg=1, hSeg=1) {
+  return new THREE.PlaneGeometry(w, h, wSeg, hSeg);
+}
+
+// ─── Advanced Primitives ──────────────────────────────────────────────────────
+
+export function createTorusKnot(r=1, tube=0.4, tSeg=128, rSeg=16, p=2, q=3) {
+  return new THREE.TorusKnotGeometry(r, tube, tSeg, rSeg, p, q);
+}
+
+export function createIcosphere(radius=1, detail=2) {
+  return new THREE.IcosahedronGeometry(radius, detail);
+}
+
+export function createCapsule(r=0.5, length=1, capSeg=8, radSeg=16) {
+  // Manual capsule: cylinder + two hemispheres
+  const parts = [];
+  const cyl = new THREE.CylinderGeometry(r, r, length, radSeg, 1, true);
+  const topHemi = new THREE.SphereGeometry(r, radSeg, capSeg, 0, Math.PI*2, 0, Math.PI/2);
+  const botHemi = new THREE.SphereGeometry(r, radSeg, capSeg, 0, Math.PI*2, Math.PI/2, Math.PI/2);
+
+  // Offset hemisphere positions
+  topHemi.translate(0,  length/2, 0);
+  botHemi.translate(0, -length/2, 0);
+
+  return mergeGeometries([cyl, topHemi, botHemi]);
+}
+
+export function createArrow(length=2, headLen=0.4, headRadius=0.2, shaftRadius=0.05) {
+  const shaft = new THREE.CylinderGeometry(shaftRadius, shaftRadius, length-headLen, 8);
+  shaft.translate(0, (length-headLen)/2, 0);
+  const head = new THREE.ConeGeometry(headRadius, headLen, 8);
+  head.translate(0, length - headLen/2, 0);
+  return mergeGeometries([shaft, head]);
+}
+
+export function createStar(outerR=1, innerR=0.4, points=5, depth=0.2) {
+  const shape = new THREE.Shape();
+  const step = Math.PI / points;
+  for (let i = 0; i < points * 2; i++) {
+    const angle = i * step - Math.PI/2;
+    const r = i % 2 === 0 ? outerR : innerR;
+    const x = Math.cos(angle) * r, y = Math.sin(angle) * r;
+    i === 0 ? shape.moveTo(x, y) : shape.lineTo(x, y);
+  }
+  shape.closePath();
+  return new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false });
+}
+
+export function createSpring(coils=5, radius=0.5, tubeRadius=0.05, height=2, seg=256) {
+  const points = [];
+  for (let i = 0; i <= seg; i++) {
+    const t = i / seg;
+    const angle = t * Math.PI * 2 * coils;
+    points.push(new THREE.Vector3(
+      Math.cos(angle) * radius,
+      t * height - height/2,
+      Math.sin(angle) * radius,
+    ));
+  }
+  const path = new THREE.CatmullRomCurve3(points);
+  return new THREE.TubeGeometry(path, seg, tubeRadius, 8, false);
+}
+
+// ─── Terrain / Landscape ──────────────────────────────────────────────────────
+
+export function createTerrain(width=10, depth=10, wSeg=64, dSeg=64, heightScale=2, seed=42) {
+  const geo = new THREE.PlaneGeometry(width, depth, wSeg, dSeg);
+  geo.rotateX(-Math.PI/2);
+  const pos = geo.attributes.position;
+  const rng = seededRandom(seed);
+
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i);
+    const h = fbmNoise(x * 0.3, z * 0.3, rng) * heightScale;
+    pos.setY(i, h);
+  }
+  pos.needsUpdate = true;
+  geo.computeVertexNormals();
+  return geo;
+}
+
+export function createMountains(width=20, depth=20, peaks=5, height=4, seed=0) {
+  const geo = createTerrain(width, depth, 128, 128, height, seed);
+  return geo;
+}
+
+// ─── Organic Shapes ───────────────────────────────────────────────────────────
+
+export function createBlob(radius=1, detail=3, noiseScale=0.5, noiseMag=0.3, seed=0) {
+  const geo = new THREE.IcosahedronGeometry(radius, detail);
+  const pos = geo.attributes.position;
+  const rng = seededRandom(seed);
+
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const noise = simpleNoise3(x*noiseScale, y*noiseScale, z*noiseScale) * noiseMag;
+    const len = Math.sqrt(x*x + y*y + z*z) + noise;
+    const scale = len / Math.sqrt(x*x + y*y + z*z);
+    pos.setXYZ(i, x*scale, y*scale, z*scale);
+  }
+  pos.needsUpdate = true;
+  geo.computeVertexNormals();
+  return geo;
+}
+
+export function createRock(seed=42) {
+  return createBlob(1, 2, 0.8, 0.4, seed);
+}
+
+export function createCloud(layers=5, seed=0) {
+  const geos = [];
+  const rng = seededRandom(seed);
+  for (let i = 0; i < layers; i++) {
+    const r = 0.4 + rng() * 0.6;
+    const g = new THREE.SphereGeometry(r, 8, 6);
+    g.translate((rng()-0.5)*1.5, (rng()-0.5)*0.4, (rng()-0.5)*0.8);
+    geos.push(g);
+  }
+  return mergeGeometries(geos);
+}
+
+// ─── Architectural ────────────────────────────────────────────────────────────
+
+export function createWall(width=4, height=3, thickness=0.2, bricks=true) {
+  const geo = new THREE.BoxGeometry(width, height, thickness, bricks?Math.round(width*2):1, bricks?Math.round(height*1.5):1, 1);
+  if (bricks) {
+    // Displace brick rows slightly for mortar effect
+    const pos = geo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const y = pos.getY(i);
+      const row = Math.round(y / 0.4);
+      if (Math.abs(y - row * 0.4) < 0.02) pos.setZ(i, pos.getZ(i) * 0.98);
+    }
+    pos.needsUpdate = true;
+  }
+  return geo;
+}
+
+export function createStairs(steps=10, stepW=2, stepH=0.2, stepD=0.3) {
+  const geos = [];
+  for (let i = 0; i < steps; i++) {
+    const g = new THREE.BoxGeometry(stepW, stepH, stepD);
+    g.translate(0, i * stepH + stepH/2, i * stepD + stepD/2);
+    geos.push(g);
+  }
+  return mergeGeometries(geos);
+}
+
+export function createPillar(radius=0.3, height=4, fluted=true, segments=16) {
+  if (fluted) {
+    // Fluted column — vary radius at different angles
+    const shape = new THREE.Shape();
+    for (let i = 0; i <= segments; i++) {
+      const angle = (i / segments) * Math.PI * 2;
+      const r = radius + Math.cos(angle * 8) * radius * 0.08;
+      const x = Math.cos(angle) * r, y = Math.sin(angle) * r;
+      i === 0 ? shape.moveTo(x, y) : shape.lineTo(x, y);
+    }
+    shape.closePath();
+    return new THREE.ExtrudeGeometry(shape, { depth: height, bevelEnabled: false });
+  }
+  return createCylinder(radius, radius * 1.1, height, segments);
+}
+
+// ─── Nature ───────────────────────────────────────────────────────────────────
+
+export function createTree(trunkHeight=2, trunkRadius=0.15, canopyRadius=1.2, canopyLayers=3, seed=0) {
+  const geos = [];
+  const rng = seededRandom(seed);
+
+  // Trunk
+  const trunk = createCylinder(trunkRadius*0.7, trunkRadius, trunkHeight, 8);
+  trunk.translate(0, trunkHeight/2, 0);
+  geos.push(trunk);
+
+  // Canopy layers
+  for (let i = 0; i < canopyLayers; i++) {
+    const t = i / (canopyLayers - 1);
+    const r = canopyRadius * (1 - t * 0.5) + rng() * 0.2;
+    const h = canopyRadius * 0.8 + rng() * 0.4;
+    const y = trunkHeight + i * (h * 0.4);
+    const layer = new THREE.ConeGeometry(r, h, 7 + i);
+    layer.translate(0, y + h/2, 0);
+    geos.push(layer);
+  }
+
+  return mergeGeometries(geos);
+}
+
+export function createGrass(blades=20, width=0.05, height=0.8, spread=1, seed=0) {
+  const geos = [];
+  const rng = seededRandom(seed);
+  for (let i = 0; i < blades; i++) {
+    const bx = (rng()-0.5)*spread*2, bz = (rng()-0.5)*spread*2;
+    const bh = height * (0.7 + rng()*0.6);
+    const tilt = (rng()-0.5)*0.4;
+    const g = new THREE.PlaneGeometry(width, bh);
+    g.rotateY(rng()*Math.PI*2);
+    g.translate(bx + tilt*bh*0.5, bh/2, bz);
+    geos.push(g);
+  }
+  return mergeGeometries(geos);
+}
+
+// ─── Text / Logo ──────────────────────────────────────────────────────────────
+
+export function createTextGeometry(text, font, options = {}) {
+  if (!font || !window.THREE?.TextGeometry) return createBox(1, 0.3, 0.1);
+  const { size=0.5, depth=0.1, bevelEnabled=true, bevelSize=0.02 } = options;
+  return new window.THREE.TextGeometry(text, { font, size, depth, bevelEnabled, bevelSize, bevelThickness: 0.01 });
+}
+
+// ─── Merge Utility ────────────────────────────────────────────────────────────
+
+export function mergeGeometries(geos) {
+  let totalVerts = 0;
+  geos.forEach(g => { totalVerts += g.attributes.position.count; });
+  const positions = new Float32Array(totalVerts * 3);
+  const indices = [];
+  let offset = 0;
+  geos.forEach(g => {
+    const pos = g.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      positions[(offset+i)*3]   = pos.getX(i);
+      positions[(offset+i)*3+1] = pos.getY(i);
+      positions[(offset+i)*3+2] = pos.getZ(i);
+    }
+    if (g.index) Array.from(g.index.array).forEach(i => indices.push(i+offset));
+    offset += pos.count;
+  });
+  const merged = new THREE.BufferGeometry();
+  merged.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  if (indices.length) merged.setIndex(indices);
+  merged.computeVertexNormals();
+  return merged;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function seededRandom(seed) {
+  let s = seed;
+  return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+}
+
+function simpleNoise3(x, y, z) {
+  return Math.sin(x*1.7+y*2.3)*Math.cos(y*1.1+z*3.7)*Math.sin(z*2.9+x*1.3);
+}
+
+function fbmNoise(x, z, rng, octaves=4) {
+  let v=0, amp=0.5, freq=1;
+  for (let i=0; i<octaves; i++) {
+    v += simpleNoise3(x*freq+rng()*10, 0, z*freq+rng()*10)*amp;
+    amp*=0.5; freq*=2;
+  }
+  return v;
+}
+
+export const PROCEDURAL_TYPES = {
+  PRIMITIVES:    ['box','sphere','cylinder','cone','torus','plane','torusKnot','icosphere','capsule','arrow','star','spring'],
+  TERRAIN:       ['terrain','mountains'],
+  ORGANIC:       ['blob','rock','cloud'],
+  ARCHITECTURAL: ['wall','stairs','pillar'],
+  NATURE:        ['tree','grass'],
 };
 
 export default {

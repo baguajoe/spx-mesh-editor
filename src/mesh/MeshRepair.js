@@ -147,7 +147,9 @@ export function fullRepair(mesh, threshold = 0.001) {
 export function createRetopoSettings() {
     return {
         targetPolyCount: 5000,
-        method: 'quadriflow',\n        adaptiveSize: 0.5,\n        symmetry: 'x',
+        method: 'quadriflow',
+        adaptiveSize: 0.5,
+        symmetry: 'x',
         preserveSharpEdges: true
     };
 }

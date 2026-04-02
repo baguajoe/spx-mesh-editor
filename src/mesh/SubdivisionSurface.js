@@ -1,7 +1,240 @@
 // SubdivisionSurface.js — Catmull-Clark non-destructive subdivision engine
 // SPX Mesh Editor | StreamPireX
 
-import * as THREE from 'three';\n\n// ─── Catmull-Clark Core ───────────────────────────────────────────────────────\n\n/**\n * Compute face points: average of all face vertices\n */\nfunction computeFacePoints(geo) {\n  const pos = geo.attributes.position;\n  const idx = geo.index ? geo.index.array : null;\n  const facePoints = [];\n\n  if (idx) {\n    for (let i = 0; i < idx.length; i += 3) {\n      const a = new THREE.Vector3().fromBufferAttribute(pos, idx[i]);\n      const b = new THREE.Vector3().fromBufferAttribute(pos, idx[i + 1]);\n      const c = new THREE.Vector3().fromBufferAttribute(pos, idx[i + 2]);\n      facePoints.push(new THREE.Vector3().addVectors(a, b).add(c).divideScalar(3));\n    }\n  }\n  return facePoints;\n}\n\n/**\n * Full Catmull-Clark subdivision pass on a BufferGeometry\n * Returns a new subdivided BufferGeometry (non-destructive)\n */\nexport function catmullClarkSubdivide(geometry, iterations = 1) {\n  let geo = geometry.clone();\n\n  for (let iter = 0; iter < iterations; iter++) {\n    geo = _subdividOnce(geo);\n  }\n\n  geo.computeVertexNormals();\n  return geo;\n}\n\nfunction _subdividOnce(geometry) {\n  const pos = geometry.attributes.position;\n  const idx = geometry.index ? Array.from(geometry.index.array) : null;\n  if (!idx) return geometry; // non-indexed not supported yet\n\n  const vertCount = pos.count;\n  const faceCount = idx.length / 3;\n\n  // Step 1: face points\n  const facePoints = [];\n  for (let f = 0; f < faceCount; f++) {\n    const a = new THREE.Vector3().fromBufferAttribute(pos, idx[f * 3]);\n    const b = new THREE.Vector3().fromBufferAttribute(pos, idx[f * 3 + 1]);\n    const c = new THREE.Vector3().fromBufferAttribute(pos, idx[f * 3 + 2]);\n    facePoints.push(new THREE.Vector3().addVectors(a, b).add(c).divideScalar(3));\n  }\n\n  // Step 2: edge points — midpoint of edge + avg of adjacent face points\n  const edgeMap = new Map();\n  const edgePoints = [];\n\n  function edgeKey(a, b) { return a < b ? `${a}_${b}` : `${b}_${a}`; }\n\n  for (let f = 0; f < faceCount; f++) {\n    const verts = [idx[f * 3], idx[f * 3 + 1], idx[f * 3 + 2]];\n    for (let e = 0; e < 3; e++) {\n      const v0 = verts[e], v1 = verts[(e + 1) % 3];\n      const key = edgeKey(v0, v1);\n      if (!edgeMap.has(key)) {\n        edgeMap.set(key, { faces: [f], v0, v1, idx: vertCount + faceCount + edgePoints.length });\n        edgePoints.push(key);\n      } else {\n        edgeMap.get(key).faces.push(f);\n      }\n    }\n  }\n\n  // Step 3: updated original vertex positions (Catmull-Clark smoothing)\n  const newOrigVerts = [];\n  for (let v = 0; v < vertCount; v++) {\n    const vp = new THREE.Vector3().fromBufferAttribute(pos, v);\n\n    // Gather adjacent faces and edges\n    const adjFaces = [];\n    const adjEdgeMids = [];\n\n    for (let f = 0; f < faceCount; f++) {\n      const verts = [idx[f * 3], idx[f * 3 + 1], idx[f * 3 + 2]];\n      if (verts.includes(v)) adjFaces.push(f);\n    }\n\n    edgeMap.forEach((data) => {\n      if (data.v0 === v || data.v1 === v) {\n        const mid = new THREE.Vector3()\n          .fromBufferAttribute(pos, data.v0)\n          .add(new THREE.Vector3().fromBufferAttribute(pos, data.v1))\n          .divideScalar(2);\n        adjEdgeMids.push(mid);\n      }\n    });\n\n    const n = adjFaces.length;\n    if (n === 0) { newOrigVerts.push(vp); continue; }\n\n    const F = new THREE.Vector3();\n    adjFaces.forEach(fi => F.add(facePoints[fi]));\n    F.divideScalar(n);\n\n    const R = new THREE.Vector3();\n    adjEdgeMids.forEach(m => R.add(m));\n    if (adjEdgeMids.length > 0) R.divideScalar(adjEdgeMids.length);\n\n    // Catmull-Clark formula: (F + 2R + (n-3)P) / n\n    const updated = new THREE.Vector3()\n      .addScaledVector(F, 1)\n      .addScaledVector(R, 2)\n      .addScaledVector(vp, n - 3)\n      .divideScalar(n);\n\n    newOrigVerts.push(updated);\n  }\n\n  // Assemble new vertex buffer\n  const totalVerts = vertCount + faceCount + edgePoints.length;\n  const newPositions = new Float32Array(totalVerts * 3);\n\n  // Original (smoothed)\n  newOrigVerts.forEach((v, i) => {\n    newPositions[i * 3] = v.x;\n    newPositions[i * 3 + 1] = v.y;\n    newPositions[i * 3 + 2] = v.z;\n  });\n\n  // Face points\n  facePoints.forEach((fp, i) => {\n    const off = (vertCount + i) * 3;\n    newPositions[off] = fp.x;\n    newPositions[off + 1] = fp.y;\n    newPositions[off + 2] = fp.z;\n  });\n\n  // Edge points\n  edgePoints.forEach((key, i) => {\n    const data = edgeMap.get(key);\n    const mid = new THREE.Vector3()\n      .fromBufferAttribute(pos, data.v0)\n      .add(new THREE.Vector3().fromBufferAttribute(pos, data.v1))\n      .divideScalar(2);\n    const fp = data.faces.reduce((acc, fi) => acc.add(facePoints[fi]), new THREE.Vector3())\n      .divideScalar(data.faces.length);\n    const ep = new THREE.Vector3().addVectors(mid, fp).divideScalar(2);\n    const off = (vertCount + faceCount + i) * 3;\n    newPositions[off] = ep.x;\n    newPositions[off + 1] = ep.y;\n    newPositions[off + 2] = ep.z;\n  });\n\n  // Build new index — each original triangle becomes 3 quads (split as 2 tris each)\n  const newIndices = [];\n  for (let f = 0; f < faceCount; f++) {\n    const v = [idx[f * 3], idx[f * 3 + 1], idx[f * 3 + 2]];\n    const fp = vertCount + f;\n\n    for (let e = 0; e < 3; e++) {\n      const v0 = v[e];\n      const v1 = v[(e + 1) % 3];\n      const key = edgeKey(v0, v1);\n      const ep = edgeMap.get(key).idx;\n      const prevKey = edgeKey(v[(e + 2) % 3], v[e]);\n      const ep2 = edgeMap.get(prevKey).idx;\n\n      // Quad as 2 triangles\n      newIndices.push(v0, ep, fp);\n      newIndices.push(v0, fp, ep2);\n    }\n  }\n\n  const newGeo = new THREE.BufferGeometry();\n  newGeo.setAttribute('position', new THREE.BufferAttribute(newPositions, 3));\n  newGeo.setIndex(newIndices);\n  newGeo.computeVertexNormals();\n  return newGeo;\n}\n\n// ─── Non-Destructive Wrapper ──────────────────────────────────────────────────\n\nexport class SubdivisionModifier {\n  constructor(mesh, levels = 1) {\n    this.mesh = mesh;\n    this.originalGeometry = mesh.geometry.clone();\n    this.levels = levels;\n    this.enabled = true;\n    this._apply();\n  }\n\n  setLevels(n) {\n    this.levels = Math.max(0, Math.min(n, 6)); // cap at 6 for performance\n    this._apply();\n  }\n\n  toggle(enabled) {\n    this.enabled = enabled;\n    if (enabled) {\n      this._apply();\n    } else {\n      this.mesh.geometry.dispose();\n      this.mesh.geometry = this.originalGeometry.clone();\n    }\n  }\n\n  updateOriginal(newGeo) {\n    this.originalGeometry = newGeo.clone();\n    if (this.enabled) this._apply();\n  }\n\n  _apply() {\n    if (!this.enabled || this.levels === 0) return;\n    const subdivided = catmullClarkSubdivide(this.originalGeometry, this.levels);\n    this.mesh.geometry.dispose();\n    this.mesh.geometry = subdivided;\n  }\n\n  dispose() {\n    this.originalGeometry.dispose();\n  }\n}\n\n// ─── Registry (for ModifierStack integration) ─────────────────────────────────\n\nexport const SUBDIVISION_MODIFIER_TYPE = 'SUBDIVISION';\n\nexport function createSubdivisionModifierDef(levels = 1) {\n  return {\n    type: SUBDIVISION_MODIFIER_TYPE,\n    label: 'Subdivision Surface',\n    icon: '⬡',
+import * as THREE from 'three';
+
+// ─── Catmull-Clark Core ───────────────────────────────────────────────────────
+
+/**
+ * Compute face points: average of all face vertices
+ */
+function computeFacePoints(geo) {
+  const pos = geo.attributes.position;
+  const idx = geo.index ? geo.index.array : null;
+  const facePoints = [];
+
+  if (idx) {
+    for (let i = 0; i < idx.length; i += 3) {
+      const a = new THREE.Vector3().fromBufferAttribute(pos, idx[i]);
+      const b = new THREE.Vector3().fromBufferAttribute(pos, idx[i + 1]);
+      const c = new THREE.Vector3().fromBufferAttribute(pos, idx[i + 2]);
+      facePoints.push(new THREE.Vector3().addVectors(a, b).add(c).divideScalar(3));
+    }
+  }
+  return facePoints;
+}
+
+/**
+ * Full Catmull-Clark subdivision pass on a BufferGeometry
+ * Returns a new subdivided BufferGeometry (non-destructive)
+ */
+export function catmullClarkSubdivide(geometry, iterations = 1) {
+  let geo = geometry.clone();
+
+  for (let iter = 0; iter < iterations; iter++) {
+    geo = _subdividOnce(geo);
+  }
+
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function _subdividOnce(geometry) {
+  const pos = geometry.attributes.position;
+  const idx = geometry.index ? Array.from(geometry.index.array) : null;
+  if (!idx) return geometry; // non-indexed not supported yet
+
+  const vertCount = pos.count;
+  const faceCount = idx.length / 3;
+
+  // Step 1: face points
+  const facePoints = [];
+  for (let f = 0; f < faceCount; f++) {
+    const a = new THREE.Vector3().fromBufferAttribute(pos, idx[f * 3]);
+    const b = new THREE.Vector3().fromBufferAttribute(pos, idx[f * 3 + 1]);
+    const c = new THREE.Vector3().fromBufferAttribute(pos, idx[f * 3 + 2]);
+    facePoints.push(new THREE.Vector3().addVectors(a, b).add(c).divideScalar(3));
+  }
+
+  // Step 2: edge points — midpoint of edge + avg of adjacent face points
+  const edgeMap = new Map();
+  const edgePoints = [];
+
+  function edgeKey(a, b) { return a < b ? `${a}_${b}` : `${b}_${a}`; }
+
+  for (let f = 0; f < faceCount; f++) {
+    const verts = [idx[f * 3], idx[f * 3 + 1], idx[f * 3 + 2]];
+    for (let e = 0; e < 3; e++) {
+      const v0 = verts[e], v1 = verts[(e + 1) % 3];
+      const key = edgeKey(v0, v1);
+      if (!edgeMap.has(key)) {
+        edgeMap.set(key, { faces: [f], v0, v1, idx: vertCount + faceCount + edgePoints.length });
+        edgePoints.push(key);
+      } else {
+        edgeMap.get(key).faces.push(f);
+      }
+    }
+  }
+
+  // Step 3: updated original vertex positions (Catmull-Clark smoothing)
+  const newOrigVerts = [];
+  for (let v = 0; v < vertCount; v++) {
+    const vp = new THREE.Vector3().fromBufferAttribute(pos, v);
+
+    // Gather adjacent faces and edges
+    const adjFaces = [];
+    const adjEdgeMids = [];
+
+    for (let f = 0; f < faceCount; f++) {
+      const verts = [idx[f * 3], idx[f * 3 + 1], idx[f * 3 + 2]];
+      if (verts.includes(v)) adjFaces.push(f);
+    }
+
+    edgeMap.forEach((data) => {
+      if (data.v0 === v || data.v1 === v) {
+        const mid = new THREE.Vector3()
+          .fromBufferAttribute(pos, data.v0)
+          .add(new THREE.Vector3().fromBufferAttribute(pos, data.v1))
+          .divideScalar(2);
+        adjEdgeMids.push(mid);
+      }
+    });
+
+    const n = adjFaces.length;
+    if (n === 0) { newOrigVerts.push(vp); continue; }
+
+    const F = new THREE.Vector3();
+    adjFaces.forEach(fi => F.add(facePoints[fi]));
+    F.divideScalar(n);
+
+    const R = new THREE.Vector3();
+    adjEdgeMids.forEach(m => R.add(m));
+    if (adjEdgeMids.length > 0) R.divideScalar(adjEdgeMids.length);
+
+    // Catmull-Clark formula: (F + 2R + (n-3)P) / n
+    const updated = new THREE.Vector3()
+      .addScaledVector(F, 1)
+      .addScaledVector(R, 2)
+      .addScaledVector(vp, n - 3)
+      .divideScalar(n);
+
+    newOrigVerts.push(updated);
+  }
+
+  // Assemble new vertex buffer
+  const totalVerts = vertCount + faceCount + edgePoints.length;
+  const newPositions = new Float32Array(totalVerts * 3);
+
+  // Original (smoothed)
+  newOrigVerts.forEach((v, i) => {
+    newPositions[i * 3] = v.x;
+    newPositions[i * 3 + 1] = v.y;
+    newPositions[i * 3 + 2] = v.z;
+  });
+
+  // Face points
+  facePoints.forEach((fp, i) => {
+    const off = (vertCount + i) * 3;
+    newPositions[off] = fp.x;
+    newPositions[off + 1] = fp.y;
+    newPositions[off + 2] = fp.z;
+  });
+
+  // Edge points
+  edgePoints.forEach((key, i) => {
+    const data = edgeMap.get(key);
+    const mid = new THREE.Vector3()
+      .fromBufferAttribute(pos, data.v0)
+      .add(new THREE.Vector3().fromBufferAttribute(pos, data.v1))
+      .divideScalar(2);
+    const fp = data.faces.reduce((acc, fi) => acc.add(facePoints[fi]), new THREE.Vector3())
+      .divideScalar(data.faces.length);
+    const ep = new THREE.Vector3().addVectors(mid, fp).divideScalar(2);
+    const off = (vertCount + faceCount + i) * 3;
+    newPositions[off] = ep.x;
+    newPositions[off + 1] = ep.y;
+    newPositions[off + 2] = ep.z;
+  });
+
+  // Build new index — each original triangle becomes 3 quads (split as 2 tris each)
+  const newIndices = [];
+  for (let f = 0; f < faceCount; f++) {
+    const v = [idx[f * 3], idx[f * 3 + 1], idx[f * 3 + 2]];
+    const fp = vertCount + f;
+
+    for (let e = 0; e < 3; e++) {
+      const v0 = v[e];
+      const v1 = v[(e + 1) % 3];
+      const key = edgeKey(v0, v1);
+      const ep = edgeMap.get(key).idx;
+      const prevKey = edgeKey(v[(e + 2) % 3], v[e]);
+      const ep2 = edgeMap.get(prevKey).idx;
+
+      // Quad as 2 triangles
+      newIndices.push(v0, ep, fp);
+      newIndices.push(v0, fp, ep2);
+    }
+  }
+
+  const newGeo = new THREE.BufferGeometry();
+  newGeo.setAttribute('position', new THREE.BufferAttribute(newPositions, 3));
+  newGeo.setIndex(newIndices);
+  newGeo.computeVertexNormals();
+  return newGeo;
+}
+
+// ─── Non-Destructive Wrapper ──────────────────────────────────────────────────
+
+export class SubdivisionModifier {
+  constructor(mesh, levels = 1) {
+    this.mesh = mesh;
+    this.originalGeometry = mesh.geometry.clone();
+    this.levels = levels;
+    this.enabled = true;
+    this._apply();
+  }
+
+  setLevels(n) {
+    this.levels = Math.max(0, Math.min(n, 6)); // cap at 6 for performance
+    this._apply();
+  }
+
+  toggle(enabled) {
+    this.enabled = enabled;
+    if (enabled) {
+      this._apply();
+    } else {
+      this.mesh.geometry.dispose();
+      this.mesh.geometry = this.originalGeometry.clone();
+    }
+  }
+
+  updateOriginal(newGeo) {
+    this.originalGeometry = newGeo.clone();
+    if (this.enabled) this._apply();
+  }
+
+  _apply() {
+    if (!this.enabled || this.levels === 0) return;
+    const subdivided = catmullClarkSubdivide(this.originalGeometry, this.levels);
+    this.mesh.geometry.dispose();
+    this.mesh.geometry = subdivided;
+  }
+
+  dispose() {
+    this.originalGeometry.dispose();
+  }
+}
+
+// ─── Registry (for ModifierStack integration) ─────────────────────────────────
+
+export const SUBDIVISION_MODIFIER_TYPE = 'SUBDIVISION';
+
+export function createSubdivisionModifierDef(levels = 1) {
+  return {
+    type: SUBDIVISION_MODIFIER_TYPE,
+    label: 'Subdivision Surface',
+    icon: '⬡',
     enabled: true,
     params: { levels },
     apply(mesh) {

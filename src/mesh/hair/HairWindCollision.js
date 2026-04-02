@@ -3,7 +3,115 @@
  * Wind field simulation, sphere/capsule colliders, and per-strand
  * constraint-based physics for hair cards and guide curves.
  */
-import * as THREE from 'three';\n\nconst clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));\nconst lerp  = (a, b, t)   => a + (b - a) * t;\n\n// ─── Value noise for wind turbulence ─────────────────────────────────────────\nfunction hash(n) { return Math.sin(n) * 43758.5453 % 1; }\nfunction noise3(x, y, z) {\n  const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);\n  const fx = x - ix, fy = y - iy, fz = z - iz;\n  const ux = fx * fx * (3 - 2 * fx);\n  const uy = fy * fy * (3 - 2 * fy);\n  const uz = fz * fz * (3 - 2 * fz);\n  const n000 = hash(ix + iy * 57 + iz * 113);\n  const n100 = hash(ix + 1 + iy * 57 + iz * 113);\n  const n010 = hash(ix + (iy + 1) * 57 + iz * 113);\n  const n110 = hash(ix + 1 + (iy + 1) * 57 + iz * 113);\n  const n001 = hash(ix + iy * 57 + (iz + 1) * 113);\n  const n101 = hash(ix + 1 + iy * 57 + (iz + 1) * 113);\n  const n011 = hash(ix + (iy + 1) * 57 + (iz + 1) * 113);\n  const n111 = hash(ix + 1 + (iy + 1) * 57 + (iz + 1) * 113);\n  return lerp(\n    lerp(lerp(n000, n100, ux), lerp(n010, n110, ux), uy),\n    lerp(lerp(n001, n101, ux), lerp(n011, n111, ux), uy),\n    uz\n  );\n}\n\n// ─── WindField ───────────────────────────────────────────────────────────────\nexport class WindField {\n  constructor(opts = {}) {\n    this.direction    = (opts.direction ?? new THREE.Vector3(1, 0, 0)).clone().normalize();\n    this.strength     = opts.strength    ?? 1.0;\n    this.turbulence   = opts.turbulence  ?? 0.3;\n    this.gustFreq     = opts.gustFreq    ?? 0.5;\n    this.gustStr      = opts.gustStr     ?? 0.4;\n    this.noiseScale   = opts.noiseScale  ?? 0.8;\n    this.noiseSpeed   = opts.noiseSpeed  ?? 0.6;\n    this._time        = 0;\n  }\n\n  // Sample wind force at world position p at time t\n  sample(p, dt = 0.016) {\n    this._time += dt;\n    const t = this._time;\n    const ns = this.noiseScale;\n    const nx = noise3(p.x * ns, p.y * ns, t * this.noiseSpeed);\n    const ny = noise3(p.y * ns, p.z * ns, t * this.noiseSpeed + 1.5);\n    const nz = noise3(p.z * ns, p.x * ns, t * this.noiseSpeed + 3.0);\n    const turbVec = new THREE.Vector3(nx - 0.5, ny - 0.5, nz - 0.5)\n      .multiplyScalar(this.turbulence * 2);\n    // Gust\n    const gust = Math.max(0, Math.sin(t * this.gustFreq * Math.PI * 2)) * this.gustStr;\n    const base = this.direction.clone().multiplyScalar(this.strength + gust);\n    return base.add(turbVec);\n  }\n\n  setDirection(v) { this.direction.copy(v).normalize(); }\n  setStrength(s)  { this.strength = s; }\n}\n\n// ─── Colliders ────────────────────────────────────────────────────────────────\nexport class SphereCollider {\n  constructor(center, radius) {\n    this.center = center.clone();\n    this.radius = radius;\n    this.type   = 'sphere';\n  }\n  // Push point outside sphere, returns true if collision\n  resolve(point, particleRadius = 0.005) {\n    const d = point.distanceTo(this.center);\n    const r = this.radius + particleRadius;\n    if (d < r) {\n      const n = point.clone().sub(this.center).normalize();\n      point.copy(this.center).add(n.multiplyScalar(r));\n      return true;\n    }\n    return false;\n  }\n  update(center) { this.center.copy(center); }\n  toJSON() { return { type: 'sphere', center: this.center.toArray(), radius: this.radius }; }\n}\n\nexport class CapsuleCollider {\n  constructor(a, b, radius) {\n    this.a      = a.clone();\n    this.b      = b.clone();\n    this.radius = radius;\n    this.type   = 'capsule';\n  }\n  // Closest point on segment a-b to p\n  _closestPoint(p) {\n    const ab = this.b.clone().sub(this.a);\n    const t  = clamp(p.clone().sub(this.a).dot(ab) / ab.lengthSq(), 0, 1);\n    return this.a.clone().add(ab.multiplyScalar(t));\n  }\n  resolve(point, particleRadius = 0.005) {\n    const cp = this._closestPoint(point);\n    const d  = point.distanceTo(cp);\n    const r  = this.radius + particleRadius;\n    if (d < r) {\n      const n = point.clone().sub(cp).normalize();\n      point.copy(cp).add(n.multiplyScalar(r));\n      return true;\n    }\n    return false;\n  }\n  update(a, b) { this.a.copy(a); this.b.copy(b); }\n  toJSON() { return { type: 'capsule', a: this.a.toArray(), b: this.b.toArray(), radius: this.radius }; }
+import * as THREE from 'three';
+
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const lerp  = (a, b, t)   => a + (b - a) * t;
+
+// ─── Value noise for wind turbulence ─────────────────────────────────────────
+function hash(n) { return Math.sin(n) * 43758.5453 % 1; }
+function noise3(x, y, z) {
+  const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
+  const fx = x - ix, fy = y - iy, fz = z - iz;
+  const ux = fx * fx * (3 - 2 * fx);
+  const uy = fy * fy * (3 - 2 * fy);
+  const uz = fz * fz * (3 - 2 * fz);
+  const n000 = hash(ix + iy * 57 + iz * 113);
+  const n100 = hash(ix + 1 + iy * 57 + iz * 113);
+  const n010 = hash(ix + (iy + 1) * 57 + iz * 113);
+  const n110 = hash(ix + 1 + (iy + 1) * 57 + iz * 113);
+  const n001 = hash(ix + iy * 57 + (iz + 1) * 113);
+  const n101 = hash(ix + 1 + iy * 57 + (iz + 1) * 113);
+  const n011 = hash(ix + (iy + 1) * 57 + (iz + 1) * 113);
+  const n111 = hash(ix + 1 + (iy + 1) * 57 + (iz + 1) * 113);
+  return lerp(
+    lerp(lerp(n000, n100, ux), lerp(n010, n110, ux), uy),
+    lerp(lerp(n001, n101, ux), lerp(n011, n111, ux), uy),
+    uz
+  );
+}
+
+// ─── WindField ───────────────────────────────────────────────────────────────
+export class WindField {
+  constructor(opts = {}) {
+    this.direction    = (opts.direction ?? new THREE.Vector3(1, 0, 0)).clone().normalize();
+    this.strength     = opts.strength    ?? 1.0;
+    this.turbulence   = opts.turbulence  ?? 0.3;
+    this.gustFreq     = opts.gustFreq    ?? 0.5;
+    this.gustStr      = opts.gustStr     ?? 0.4;
+    this.noiseScale   = opts.noiseScale  ?? 0.8;
+    this.noiseSpeed   = opts.noiseSpeed  ?? 0.6;
+    this._time        = 0;
+  }
+
+  // Sample wind force at world position p at time t
+  sample(p, dt = 0.016) {
+    this._time += dt;
+    const t = this._time;
+    const ns = this.noiseScale;
+    const nx = noise3(p.x * ns, p.y * ns, t * this.noiseSpeed);
+    const ny = noise3(p.y * ns, p.z * ns, t * this.noiseSpeed + 1.5);
+    const nz = noise3(p.z * ns, p.x * ns, t * this.noiseSpeed + 3.0);
+    const turbVec = new THREE.Vector3(nx - 0.5, ny - 0.5, nz - 0.5)
+      .multiplyScalar(this.turbulence * 2);
+    // Gust
+    const gust = Math.max(0, Math.sin(t * this.gustFreq * Math.PI * 2)) * this.gustStr;
+    const base = this.direction.clone().multiplyScalar(this.strength + gust);
+    return base.add(turbVec);
+  }
+
+  setDirection(v) { this.direction.copy(v).normalize(); }
+  setStrength(s)  { this.strength = s; }
+}
+
+// ─── Colliders ────────────────────────────────────────────────────────────────
+export class SphereCollider {
+  constructor(center, radius) {
+    this.center = center.clone();
+    this.radius = radius;
+    this.type   = 'sphere';
+  }
+  // Push point outside sphere, returns true if collision
+  resolve(point, particleRadius = 0.005) {
+    const d = point.distanceTo(this.center);
+    const r = this.radius + particleRadius;
+    if (d < r) {
+      const n = point.clone().sub(this.center).normalize();
+      point.copy(this.center).add(n.multiplyScalar(r));
+      return true;
+    }
+    return false;
+  }
+  update(center) { this.center.copy(center); }
+  toJSON() { return { type: 'sphere', center: this.center.toArray(), radius: this.radius }; }
+}
+
+export class CapsuleCollider {
+  constructor(a, b, radius) {
+    this.a      = a.clone();
+    this.b      = b.clone();
+    this.radius = radius;
+    this.type   = 'capsule';
+  }
+  // Closest point on segment a-b to p
+  _closestPoint(p) {
+    const ab = this.b.clone().sub(this.a);
+    const t  = clamp(p.clone().sub(this.a).dot(ab) / ab.lengthSq(), 0, 1);
+    return this.a.clone().add(ab.multiplyScalar(t));
+  }
+  resolve(point, particleRadius = 0.005) {
+    const cp = this._closestPoint(point);
+    const d  = point.distanceTo(cp);
+    const r  = this.radius + particleRadius;
+    if (d < r) {
+      const n = point.clone().sub(cp).normalize();
+      point.copy(cp).add(n.multiplyScalar(r));
+      return true;
+    }
+    return false;
+  }
+  update(a, b) { this.a.copy(a); this.b.copy(b); }
+  toJSON() { return { type: 'capsule', a: this.a.toArray(), b: this.b.toArray(), radius: this.radius }; }
 }
 
 // ─── HairWindCollision ────────────────────────────────────────────────────────

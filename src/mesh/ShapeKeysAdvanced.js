@@ -3,5 +3,342 @@
 // Features: corrective shapes, driven shapes, combination shapes,
 //           muscle simulation, inbetween shapes, shape key drivers
 
-import * as THREE from 'three';\n\n// ─── Shape Key Creation ───────────────────────────────────────────────────────\n\nexport function createAdvancedShapeKey(name, mesh, opts = {}) {\n  const pos = mesh.geometry.attributes.position;\n  return {\n    id:           crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),\n    name,\n    data:         new Float32Array(pos.array),\n    value:        0,\n    mute:         false,\n    locked:       false,\n    relativeKey:  opts.relativeKey  ?? 'Basis',\n    driver:       opts.driver       ?? null,   // { type, boneA, boneB, axis, minAngle, maxAngle }\n    range:        opts.range        ?? [0, 1],\n    sliderMin:    opts.sliderMin    ?? 0,\n    sliderMax:    opts.sliderMax    ?? 1,\n    category:     opts.category     ?? 'shape', // 'shape' | 'corrective' | 'muscle' | 'inbetween'\n    inbetweens:   opts.inbetweens   ?? [],       // [{ value, data }] for multi-target interpolation\n    combinations: opts.combinations ?? [],       // [{ keyName, weight }] combo shapes\n  };\n}\n\nexport function addAdvancedShapeKey(keys, name, mesh, opts = {}) {\n  const k = createAdvancedShapeKey(name, mesh, opts);\n  keys.push(k);\n  return k;\n}\n\nexport function removeShapeKey(keys, id) {\n  const i = keys.findIndex(k => k.id === id);\n  if (i !== -1) keys.splice(i, 1);\n  return keys;\n}\n\n// ─── Corrective Shape Keys ────────────────────────────────────────────────────\n\n/**\n * Create a corrective shape key that triggers when a bone reaches a certain angle\n * triggerBone: bone name, triggerAngle: degrees, tolerance: degrees\n */\nexport function createCorrectiveShapeKey(name, mesh, triggerBone, triggerAngle, tolerance = 15, opts = {}) {\n  return createAdvancedShapeKey(name, mesh, {\n    ...opts,\n    category: 'corrective',\n    driver: {\n      type:        'bone_angle',\n      bone:        triggerBone,\n      triggerAngle,\n      tolerance,\n      axis:        opts.axis ?? 'z',\n    },\n  });\n}\n\nexport function evaluateCorrectiveShapeKey(key, skeleton) {\n  if (!key.driver || key.driver.type !== 'bone_angle') return key.value;\n  const bone = skeleton?.bones?.find(b => b.name === key.driver.bone);\n  if (!bone) return 0;\n\n  const euler = new THREE.Euler().setFromQuaternion(bone.quaternion);\n  const axisMap = { x: euler.x, y: euler.y, z: euler.z };\n  const angle = (axisMap[key.driver.axis] ?? 0) * 180 / Math.PI;\n  const diff = Math.abs(angle - key.driver.triggerAngle);\n\n  if (diff > key.driver.tolerance) return 0;\n  return 1 - diff / key.driver.tolerance;\n}\n\n// ─── Driven Shape Keys ────────────────────────────────────────────────────────\n\nexport function createDrivenShapeKey(name, mesh, driverConfig, opts = {}) {\n  return createAdvancedShapeKey(name, mesh, {\n    ...opts,\n    category: 'shape',\n    driver: driverConfig,\n  });\n}\n\nexport function evaluateDrivenShapeKey(key, context = {}) {\n  if (!key.driver) return key.value;\n  const { type } = key.driver;\n\n  switch (type) {\n    case 'bone_angle': return evaluateCorrectiveShapeKey(key, context.skeleton);\n    case 'bone_location': {\n      const bone = context.skeleton?.bones?.find(b => b.name === key.driver.bone);\n      if (!bone) return 0;\n      const val = bone.position[key.driver.axis ?? 'y'];\n      return THREE.MathUtils.mapLinear(val, key.driver.min ?? 0, key.driver.max ?? 1, 0, 1);\n    }\n    case 'custom': return key.driver.evaluate?.(context) ?? 0;\n    default: return key.value;\n  }\n}\n\n// ─── Combination Shapes ───────────────────────────────────────────────────────\n\n/**\n * A combination shape activates only when multiple shapes are active simultaneously\n * Useful for elbow/shoulder correctives that only need fixing at specific pose combos\n */\nexport function createCombinationShapeKey(name, mesh, combinations, opts = {}) {\n  return createAdvancedShapeKey(name, mesh, {\n    ...opts,\n    category: 'corrective',\n    combinations, // [{ keyName: 'smile', weight: 0.8 }, { keyName: 'eyeClose', weight: 0.6 }]\n  });\n}\n\nexport function evaluateCombinationWeight(key, keys) {\n  if (!key.combinations?.length) return key.value;\n  let combo = 1;\n  for (const c of key.combinations) {\n    const other = keys.find(k => k.name === c.keyName);\n    if (!other) return 0;\n    combo *= Math.min(1, other.value / (c.weight || 1));\n  }\n  return combo;\n}\n\n// ─── Inbetween Shapes ────────────────────────────────────────────────────────\n\n/**\n * Inbetween shapes define intermediate targets at specific value points\n * e.g. a shape at value=0.5 that adjusts the blend between 0 and 1\n */\nexport function addInbetween(key, atValue, mesh) {\n  const pos = mesh.geometry.attributes.position;\n  key.inbetweens.push({\n    value: atValue,\n    data:  new Float32Array(pos.array),\n  });\n  key.inbetweens.sort((a, b) => a.value - b.value);\n}\n\nfunction interpolateInbetween(key, t) {\n  if (!key.inbetweens?.length) return null;\n\n  // Add boundary points\n  const points = [\n    { value: 0, data: key.inbetweens[0]?.data ?? key.data },\n    ...key.inbetweens,\n    { value: 1, data: key.data },\n  ];\n\n  // Find bracketing inbetweens\n  let lo = points[0], hi = points[points.length - 1];\n  for (let i = 0; i < points.length - 1; i++) {\n    if (t >= points[i].value && t <= points[i+1].value) {\n      lo = points[i]; hi = points[i+1]; break;\n    }\n  }\n\n  const alpha = (hi.value - lo.value) > 0\n    ? (t - lo.value) / (hi.value - lo.value) : 0;\n\n  const result = new Float32Array(lo.data.length);\n  for (let i = 0; i < result.length; i++) {\n    result[i] = lo.data[i] * (1 - alpha) + hi.data[i] * alpha;\n  }\n  return result;\n}\n\n// ─── Shape Key Evaluation ─────────────────────────────────────────────────────\n\nexport function evaluateShapeKeysAdvanced(mesh, keys, context = {}) {\n  if (!keys?.length || !mesh?.geometry?.attributes?.position) return;\n\n  const pos   = mesh.geometry.attributes.position;\n  const basis = keys.find(k => k.name === 'Basis');\n  if (!basis) return;\n\n  // Start from basis\n  for (let i = 0; i < pos.array.length; i++) pos.array[i] = basis.data[i];\n\n  for (const key of keys) {\n    if (key.name === 'Basis' || key.mute) continue;\n\n    // Get effective value\n    let value = key.value;\n    if (key.driver) value = evaluateDrivenShapeKey(key, context);\n    if (key.combinations?.length) value = evaluateCombinationWeight(key, keys);\n    value = Math.max(key.range[0], Math.min(key.range[1], value));\n    if (value === 0) continue;\n\n    // Get target data (inbetween or direct)\n    const targetData = key.inbetweens?.length\n      ? interpolateInbetween(key, value)\n      : key.data;\n\n    if (!targetData) continue;\n\n    // Get relative basis\n    const relKey = keys.find(k => k.name === key.relativeKey);\n    const relData = relKey?.data ?? basis.data;\n\n    // Apply delta\n    for (let i = 0; i < pos.array.length; i++) {\n      pos.array[i] += (targetData[i] - relData[i]) * value;\n    }\n  }\n\n  pos.needsUpdate = true;\n  mesh.geometry.computeVertexNormals();\n}\n\n// ─── Muscle Simulation ────────────────────────────────────────────────────────\n\nexport class MuscleSimulator {\n  constructor(mesh, skeleton) {\n    this.mesh      = mesh;\n    this.skeleton  = skeleton;\n    this.muscles   = [];\n    this.restPos   = new Float32Array(mesh.geometry.attributes.position.array);\n    this.enabled   = true;\n  }\n\n  addMuscle(options = {}) {\n    const {\n      name        = 'Muscle',\n      originBone  = null,   // bone at muscle origin\n      insertBone  = null,   // bone at muscle insertion\n      bulgeAxis   = 'y',    // which axis the muscle bulges on\n      bulgeAmount = 0.05,   // max bulge at full contraction\n      affectedVerts = [],   // vertex indices affected\n      falloff     = 2.0,    // distance falloff\n    } = options;\n\n    this.muscles.push({ name, originBone, insertBone, bulgeAxis, bulgeAmount, affectedVerts, falloff, _prevAngle: 0 });\n  }\n\n  autoDetectMuscles() {\n    // Auto-create muscles for standard joints\n    const pairs = [\n      { name: 'LeftBicep',   origin: 'LeftArm',    insert: 'LeftForeArm',  bulgeAxis: 'z', bulgeAmount: 0.04 },\n      { name: 'RightBicep',  origin: 'RightArm',   insert: 'RightForeArm', bulgeAxis: 'z', bulgeAmount: 0.04 },\n      { name: 'LeftQuad',    origin: 'LeftUpLeg',  insert: 'LeftLeg',      bulgeAxis: 'z', bulgeAmount: 0.05 },\n      { name: 'RightQuad',   origin: 'RightUpLeg', insert: 'RightLeg',     bulgeAxis: 'z', bulgeAmount: 0.05 },\n      { name: 'LeftCalf',    origin: 'LeftLeg',    insert: 'LeftFoot',     bulgeAxis: 'z', bulgeAmount: 0.03 },\n      { name: 'RightCalf',   origin: 'RightLeg',   insert: 'RightFoot',    bulgeAxis: 'z', bulgeAmount: 0.03 },\n    ];\n\n    pairs.forEach(p => {\n      const ob = this.skeleton.bones.find(b => b.name.includes(p.origin));\n      const ib = this.skeleton.bones.find(b => b.name.includes(p.insert));\n      if (ob && ib) {\n        this.addMuscle({ ...p, originBone: ob.name, insertBone: ib.name });\n      }\n    });\n  }\n\n  update() {\n    if (!this.enabled || !this.muscles.length) return;\n\n    const pos = this.mesh.geometry.attributes.position;\n    pos.array.set(this.restPos);\n\n    this.muscles.forEach(muscle => {\n      const ob = this.skeleton.bones.find(b => b.name === muscle.originBone);\n      const ib = this.skeleton.bones.find(b => b.name === muscle.insertBone);\n      if (!ob || !ib) return;\n\n      // Get joint angle to determine contraction\n      const euler = new THREE.Euler().setFromQuaternion(ib.quaternion);\n      const angle = Math.abs(euler[muscle.bulgeAxis] ?? euler.z);\n      const contraction = Math.sin(angle) * muscle.bulgeAmount;\n\n      // Get bone midpoint world position\n      const op = new THREE.Vector3(), ip = new THREE.Vector3();\n      ob.getWorldPosition(op); ib.getWorldPosition(ip);\n      const mid = op.clone().lerp(ip, 0.5);\n\n      // Apply bulge to nearby vertices\n      for (let i = 0; i < pos.count; i++) {\n        const vp = new THREE.Vector3().fromBufferAttribute(pos, i);\n        const dist = vp.distanceTo(mid);\n        const influence = Math.exp(-dist * muscle.falloff) * contraction;\n\n        if (Math.abs(influence) < 0.0001) continue;\n\n        // Bulge outward from bone axis\n        const toVert = vp.clone().sub(mid).normalize();\n        pos.setXYZ(i,\n          pos.getX(i) + toVert.x * influence,\n          pos.getY(i) + toVert.y * influence,\n          pos.getZ(i) + toVert.z * influence,\n        );\n      }\n    });\n\n    pos.needsUpdate = true;\n    this.mesh.geometry.computeVertexNormals();\n  }\n\n  setEnabled(v) { this.enabled = v; }\n  getMuscles()  { return this.muscles; }\n  dispose()     { this.muscles = []; }\n}\n\n// ─── Preset Shape Keys ────────────────────────────────────────────────────────\n\nexport const FACE_SHAPE_PRESETS = [\n  'Basis', 'JawOpen', 'JawLeft', 'JawRight', 'JawForward',\n  'MouthSmileLeft', 'MouthSmileRight', 'MouthFrownLeft', 'MouthFrownRight',\n  'MouthPucker', 'MouthWide', 'MouthUpperUp', 'MouthLowerDown',\n  'EyeBlinkLeft', 'EyeBlinkRight', 'EyeOpenLeft', 'EyeOpenRight',\n  'EyeSquintLeft', 'EyeSquintRight', 'EyeWideLeft', 'EyeWideRight',\n  'BrowInnerUp', 'BrowOuterUpLeft', 'BrowOuterUpRight',\n  'BrowDownLeft', 'BrowDownRight',\n  'CheekPuff', 'CheekSquintLeft', 'CheekSquintRight',\n  'NoseSneerLeft', 'NoseSneerRight',\n  'TongueOut',\n];\n\nexport const BODY_SHAPE_PRESETS = [\n  'Basis',\n  'ElbowBendLeft', 'ElbowBendRight',\n  'KneeBendLeft', 'KneeBendRight',\n  'ShoulderRaiseLeft', 'ShoulderRaiseRight',\n  'SpineBend', 'SpineTwist',\n  'HipShift',\n];\n\nexport default {\n  createAdvancedShapeKey, addAdvancedShapeKey, removeShapeKey,\n  createCorrectiveShapeKey, evaluateCorrectiveShapeKey,\n  createDrivenShapeKey, evaluateDrivenShapeKey,\n  createCombinationShapeKey, evaluateCombinationWeight,\n  addInbetween, evaluateShapeKeysAdvanced,\n  MuscleSimulator,\n  FACE_SHAPE_PRESETS, BODY_SHAPE_PRESETS,\n};\nexport function mirrorShapeKey(key, axis) { axis=axis||'x'; var m={...key,id:Math.random().toString(36).slice(2),name:key.name+'_mirror',data:new Float32Array(key.data)}; var ai={x:0,y:1,z:2}[axis]||0; for(var i=ai;i<m.data.length;i+=3)m.data[i]*=-1; return m; }\nexport function blendShapeKeys(a, b, t) { t=t||0.5; if(a.data.length!==b.data.length)return a; var d=new Float32Array(a.data.length); for(var i=0;i<d.length;i++)d[i]=a.data[i]*(1-t)+b.data[i]*t; return {...a,name:a.name+'_blend',data:d}; }\nexport function driverShapeKey(key, cfg) { return {...key,driver:cfg}; }\nexport function buildMorphTargetsFromKeys(keys) { return keys.filter(k=>k.name!=='Basis').map(k=>({name:k.name,vertices:Array.from(k.data)})); }
+import * as THREE from 'three';
+
+// ─── Shape Key Creation ───────────────────────────────────────────────────────
+
+export function createAdvancedShapeKey(name, mesh, opts = {}) {
+  const pos = mesh.geometry.attributes.position;
+  return {
+    id:           crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2),
+    name,
+    data:         new Float32Array(pos.array),
+    value:        0,
+    mute:         false,
+    locked:       false,
+    relativeKey:  opts.relativeKey  ?? 'Basis',
+    driver:       opts.driver       ?? null,   // { type, boneA, boneB, axis, minAngle, maxAngle }
+    range:        opts.range        ?? [0, 1],
+    sliderMin:    opts.sliderMin    ?? 0,
+    sliderMax:    opts.sliderMax    ?? 1,
+    category:     opts.category     ?? 'shape', // 'shape' | 'corrective' | 'muscle' | 'inbetween'
+    inbetweens:   opts.inbetweens   ?? [],       // [{ value, data }] for multi-target interpolation
+    combinations: opts.combinations ?? [],       // [{ keyName, weight }] combo shapes
+  };
+}
+
+export function addAdvancedShapeKey(keys, name, mesh, opts = {}) {
+  const k = createAdvancedShapeKey(name, mesh, opts);
+  keys.push(k);
+  return k;
+}
+
+export function removeShapeKey(keys, id) {
+  const i = keys.findIndex(k => k.id === id);
+  if (i !== -1) keys.splice(i, 1);
+  return keys;
+}
+
+// ─── Corrective Shape Keys ────────────────────────────────────────────────────
+
+/**
+ * Create a corrective shape key that triggers when a bone reaches a certain angle
+ * triggerBone: bone name, triggerAngle: degrees, tolerance: degrees
+ */
+export function createCorrectiveShapeKey(name, mesh, triggerBone, triggerAngle, tolerance = 15, opts = {}) {
+  return createAdvancedShapeKey(name, mesh, {
+    ...opts,
+    category: 'corrective',
+    driver: {
+      type:        'bone_angle',
+      bone:        triggerBone,
+      triggerAngle,
+      tolerance,
+      axis:        opts.axis ?? 'z',
+    },
+  });
+}
+
+export function evaluateCorrectiveShapeKey(key, skeleton) {
+  if (!key.driver || key.driver.type !== 'bone_angle') return key.value;
+  const bone = skeleton?.bones?.find(b => b.name === key.driver.bone);
+  if (!bone) return 0;
+
+  const euler = new THREE.Euler().setFromQuaternion(bone.quaternion);
+  const axisMap = { x: euler.x, y: euler.y, z: euler.z };
+  const angle = (axisMap[key.driver.axis] ?? 0) * 180 / Math.PI;
+  const diff = Math.abs(angle - key.driver.triggerAngle);
+
+  if (diff > key.driver.tolerance) return 0;
+  return 1 - diff / key.driver.tolerance;
+}
+
+// ─── Driven Shape Keys ────────────────────────────────────────────────────────
+
+export function createDrivenShapeKey(name, mesh, driverConfig, opts = {}) {
+  return createAdvancedShapeKey(name, mesh, {
+    ...opts,
+    category: 'shape',
+    driver: driverConfig,
+  });
+}
+
+export function evaluateDrivenShapeKey(key, context = {}) {
+  if (!key.driver) return key.value;
+  const { type } = key.driver;
+
+  switch (type) {
+    case 'bone_angle': return evaluateCorrectiveShapeKey(key, context.skeleton);
+    case 'bone_location': {
+      const bone = context.skeleton?.bones?.find(b => b.name === key.driver.bone);
+      if (!bone) return 0;
+      const val = bone.position[key.driver.axis ?? 'y'];
+      return THREE.MathUtils.mapLinear(val, key.driver.min ?? 0, key.driver.max ?? 1, 0, 1);
+    }
+    case 'custom': return key.driver.evaluate?.(context) ?? 0;
+    default: return key.value;
+  }
+}
+
+// ─── Combination Shapes ───────────────────────────────────────────────────────
+
+/**
+ * A combination shape activates only when multiple shapes are active simultaneously
+ * Useful for elbow/shoulder correctives that only need fixing at specific pose combos
+ */
+export function createCombinationShapeKey(name, mesh, combinations, opts = {}) {
+  return createAdvancedShapeKey(name, mesh, {
+    ...opts,
+    category: 'corrective',
+    combinations, // [{ keyName: 'smile', weight: 0.8 }, { keyName: 'eyeClose', weight: 0.6 }]
+  });
+}
+
+export function evaluateCombinationWeight(key, keys) {
+  if (!key.combinations?.length) return key.value;
+  let combo = 1;
+  for (const c of key.combinations) {
+    const other = keys.find(k => k.name === c.keyName);
+    if (!other) return 0;
+    combo *= Math.min(1, other.value / (c.weight || 1));
+  }
+  return combo;
+}
+
+// ─── Inbetween Shapes ────────────────────────────────────────────────────────
+
+/**
+ * Inbetween shapes define intermediate targets at specific value points
+ * e.g. a shape at value=0.5 that adjusts the blend between 0 and 1
+ */
+export function addInbetween(key, atValue, mesh) {
+  const pos = mesh.geometry.attributes.position;
+  key.inbetweens.push({
+    value: atValue,
+    data:  new Float32Array(pos.array),
+  });
+  key.inbetweens.sort((a, b) => a.value - b.value);
+}
+
+function interpolateInbetween(key, t) {
+  if (!key.inbetweens?.length) return null;
+
+  // Add boundary points
+  const points = [
+    { value: 0, data: key.inbetweens[0]?.data ?? key.data },
+    ...key.inbetweens,
+    { value: 1, data: key.data },
+  ];
+
+  // Find bracketing inbetweens
+  let lo = points[0], hi = points[points.length - 1];
+  for (let i = 0; i < points.length - 1; i++) {
+    if (t >= points[i].value && t <= points[i+1].value) {
+      lo = points[i]; hi = points[i+1]; break;
+    }
+  }
+
+  const alpha = (hi.value - lo.value) > 0
+    ? (t - lo.value) / (hi.value - lo.value) : 0;
+
+  const result = new Float32Array(lo.data.length);
+  for (let i = 0; i < result.length; i++) {
+    result[i] = lo.data[i] * (1 - alpha) + hi.data[i] * alpha;
+  }
+  return result;
+}
+
+// ─── Shape Key Evaluation ─────────────────────────────────────────────────────
+
+export function evaluateShapeKeysAdvanced(mesh, keys, context = {}) {
+  if (!keys?.length || !mesh?.geometry?.attributes?.position) return;
+
+  const pos   = mesh.geometry.attributes.position;
+  const basis = keys.find(k => k.name === 'Basis');
+  if (!basis) return;
+
+  // Start from basis
+  for (let i = 0; i < pos.array.length; i++) pos.array[i] = basis.data[i];
+
+  for (const key of keys) {
+    if (key.name === 'Basis' || key.mute) continue;
+
+    // Get effective value
+    let value = key.value;
+    if (key.driver) value = evaluateDrivenShapeKey(key, context);
+    if (key.combinations?.length) value = evaluateCombinationWeight(key, keys);
+    value = Math.max(key.range[0], Math.min(key.range[1], value));
+    if (value === 0) continue;
+
+    // Get target data (inbetween or direct)
+    const targetData = key.inbetweens?.length
+      ? interpolateInbetween(key, value)
+      : key.data;
+
+    if (!targetData) continue;
+
+    // Get relative basis
+    const relKey = keys.find(k => k.name === key.relativeKey);
+    const relData = relKey?.data ?? basis.data;
+
+    // Apply delta
+    for (let i = 0; i < pos.array.length; i++) {
+      pos.array[i] += (targetData[i] - relData[i]) * value;
+    }
+  }
+
+  pos.needsUpdate = true;
+  mesh.geometry.computeVertexNormals();
+}
+
+// ─── Muscle Simulation ────────────────────────────────────────────────────────
+
+export class MuscleSimulator {
+  constructor(mesh, skeleton) {
+    this.mesh      = mesh;
+    this.skeleton  = skeleton;
+    this.muscles   = [];
+    this.restPos   = new Float32Array(mesh.geometry.attributes.position.array);
+    this.enabled   = true;
+  }
+
+  addMuscle(options = {}) {
+    const {
+      name        = 'Muscle',
+      originBone  = null,   // bone at muscle origin
+      insertBone  = null,   // bone at muscle insertion
+      bulgeAxis   = 'y',    // which axis the muscle bulges on
+      bulgeAmount = 0.05,   // max bulge at full contraction
+      affectedVerts = [],   // vertex indices affected
+      falloff     = 2.0,    // distance falloff
+    } = options;
+
+    this.muscles.push({ name, originBone, insertBone, bulgeAxis, bulgeAmount, affectedVerts, falloff, _prevAngle: 0 });
+  }
+
+  autoDetectMuscles() {
+    // Auto-create muscles for standard joints
+    const pairs = [
+      { name: 'LeftBicep',   origin: 'LeftArm',    insert: 'LeftForeArm',  bulgeAxis: 'z', bulgeAmount: 0.04 },
+      { name: 'RightBicep',  origin: 'RightArm',   insert: 'RightForeArm', bulgeAxis: 'z', bulgeAmount: 0.04 },
+      { name: 'LeftQuad',    origin: 'LeftUpLeg',  insert: 'LeftLeg',      bulgeAxis: 'z', bulgeAmount: 0.05 },
+      { name: 'RightQuad',   origin: 'RightUpLeg', insert: 'RightLeg',     bulgeAxis: 'z', bulgeAmount: 0.05 },
+      { name: 'LeftCalf',    origin: 'LeftLeg',    insert: 'LeftFoot',     bulgeAxis: 'z', bulgeAmount: 0.03 },
+      { name: 'RightCalf',   origin: 'RightLeg',   insert: 'RightFoot',    bulgeAxis: 'z', bulgeAmount: 0.03 },
+    ];
+
+    pairs.forEach(p => {
+      const ob = this.skeleton.bones.find(b => b.name.includes(p.origin));
+      const ib = this.skeleton.bones.find(b => b.name.includes(p.insert));
+      if (ob && ib) {
+        this.addMuscle({ ...p, originBone: ob.name, insertBone: ib.name });
+      }
+    });
+  }
+
+  update() {
+    if (!this.enabled || !this.muscles.length) return;
+
+    const pos = this.mesh.geometry.attributes.position;
+    pos.array.set(this.restPos);
+
+    this.muscles.forEach(muscle => {
+      const ob = this.skeleton.bones.find(b => b.name === muscle.originBone);
+      const ib = this.skeleton.bones.find(b => b.name === muscle.insertBone);
+      if (!ob || !ib) return;
+
+      // Get joint angle to determine contraction
+      const euler = new THREE.Euler().setFromQuaternion(ib.quaternion);
+      const angle = Math.abs(euler[muscle.bulgeAxis] ?? euler.z);
+      const contraction = Math.sin(angle) * muscle.bulgeAmount;
+
+      // Get bone midpoint world position
+      const op = new THREE.Vector3(), ip = new THREE.Vector3();
+      ob.getWorldPosition(op); ib.getWorldPosition(ip);
+      const mid = op.clone().lerp(ip, 0.5);
+
+      // Apply bulge to nearby vertices
+      for (let i = 0; i < pos.count; i++) {
+        const vp = new THREE.Vector3().fromBufferAttribute(pos, i);
+        const dist = vp.distanceTo(mid);
+        const influence = Math.exp(-dist * muscle.falloff) * contraction;
+
+        if (Math.abs(influence) < 0.0001) continue;
+
+        // Bulge outward from bone axis
+        const toVert = vp.clone().sub(mid).normalize();
+        pos.setXYZ(i,
+          pos.getX(i) + toVert.x * influence,
+          pos.getY(i) + toVert.y * influence,
+          pos.getZ(i) + toVert.z * influence,
+        );
+      }
+    });
+
+    pos.needsUpdate = true;
+    this.mesh.geometry.computeVertexNormals();
+  }
+
+  setEnabled(v) { this.enabled = v; }
+  getMuscles()  { return this.muscles; }
+  dispose()     { this.muscles = []; }
+}
+
+// ─── Preset Shape Keys ────────────────────────────────────────────────────────
+
+export const FACE_SHAPE_PRESETS = [
+  'Basis', 'JawOpen', 'JawLeft', 'JawRight', 'JawForward',
+  'MouthSmileLeft', 'MouthSmileRight', 'MouthFrownLeft', 'MouthFrownRight',
+  'MouthPucker', 'MouthWide', 'MouthUpperUp', 'MouthLowerDown',
+  'EyeBlinkLeft', 'EyeBlinkRight', 'EyeOpenLeft', 'EyeOpenRight',
+  'EyeSquintLeft', 'EyeSquintRight', 'EyeWideLeft', 'EyeWideRight',
+  'BrowInnerUp', 'BrowOuterUpLeft', 'BrowOuterUpRight',
+  'BrowDownLeft', 'BrowDownRight',
+  'CheekPuff', 'CheekSquintLeft', 'CheekSquintRight',
+  'NoseSneerLeft', 'NoseSneerRight',
+  'TongueOut',
+];
+
+export const BODY_SHAPE_PRESETS = [
+  'Basis',
+  'ElbowBendLeft', 'ElbowBendRight',
+  'KneeBendLeft', 'KneeBendRight',
+  'ShoulderRaiseLeft', 'ShoulderRaiseRight',
+  'SpineBend', 'SpineTwist',
+  'HipShift',
+];
+
+export default {
+  createAdvancedShapeKey, addAdvancedShapeKey, removeShapeKey,
+  createCorrectiveShapeKey, evaluateCorrectiveShapeKey,
+  createDrivenShapeKey, evaluateDrivenShapeKey,
+  createCombinationShapeKey, evaluateCombinationWeight,
+  addInbetween, evaluateShapeKeysAdvanced,
+  MuscleSimulator,
+  FACE_SHAPE_PRESETS, BODY_SHAPE_PRESETS,
+};
+export function mirrorShapeKey(key, axis) { axis=axis||'x'; var m={...key,id:Math.random().toString(36).slice(2),name:key.name+'_mirror',data:new Float32Array(key.data)}; var ai={x:0,y:1,z:2}[axis]||0; for(var i=ai;i<m.data.length;i+=3)m.data[i]*=-1; return m; }
+export function blendShapeKeys(a, b, t) { t=t||0.5; if(a.data.length!==b.data.length)return a; var d=new Float32Array(a.data.length); for(var i=0;i<d.length;i++)d[i]=a.data[i]*(1-t)+b.data[i]*t; return {...a,name:a.name+'_blend',data:d}; }
+export function driverShapeKey(key, cfg) { return {...key,driver:cfg}; }
+export function buildMorphTargetsFromKeys(keys) { return keys.filter(k=>k.name!=='Basis').map(k=>({name:k.name,vertices:Array.from(k.data)})); }
 export function getShapeKeyStats(keys) { return {total:keys.length,active:keys.filter(k=>k.value>0).length,muted:keys.filter(k=>k.mute).length}; }

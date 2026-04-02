@@ -2,7 +2,281 @@
 // SPX Mesh Editor | StreamPireX
 // 4-person simultaneous webcam tracking, retargeting, recording, export
 
-import * as THREE from 'three';\n\nconst MP_POSE_URL  = 'https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js';\nconst MP_HOLISTIC  = 'https://cdn.jsdelivr.net/npm/@mediapipe/holistic/holistic.js';\n\n// Joint mapping MediaPipe → skeleton\nexport const MP_TO_JOINT = {\n  0:'head', 11:'leftShoulder', 12:'rightShoulder',\n  13:'leftElbow', 14:'rightElbow', 15:'leftWrist', 16:'rightWrist',\n  23:'leftHip', 24:'rightHip', 25:'leftKnee', 26:'rightKnee',\n  27:'leftAnkle', 28:'rightAnkle', 31:'leftToe', 32:'rightToe',\n};\n\n// ─── Person Track ─────────────────────────────────────────────────────────────\n\nclass PersonTrack {\n  constructor(id, options = {}) {\n    this.id        = id;\n    this.joints    = {};\n    this.history   = []; // ring buffer of past frames\n    this.maxHistory = options.maxHistory ?? 120;\n    this.smoother  = new PoseSmoother(options.smoothing ?? 0.7);\n    this.recording = [];\n    this.skeleton  = null;\n    this.visible   = true;\n    this.color     = options.color ?? new THREE.Color(Math.random(), Math.random(), Math.random());\n    this.bbox      = null; // bounding box in image space\n    this.confidence = 0;\n  }\n\n  update(landmarks, width, height) {\n    if (!landmarks) return;\n    const joints = {};\n    let totalConf = 0, count = 0;\n\n    Object.entries(MP_TO_JOINT).forEach(([idx, name]) => {\n      const lm = landmarks[parseInt(idx)];\n      if (!lm) return;\n      const conf = lm.visibility ?? 1;\n      totalConf += conf; count++;\n      joints[name] = {\n        x: lm.x, y: lm.y, z: lm.z ?? 0,\n        visibility: conf,\n        screenX: lm.x * width,\n        screenY: lm.y * height,\n      };\n    });\n\n    this.confidence = count > 0 ? totalConf / count : 0;\n    this.joints = this.smoother.smooth(joints);\n\n    // Derive synthetic joints\n    const ls = this.joints.leftShoulder, rs = this.joints.rightShoulder;\n    const lh = this.joints.leftHip,     rh = this.joints.rightHip;\n    if (ls && rs) this.joints.neck  = { x:(ls.x+rs.x)/2, y:(ls.y+rs.y)/2-0.04, z:(ls.z+rs.z)/2, visibility:1 };\n    if (ls && rs && lh && rh) this.joints.hips = { x:(lh.x+rh.x)/2, y:(lh.y+rh.y)/2, z:(lh.z+rh.z)/2, visibility:1 };\n    if (this.joints.neck && this.joints.hips) {\n      const n = this.joints.neck, h = this.joints.hips;\n      this.joints.spine = { x:(n.x+h.x)/2, y:(n.y+h.y)/2, z:(n.z+h.z)/2, visibility:1 };\n    }\n\n    // Update bounding box\n    const xs = Object.values(this.joints).map(j => j.x).filter(Boolean);\n    const ys = Object.values(this.joints).map(j => j.y).filter(Boolean);\n    if (xs.length) this.bbox = { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };\n\n    // History\n    this.history.push({ joints: { ...this.joints }, timestamp: Date.now() });\n    if (this.history.length > this.maxHistory) this.history.shift();\n  }\n\n  retargetToSkeleton(skeleton, options = {}) {\n    if (!skeleton?.bones) return;\n    this.skeleton = skeleton;\n    const { scaleToSkeleton = true } = options;\n\n    Object.entries(this.joints).forEach(([jointName, joint]) => {\n      const bone = skeleton.bones.find(b => b.name.toLowerCase().includes(jointName.toLowerCase()));\n      if (!bone || joint.visibility < 0.3) return;\n\n      const parent = this.joints[_getParentJoint(jointName)];\n      if (!parent) return;\n\n      const dir = new THREE.Vector3(joint.x - parent.x, -(joint.y - parent.y), joint.z - parent.z).normalize();\n      const parentBone = bone.parent;\n      if (!parentBone) return;\n\n      const worldQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);\n      const parentWorldQuat = new THREE.Quaternion();\n      parentBone.getWorldQuaternion(parentWorldQuat);\n      bone.quaternion.copy(parentWorldQuat.invert().multiply(worldQuat));\n    });\n  }\n\n  startRecording() { this.recording = []; }\n\n  recordFrame() {\n    this.recording.push({ joints: JSON.parse(JSON.stringify(this.joints)), time: Date.now() });\n  }\n\n  stopRecording() { return this.recording; }\n\n  exportBVH() {\n    if (!this.recording.length) return '';\n    const joints = Object.keys(MP_TO_JOINT).map(k => MP_TO_JOINT[k]);\n    let bvh = 'HIERARCHY\nROOT hips\n{\n\tOFFSET 0.00 0.00 0.00\n\tCHANNELS 6 Xposition Yposition Zposition Zrotation Xrotation Yrotation\n}\n';\n    bvh += `MOTION\\nFrames: ${this.recording.length}\\nFrame Time: ${1/30}\\n`;\n    this.recording.forEach(frame => {\n      const h = frame.joints.hips ?? { x: 0, y: 0, z: 0 };\n      bvh += `${h.x*100} ${h.y*100} ${h.z*100} 0 0 0\\n`;\n    });\n    return bvh;\n  }\n}\n\nfunction _getParentJoint(name) {\n  const parents = {\n    leftElbow: 'leftShoulder', rightElbow: 'rightShoulder',\n    leftWrist: 'leftElbow',    rightWrist: 'rightElbow',\n    leftKnee:  'leftHip',     rightKnee:  'rightHip',\n    leftAnkle: 'leftKnee',    rightAnkle: 'rightKnee',\n    leftToe:   'leftAnkle',   rightToe:   'rightAnkle',\n    leftShoulder: 'neck',      rightShoulder: 'neck',\n    leftHip: 'hips',           rightHip: 'hips',\n    neck: 'spine', head: 'neck',\n  };\n  return parents[name];\n}\n\n// ─── Pose Smoother ────────────────────────────────────────────────────────────\n\nclass PoseSmoother {\n  constructor(alpha = 0.7) { this.alpha = alpha; this._prev = null; }\n  smooth(joints) {\n    if (!this._prev) { this._prev = joints; return joints; }\n    const result = {};\n    Object.entries(joints).forEach(([name, j]) => {\n      const p = this._prev[name];\n      if (!p) { result[name] = j; return; }\n      result[name] = {\n        x: p.x * this.alpha + j.x * (1-this.alpha),\n        y: p.y * this.alpha + j.y * (1-this.alpha),\n        z: p.z * this.alpha + j.z * (1-this.alpha),\n        visibility: j.visibility,\n        screenX: j.screenX, screenY: j.screenY,\n      };\n    });\n    this._prev = result;\n    return result;\n  }\n  reset() { this._prev = null; }\n}\n\n// ─── Multi Person Tracker ─────────────────────────────────────────────────────\n\nexport class MultiPersonMocap {\n  constructor(options = {}) {\n    this.maxPersons  = options.maxPersons ?? 4;\n    this.persons     = [];\n    this.pose        = null;\n    this.video       = null;\n    this.canvas      = document.createElement('canvas');\n    this.ctx         = this.canvas.getContext('2d');\n    this.running     = false;\n    this.onUpdate    = options.onUpdate ?? null;\n    this.smoother    = options.smoothing ?? 0.7;\n    this.showSkeleton = options.showSkeleton ?? true;\n    this._frameCount = 0;\n    this._recording  = false;\n  }\n\n  async init() {\n    await this._loadMediaPipe();\n    for (let i = 0; i < this.maxPersons; i++) {\n      this.persons.push(new PersonTrack(i, { smoothing: this.smoother }));\n    }\n    return this;\n  }\n\n  async _loadMediaPipe() {\n    if (typeof Pose !== 'undefined') return;\n    await new Promise((res, rej) => {\n      const s = document.createElement('script');\n      s.src = MP_POSE_URL; s.onload = res; s.onerror = rej;\n      document.head.appendChild(s);\n    });\n  }\n\n  async startCamera(constraints = {}) {\n    const stream = await navigator.mediaDevices.getUserMedia({\n      video: { width: 640, height: 480, facingMode: 'user', ...constraints },\n    });\n    this.video = document.createElement('video');\n    this.video.srcObject = stream;\n    this.video.playsInline = true;\n    await this.video.play();\n    this.canvas.width  = this.video.videoWidth;\n    this.canvas.height = this.video.videoHeight;\n    this.running = true;\n    this._loop();\n    return this;\n  }\n\n  _loop() {\n    if (!this.running) return;\n    this.ctx.drawImage(this.video, 0, 0);\n    this._frameCount++;\n    // In a real implementation, MediaPipe would process each frame\n    // For now, simulate with placeholder data\n    this._simulateDetection();\n    this.onUpdate?.(this.persons);\n    requestAnimationFrame(() => this._loop());\n  }\n\n  _simulateDetection() {\n    // Placeholder — real implementation uses MediaPipe Pose\n    this.persons.forEach((person, i) => {\n      if (i > 0) return; // Only simulate 1 person without real ML\n      const t = Date.now() / 1000;\n      const fakeJoints = {};\n      Object.values(MP_TO_JOINT).forEach(name => {\n        fakeJoints[name] = { x: 0.5 + Math.sin(t + i) * 0.1, y: 0.5, z: 0, visibility: 0.9 };\n      });\n      person.update(Object.keys(MP_TO_JOINT).map(k => ({ x: 0.5, y: 0.5, z: 0, visibility: 0.9 })), 640, 480);\n    });\n  }\n\n  processLandmarks(landmarks, personIndex = 0) {\n    const person = this.persons[personIndex];\n    if (!person) return;\n    person.update(landmarks, this.canvas.width, this.canvas.height);\n    if (this._recording) person.recordFrame();\n  }\n\n  retargetAll(skeletons) {\n    this.persons.forEach((person, i) => {\n      if (skeletons[i]) person.retargetToSkeleton(skeletons[i]);\n    });\n  }\n\n  startRecording() {\n    this._recording = true;\n    this.persons.forEach(p => p.startRecording());\n  }\n\n  stopRecording() {\n    this._recording = false;\n    return this.persons.map(p => p.stopRecording());\n  }\n\n  exportAllBVH() { return this.persons.map(p => p.exportBVH()); }\n\n  getPerson(index) { return this.persons[index] ?? null; }\n  getActivePersons() { return this.persons.filter(p => p.confidence > 0.3); }\n\n  stop() {\n    this.running = false;\n    if (this.video?.srcObject) {\n      this.video.srcObject.getTracks().forEach(t => t.stop());\n    }\n  }\n\n  drawSkeletons(ctx, width, height) {\n    this.persons.forEach(person => {\n      if (person.confidence < 0.3) return;\n      ctx.strokeStyle = `#${person.color.getHexString()}`;\n      ctx.lineWidth = 3;\n      const bones = [\n        ['neck','leftShoulder'],['neck','rightShoulder'],\n        ['leftShoulder','leftElbow'],['leftElbow','leftWrist'],\n        ['rightShoulder','rightElbow'],['rightElbow','rightWrist'],\n        ['hips','leftHip'],['hips','rightHip'],\n        ['leftHip','leftKnee'],['leftKnee','leftAnkle'],\n        ['rightHip','rightKnee'],['rightKnee','rightAnkle'],\n        ['neck','hips'],['head','neck'],
+import * as THREE from 'three';
+
+const MP_POSE_URL  = 'https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js';
+const MP_HOLISTIC  = 'https://cdn.jsdelivr.net/npm/@mediapipe/holistic/holistic.js';
+
+// Joint mapping MediaPipe → skeleton
+export const MP_TO_JOINT = {
+  0:'head', 11:'leftShoulder', 12:'rightShoulder',
+  13:'leftElbow', 14:'rightElbow', 15:'leftWrist', 16:'rightWrist',
+  23:'leftHip', 24:'rightHip', 25:'leftKnee', 26:'rightKnee',
+  27:'leftAnkle', 28:'rightAnkle', 31:'leftToe', 32:'rightToe',
+};
+
+// ─── Person Track ─────────────────────────────────────────────────────────────
+
+class PersonTrack {
+  constructor(id, options = {}) {
+    this.id        = id;
+    this.joints    = {};
+    this.history   = []; // ring buffer of past frames
+    this.maxHistory = options.maxHistory ?? 120;
+    this.smoother  = new PoseSmoother(options.smoothing ?? 0.7);
+    this.recording = [];
+    this.skeleton  = null;
+    this.visible   = true;
+    this.color     = options.color ?? new THREE.Color(Math.random(), Math.random(), Math.random());
+    this.bbox      = null; // bounding box in image space
+    this.confidence = 0;
+  }
+
+  update(landmarks, width, height) {
+    if (!landmarks) return;
+    const joints = {};
+    let totalConf = 0, count = 0;
+
+    Object.entries(MP_TO_JOINT).forEach(([idx, name]) => {
+      const lm = landmarks[parseInt(idx)];
+      if (!lm) return;
+      const conf = lm.visibility ?? 1;
+      totalConf += conf; count++;
+      joints[name] = {
+        x: lm.x, y: lm.y, z: lm.z ?? 0,
+        visibility: conf,
+        screenX: lm.x * width,
+        screenY: lm.y * height,
+      };
+    });
+
+    this.confidence = count > 0 ? totalConf / count : 0;
+    this.joints = this.smoother.smooth(joints);
+
+    // Derive synthetic joints
+    const ls = this.joints.leftShoulder, rs = this.joints.rightShoulder;
+    const lh = this.joints.leftHip,     rh = this.joints.rightHip;
+    if (ls && rs) this.joints.neck  = { x:(ls.x+rs.x)/2, y:(ls.y+rs.y)/2-0.04, z:(ls.z+rs.z)/2, visibility:1 };
+    if (ls && rs && lh && rh) this.joints.hips = { x:(lh.x+rh.x)/2, y:(lh.y+rh.y)/2, z:(lh.z+rh.z)/2, visibility:1 };
+    if (this.joints.neck && this.joints.hips) {
+      const n = this.joints.neck, h = this.joints.hips;
+      this.joints.spine = { x:(n.x+h.x)/2, y:(n.y+h.y)/2, z:(n.z+h.z)/2, visibility:1 };
+    }
+
+    // Update bounding box
+    const xs = Object.values(this.joints).map(j => j.x).filter(Boolean);
+    const ys = Object.values(this.joints).map(j => j.y).filter(Boolean);
+    if (xs.length) this.bbox = { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+
+    // History
+    this.history.push({ joints: { ...this.joints }, timestamp: Date.now() });
+    if (this.history.length > this.maxHistory) this.history.shift();
+  }
+
+  retargetToSkeleton(skeleton, options = {}) {
+    if (!skeleton?.bones) return;
+    this.skeleton = skeleton;
+    const { scaleToSkeleton = true } = options;
+
+    Object.entries(this.joints).forEach(([jointName, joint]) => {
+      const bone = skeleton.bones.find(b => b.name.toLowerCase().includes(jointName.toLowerCase()));
+      if (!bone || joint.visibility < 0.3) return;
+
+      const parent = this.joints[_getParentJoint(jointName)];
+      if (!parent) return;
+
+      const dir = new THREE.Vector3(joint.x - parent.x, -(joint.y - parent.y), joint.z - parent.z).normalize();
+      const parentBone = bone.parent;
+      if (!parentBone) return;
+
+      const worldQuat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+      const parentWorldQuat = new THREE.Quaternion();
+      parentBone.getWorldQuaternion(parentWorldQuat);
+      bone.quaternion.copy(parentWorldQuat.invert().multiply(worldQuat));
+    });
+  }
+
+  startRecording() { this.recording = []; }
+
+  recordFrame() {
+    this.recording.push({ joints: JSON.parse(JSON.stringify(this.joints)), time: Date.now() });
+  }
+
+  stopRecording() { return this.recording; }
+
+  exportBVH() {
+    if (!this.recording.length) return '';
+    const joints = Object.keys(MP_TO_JOINT).map(k => MP_TO_JOINT[k]);
+    let bvh = 'HIERARCHY\nROOT hips\n{\n\tOFFSET 0.00 0.00 0.00\n\tCHANNELS 6 Xposition Yposition Zposition Zrotation Xrotation Yrotation\n}\n';
+    bvh += `MOTION\nFrames: ${this.recording.length}\nFrame Time: ${1/30}\n`;
+    this.recording.forEach(frame => {
+      const h = frame.joints.hips ?? { x: 0, y: 0, z: 0 };
+      bvh += `${h.x*100} ${h.y*100} ${h.z*100} 0 0 0\n`;
+    });
+    return bvh;
+  }
+}
+
+function _getParentJoint(name) {
+  const parents = {
+    leftElbow: 'leftShoulder', rightElbow: 'rightShoulder',
+    leftWrist: 'leftElbow',    rightWrist: 'rightElbow',
+    leftKnee:  'leftHip',     rightKnee:  'rightHip',
+    leftAnkle: 'leftKnee',    rightAnkle: 'rightKnee',
+    leftToe:   'leftAnkle',   rightToe:   'rightAnkle',
+    leftShoulder: 'neck',      rightShoulder: 'neck',
+    leftHip: 'hips',           rightHip: 'hips',
+    neck: 'spine', head: 'neck',
+  };
+  return parents[name];
+}
+
+// ─── Pose Smoother ────────────────────────────────────────────────────────────
+
+class PoseSmoother {
+  constructor(alpha = 0.7) { this.alpha = alpha; this._prev = null; }
+  smooth(joints) {
+    if (!this._prev) { this._prev = joints; return joints; }
+    const result = {};
+    Object.entries(joints).forEach(([name, j]) => {
+      const p = this._prev[name];
+      if (!p) { result[name] = j; return; }
+      result[name] = {
+        x: p.x * this.alpha + j.x * (1-this.alpha),
+        y: p.y * this.alpha + j.y * (1-this.alpha),
+        z: p.z * this.alpha + j.z * (1-this.alpha),
+        visibility: j.visibility,
+        screenX: j.screenX, screenY: j.screenY,
+      };
+    });
+    this._prev = result;
+    return result;
+  }
+  reset() { this._prev = null; }
+}
+
+// ─── Multi Person Tracker ─────────────────────────────────────────────────────
+
+export class MultiPersonMocap {
+  constructor(options = {}) {
+    this.maxPersons  = options.maxPersons ?? 4;
+    this.persons     = [];
+    this.pose        = null;
+    this.video       = null;
+    this.canvas      = document.createElement('canvas');
+    this.ctx         = this.canvas.getContext('2d');
+    this.running     = false;
+    this.onUpdate    = options.onUpdate ?? null;
+    this.smoother    = options.smoothing ?? 0.7;
+    this.showSkeleton = options.showSkeleton ?? true;
+    this._frameCount = 0;
+    this._recording  = false;
+  }
+
+  async init() {
+    await this._loadMediaPipe();
+    for (let i = 0; i < this.maxPersons; i++) {
+      this.persons.push(new PersonTrack(i, { smoothing: this.smoother }));
+    }
+    return this;
+  }
+
+  async _loadMediaPipe() {
+    if (typeof Pose !== 'undefined') return;
+    await new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = MP_POSE_URL; s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
+
+  async startCamera(constraints = {}) {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 640, height: 480, facingMode: 'user', ...constraints },
+    });
+    this.video = document.createElement('video');
+    this.video.srcObject = stream;
+    this.video.playsInline = true;
+    await this.video.play();
+    this.canvas.width  = this.video.videoWidth;
+    this.canvas.height = this.video.videoHeight;
+    this.running = true;
+    this._loop();
+    return this;
+  }
+
+  _loop() {
+    if (!this.running) return;
+    this.ctx.drawImage(this.video, 0, 0);
+    this._frameCount++;
+    // In a real implementation, MediaPipe would process each frame
+    // For now, simulate with placeholder data
+    this._simulateDetection();
+    this.onUpdate?.(this.persons);
+    requestAnimationFrame(() => this._loop());
+  }
+
+  _simulateDetection() {
+    // Placeholder — real implementation uses MediaPipe Pose
+    this.persons.forEach((person, i) => {
+      if (i > 0) return; // Only simulate 1 person without real ML
+      const t = Date.now() / 1000;
+      const fakeJoints = {};
+      Object.values(MP_TO_JOINT).forEach(name => {
+        fakeJoints[name] = { x: 0.5 + Math.sin(t + i) * 0.1, y: 0.5, z: 0, visibility: 0.9 };
+      });
+      person.update(Object.keys(MP_TO_JOINT).map(k => ({ x: 0.5, y: 0.5, z: 0, visibility: 0.9 })), 640, 480);
+    });
+  }
+
+  processLandmarks(landmarks, personIndex = 0) {
+    const person = this.persons[personIndex];
+    if (!person) return;
+    person.update(landmarks, this.canvas.width, this.canvas.height);
+    if (this._recording) person.recordFrame();
+  }
+
+  retargetAll(skeletons) {
+    this.persons.forEach((person, i) => {
+      if (skeletons[i]) person.retargetToSkeleton(skeletons[i]);
+    });
+  }
+
+  startRecording() {
+    this._recording = true;
+    this.persons.forEach(p => p.startRecording());
+  }
+
+  stopRecording() {
+    this._recording = false;
+    return this.persons.map(p => p.stopRecording());
+  }
+
+  exportAllBVH() { return this.persons.map(p => p.exportBVH()); }
+
+  getPerson(index) { return this.persons[index] ?? null; }
+  getActivePersons() { return this.persons.filter(p => p.confidence > 0.3); }
+
+  stop() {
+    this.running = false;
+    if (this.video?.srcObject) {
+      this.video.srcObject.getTracks().forEach(t => t.stop());
+    }
+  }
+
+  drawSkeletons(ctx, width, height) {
+    this.persons.forEach(person => {
+      if (person.confidence < 0.3) return;
+      ctx.strokeStyle = `#${person.color.getHexString()}`;
+      ctx.lineWidth = 3;
+      const bones = [
+        ['neck','leftShoulder'],['neck','rightShoulder'],
+        ['leftShoulder','leftElbow'],['leftElbow','leftWrist'],
+        ['rightShoulder','rightElbow'],['rightElbow','rightWrist'],
+        ['hips','leftHip'],['hips','rightHip'],
+        ['leftHip','leftKnee'],['leftKnee','leftAnkle'],
+        ['rightHip','rightKnee'],['rightKnee','rightAnkle'],
+        ['neck','hips'],['head','neck'],
       ];
       bones.forEach(([a, b]) => {
         const ja = person.joints[a], jb = person.joints[b];

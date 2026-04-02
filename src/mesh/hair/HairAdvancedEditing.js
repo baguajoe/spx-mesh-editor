@@ -3,7 +3,107 @@
  * Advanced hair editing: guide curve interpolation, strand clustering,
  * symmetry, spline shaping, select-by-mask, and advanced cut operations.
  */
-import * as THREE from 'three';\n\nconst clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));\nconst lerp  = (a, b, t)   => a + (b - a) * t;\n\n// ─── Catmull-Rom interpolation for guide curves ───────────────────────────\nexport function catmullRomPoint(p0, p1, p2, p3, t) {\n  const t2 = t * t, t3 = t * t * t;\n  return new THREE.Vector3(\n    0.5 * ((2*p1.x) + (-p0.x+p2.x)*t + (2*p0.x-5*p1.x+4*p2.x-p3.x)*t2 + (-p0.x+3*p1.x-3*p2.x+p3.x)*t3),\n    0.5 * ((2*p1.y) + (-p0.y+p2.y)*t + (2*p0.y-5*p1.y+4*p2.y-p3.y)*t2 + (-p0.y+3*p1.y-3*p2.y+p3.y)*t3),\n    0.5 * ((2*p1.z) + (-p0.z+p2.z)*t + (2*p0.z-5*p1.z+4*p2.z-p3.z)*t2 + (-p0.z+3*p1.z-3*p2.z+p3.z)*t3),\n  );\n}\n\nexport function buildGuideCurve(controlPoints, segments = 20) {\n  if (controlPoints.length < 2) return controlPoints;\n  const pts = [];\n  for (let i = 0; i < controlPoints.length - 1; i++) {\n    const p0 = controlPoints[Math.max(0, i-1)];\n    const p1 = controlPoints[i];\n    const p2 = controlPoints[Math.min(controlPoints.length-1, i+1)];\n    const p3 = controlPoints[Math.min(controlPoints.length-1, i+2)];\n    for (let s = 0; s < segments; s++) {\n      pts.push(catmullRomPoint(p0, p1, p2, p3, s / segments));\n    }\n  }\n  pts.push(controlPoints[controlPoints.length-1]);\n  return pts;\n}\n\n// ─── Strand interpolation ─────────────────────────────────────────────────\nexport function interpolateStrandsToGuide(strands, guide, strength = 0.5) {\n  return strands.map(strand => {\n    const newCurve = strand.curve.map((pt, i) => {\n      const t       = i / (strand.curve.length - 1);\n      const guidePt = sampleCurveAt(guide, t);\n      return pt.clone().lerp(guidePt, strength);\n    });\n    return { ...strand, curve: newCurve };\n  });\n}\n\nexport function sampleCurveAt(curve, t) {\n  if (curve.length === 0) return new THREE.Vector3();\n  if (curve.length === 1) return curve[0].clone();\n  const idx = clamp(t * (curve.length - 1), 0, curve.length - 1);\n  const lo  = Math.floor(idx), hi = Math.ceil(idx);\n  const frac = idx - lo;\n  return curve[lo].clone().lerp(curve[hi] ?? curve[lo], frac);\n}\n\n// ─── Strand clustering ────────────────────────────────────────────────────\nexport function clusterStrands(strands, clumpCount, strength = 0.4) {\n  if (clumpCount <= 0 || strands.length === 0) return strands;\n  const k = Math.min(clumpCount, strands.length);\n  // K-means centers (init from evenly-spaced strands)\n  let centers = Array.from({ length: k }, (_, i) =>\n    strands[Math.floor((i / k) * strands.length)].rootPos.clone()\n  );\n  // One pass of assignment + centroid update\n  const assignments = new Array(strands.length).fill(0);\n  strands.forEach((s, si) => {\n    let best = 0, bestDist = Infinity;\n    centers.forEach((c, ci) => {\n      const d = s.rootPos.distanceTo(c);\n      if (d < bestDist) { bestDist = d; best = ci; }\n    });\n    assignments[si] = best;\n  });\n  const newCenters = centers.map(() => new THREE.Vector3());\n  const counts     = new Array(k).fill(0);\n  strands.forEach((s, si) => { newCenters[assignments[si]].add(s.rootPos); counts[assignments[si]]++; });\n  newCenters.forEach((c, i) => { if (counts[i]) c.divideScalar(counts[i]); });\n  // Move strands toward their cluster center\n  return strands.map((strand, si) => {\n    const center = newCenters[assignments[si]];\n    const newCurve = strand.curve.map((pt, pi) => {\n      if (pi === 0) return pt.clone();\n      const t = pi / (strand.curve.length - 1);\n      return pt.clone().add(center.clone().sub(strand.rootPos).multiplyScalar(strength * t * 0.3));\n    });\n    return { ...strand, curve: newCurve };\n  });\n}\n\n// ─── Symmetry ─────────────────────────────────────────────────────────────\nexport class HairSymmetry {\n  constructor(axis = 'X', threshold = 0.02) {\n    this.axis      = axis;\n    this.threshold = threshold;\n  }\n  findMirror(strand, strands) {\n    const mp = this._mirrorPos(strand.rootPos);\n    return strands.find(s => s.rootPos.distanceTo(mp) < this.threshold && s.id !== strand.id);\n  }\n  _mirrorPos(pos) {\n    const m = pos.clone();\n    if (this.axis === 'X') m.x = -m.x;\n    if (this.axis === 'Y') m.y = -m.y;\n    if (this.axis === 'Z') m.z = -m.z;
+import * as THREE from 'three';
+
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const lerp  = (a, b, t)   => a + (b - a) * t;
+
+// ─── Catmull-Rom interpolation for guide curves ───────────────────────────
+export function catmullRomPoint(p0, p1, p2, p3, t) {
+  const t2 = t * t, t3 = t * t * t;
+  return new THREE.Vector3(
+    0.5 * ((2*p1.x) + (-p0.x+p2.x)*t + (2*p0.x-5*p1.x+4*p2.x-p3.x)*t2 + (-p0.x+3*p1.x-3*p2.x+p3.x)*t3),
+    0.5 * ((2*p1.y) + (-p0.y+p2.y)*t + (2*p0.y-5*p1.y+4*p2.y-p3.y)*t2 + (-p0.y+3*p1.y-3*p2.y+p3.y)*t3),
+    0.5 * ((2*p1.z) + (-p0.z+p2.z)*t + (2*p0.z-5*p1.z+4*p2.z-p3.z)*t2 + (-p0.z+3*p1.z-3*p2.z+p3.z)*t3),
+  );
+}
+
+export function buildGuideCurve(controlPoints, segments = 20) {
+  if (controlPoints.length < 2) return controlPoints;
+  const pts = [];
+  for (let i = 0; i < controlPoints.length - 1; i++) {
+    const p0 = controlPoints[Math.max(0, i-1)];
+    const p1 = controlPoints[i];
+    const p2 = controlPoints[Math.min(controlPoints.length-1, i+1)];
+    const p3 = controlPoints[Math.min(controlPoints.length-1, i+2)];
+    for (let s = 0; s < segments; s++) {
+      pts.push(catmullRomPoint(p0, p1, p2, p3, s / segments));
+    }
+  }
+  pts.push(controlPoints[controlPoints.length-1]);
+  return pts;
+}
+
+// ─── Strand interpolation ─────────────────────────────────────────────────
+export function interpolateStrandsToGuide(strands, guide, strength = 0.5) {
+  return strands.map(strand => {
+    const newCurve = strand.curve.map((pt, i) => {
+      const t       = i / (strand.curve.length - 1);
+      const guidePt = sampleCurveAt(guide, t);
+      return pt.clone().lerp(guidePt, strength);
+    });
+    return { ...strand, curve: newCurve };
+  });
+}
+
+export function sampleCurveAt(curve, t) {
+  if (curve.length === 0) return new THREE.Vector3();
+  if (curve.length === 1) return curve[0].clone();
+  const idx = clamp(t * (curve.length - 1), 0, curve.length - 1);
+  const lo  = Math.floor(idx), hi = Math.ceil(idx);
+  const frac = idx - lo;
+  return curve[lo].clone().lerp(curve[hi] ?? curve[lo], frac);
+}
+
+// ─── Strand clustering ────────────────────────────────────────────────────
+export function clusterStrands(strands, clumpCount, strength = 0.4) {
+  if (clumpCount <= 0 || strands.length === 0) return strands;
+  const k = Math.min(clumpCount, strands.length);
+  // K-means centers (init from evenly-spaced strands)
+  let centers = Array.from({ length: k }, (_, i) =>
+    strands[Math.floor((i / k) * strands.length)].rootPos.clone()
+  );
+  // One pass of assignment + centroid update
+  const assignments = new Array(strands.length).fill(0);
+  strands.forEach((s, si) => {
+    let best = 0, bestDist = Infinity;
+    centers.forEach((c, ci) => {
+      const d = s.rootPos.distanceTo(c);
+      if (d < bestDist) { bestDist = d; best = ci; }
+    });
+    assignments[si] = best;
+  });
+  const newCenters = centers.map(() => new THREE.Vector3());
+  const counts     = new Array(k).fill(0);
+  strands.forEach((s, si) => { newCenters[assignments[si]].add(s.rootPos); counts[assignments[si]]++; });
+  newCenters.forEach((c, i) => { if (counts[i]) c.divideScalar(counts[i]); });
+  // Move strands toward their cluster center
+  return strands.map((strand, si) => {
+    const center = newCenters[assignments[si]];
+    const newCurve = strand.curve.map((pt, pi) => {
+      if (pi === 0) return pt.clone();
+      const t = pi / (strand.curve.length - 1);
+      return pt.clone().add(center.clone().sub(strand.rootPos).multiplyScalar(strength * t * 0.3));
+    });
+    return { ...strand, curve: newCurve };
+  });
+}
+
+// ─── Symmetry ─────────────────────────────────────────────────────────────
+export class HairSymmetry {
+  constructor(axis = 'X', threshold = 0.02) {
+    this.axis      = axis;
+    this.threshold = threshold;
+  }
+  findMirror(strand, strands) {
+    const mp = this._mirrorPos(strand.rootPos);
+    return strands.find(s => s.rootPos.distanceTo(mp) < this.threshold && s.id !== strand.id);
+  }
+  _mirrorPos(pos) {
+    const m = pos.clone();
+    if (this.axis === 'X') m.x = -m.x;
+    if (this.axis === 'Y') m.y = -m.y;
+    if (this.axis === 'Z') m.z = -m.z;
     return m;
   }
   mirrorAll(strands) {

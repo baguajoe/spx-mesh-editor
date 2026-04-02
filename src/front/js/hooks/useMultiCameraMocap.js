@@ -1,6 +1,45 @@
 // useMultiCameraMocap.js
 // Multi-camera mocap hook — manages multiple camera streams
-import { useState, useRef, useCallback, useEffect } from 'react';\n\nconst useMultiCameraMocap = () => {\n  const [cameras, setCameras]           = useState([]);\n  const [streams, setStreams]           = useState({});\n  const [isReady, setIsReady]           = useState(false);\n  const [error, setError]               = useState(null);\n  const streamRefs = useRef({});\n\n  // Enumerate available cameras\n  const enumerateCameras = useCallback(async () => {\n    try {\n      const devices = await navigator.mediaDevices.enumerateDevices();\n      const videoDevices = devices.filter(d => d.kind === 'videoinput');\n      setCameras(videoDevices);\n      return videoDevices;\n    } catch (err) {\n      setError(err.message);\n      return [];\n    }\n  }, []);\n\n  // Start a specific camera stream\n  const startCamera = useCallback(async (deviceId, role = 'body') => {\n    try {\n      const stream = await navigator.mediaDevices.getUserMedia({\n        video: { deviceId: deviceId ? { exact: deviceId } : undefined, width: 640, height: 480 },\n      });\n      streamRefs.current[role] = stream;\n      setStreams(prev => ({ ...prev, [role]: stream }));\n      setIsReady(true);\n      return stream;\n    } catch (err) {\n      setError(err.message);\n      return null;\n    }\n  }, []);\n\n  // Stop a specific camera stream\n  const stopCamera = useCallback((role = 'body') => {
+import { useState, useRef, useCallback, useEffect } from 'react';
+
+const useMultiCameraMocap = () => {
+  const [cameras, setCameras]           = useState([]);
+  const [streams, setStreams]           = useState({});
+  const [isReady, setIsReady]           = useState(false);
+  const [error, setError]               = useState(null);
+  const streamRefs = useRef({});
+
+  // Enumerate available cameras
+  const enumerateCameras = useCallback(async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(d => d.kind === 'videoinput');
+      setCameras(videoDevices);
+      return videoDevices;
+    } catch (err) {
+      setError(err.message);
+      return [];
+    }
+  }, []);
+
+  // Start a specific camera stream
+  const startCamera = useCallback(async (deviceId, role = 'body') => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { deviceId: deviceId ? { exact: deviceId } : undefined, width: 640, height: 480 },
+      });
+      streamRefs.current[role] = stream;
+      setStreams(prev => ({ ...prev, [role]: stream }));
+      setIsReady(true);
+      return stream;
+    } catch (err) {
+      setError(err.message);
+      return null;
+    }
+  }, []);
+
+  // Stop a specific camera stream
+  const stopCamera = useCallback((role = 'body') => {
     const stream = streamRefs.current[role];
     if (stream) {
       stream.getTracks().forEach(t => t.stop());

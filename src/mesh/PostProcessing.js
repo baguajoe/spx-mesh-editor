@@ -194,6 +194,8 @@ export function applyPostStack(canvas, effects = []) {
 }
 export function createPassStack() {
     return [
-        { id: 'bloom', name: 'Bloom', enabled: true, intensity: 1.5 },\n        { id: 'ssao', name: 'AO', enabled: true, radius: 0.1 },\n        { id: 'tonemap', name: 'ACES', enabled: true, exposure: 1.0 }
+        { id: 'bloom', name: 'Bloom', enabled: true, intensity: 1.5 },
+        { id: 'ssao', name: 'AO', enabled: true, radius: 0.1 },
+        { id: 'tonemap', name: 'ACES', enabled: true, exposure: 1.0 }
     ];
 }

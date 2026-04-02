@@ -3,4 +3,322 @@
 // Features: position-based dynamics, stretch/shear/bend constraints,
 //           self-collision, friction, air resistance, tearing, pinning
 
-import * as THREE from 'three';\n\n// ─── Particle ────────────────────────────────────────────────────────────────\n\nexport function createClothParticle(position, mass = 1.0) {\n  return {\n    position: position.clone(),\n    prevPos:  position.clone(),\n    velocity: new THREE.Vector3(),\n    force:    new THREE.Vector3(),\n    mass,\n    invMass:  mass > 0 ? 1 / mass : 0,\n    pinned:   false,\n    pinWeight: 0,\n    friction: 0.5,\n  };\n}\n\n// ─── Constraint Types ─────────────────────────────────────────────────────────\n\nconst CONSTRAINT = { STRETCH: 'stretch', SHEAR: 'shear', BEND: 'bend' };\n\nfunction createConstraint(a, b, restLen, stiffness, type = CONSTRAINT.STRETCH, maxStretch = 1.1) {\n  return { a, b, restLen, stiffness, type, maxStretch, broken: false };\n}\n\n// ─── Cloth Creation ───────────────────────────────────────────────────────────\n\nexport function createCloth(mesh, options = {}) {\n  const {\n    mass        = 1.0,\n    stiffness   = 0.95,\n    shearStiff  = 0.8,\n    bendStiff   = 0.3,\n    damping     = 0.99,\n    gravity     = -9.8,\n    iterations  = 12,\n    windForce   = new THREE.Vector3(0, 0, 0),\n    tearing     = false,\n    tearThreshold = 2.5,\n    selfCollision = false,\n    selfCollisionRadius = 0.02,\n  } = options;\n\n  const geo = mesh.geometry;\n  const pos = geo.attributes.position;\n  const idx = geo.index;\n  if (!pos) return null;\n\n  const mat = mesh.matrixWorld;\n  const particles = [];\n\n  for (let i = 0; i < pos.count; i++) {\n    const p = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(mat);\n    particles.push(createClothParticle(p, mass));\n  }\n\n  const constraints = [];\n  const edgeSet = new Set();\n\n  if (idx) {\n    const arr = idx.array;\n    for (let i = 0; i < arr.length; i += 3) {\n      const a = arr[i], b = arr[i+1], c = arr[i+2];\n\n      // Stretch constraints (edges)\n      for (let k = 0; k < 3; k++) {\n        const va = arr[i+k], vb = arr[i+(k+1)%3];\n        const key = Math.min(va,vb) + '_' + Math.max(va,vb);\n        if (!edgeSet.has(key)) {\n          edgeSet.add(key);\n          const restLen = particles[va].position.distanceTo(particles[vb].position);\n          constraints.push(createConstraint(va, vb, restLen, stiffness, CONSTRAINT.STRETCH, tearThreshold));\n        }\n      }\n\n      // Shear constraints (face diagonals)\n      const shearKey = Math.min(a,c) + '_' + Math.max(a,c) + '_s';\n      if (!edgeSet.has(shearKey)) {\n        edgeSet.add(shearKey);\n        const restLen = particles[a].position.distanceTo(particles[c].position);\n        constraints.push(createConstraint(a, c, restLen, shearStiff, CONSTRAINT.SHEAR));\n      }\n    }\n\n    // Bend constraints (skip-one-vertex connections)\n    const vertFaces = new Map();\n    for (let i = 0; i < arr.length; i += 3) {\n      for (let k = 0; k < 3; k++) {\n        const v = arr[i+k];\n        if (!vertFaces.has(v)) vertFaces.set(v, []);\n        vertFaces.get(v).push(i/3);\n      }\n    }\n\n    edgeSet.forEach(key => {\n      if (key.includes('_s')) return;\n      const [va, vb] = key.split('_').map(Number);\n      const facesA = vertFaces.get(va) ?? [];\n      const facesB = vertFaces.get(vb) ?? [];\n      const shared = facesA.filter(f => facesB.includes(f));\n      if (shared.length === 2) {\n        // Find the two non-shared vertices\n        const faceVerts = (fi) => [arr[fi*3], arr[fi*3+1], arr[fi*3+2]];\n        const v0 = faceVerts(shared[0]).find(v => v !== va && v !== vb);\n        const v1 = faceVerts(shared[1]).find(v => v !== va && v !== vb);\n        if (v0 !== undefined && v1 !== undefined) {\n          const bendKey = Math.min(v0,v1) + '_' + Math.max(v0,v1) + '_b';\n          if (!edgeSet.has(bendKey)) {\n            edgeSet.add(bendKey);\n            const restLen = particles[v0].position.distanceTo(particles[v1].position);\n            constraints.push(createConstraint(v0, v1, restLen, bendStiff, CONSTRAINT.BEND));\n          }\n        }\n      }\n    });\n  }\n\n  return {\n    particles, constraints, mesh,\n    stiffness, damping, gravity, iterations, windForce,\n    tearing, tearThreshold, selfCollision, selfCollisionRadius,\n    colliders: [],\n    friction: 0.5,\n    airResistance: 0.02,\n  };\n}\n\n// ─── Pin Vertices ─────────────────────────────────────────────────────────────\n\nexport function pinParticle(cloth, index, weight = 1.0) {\n  if (cloth.particles[index]) {\n    cloth.particles[index].pinned = true;\n    cloth.particles[index].pinWeight = weight;\n    cloth.particles[index].invMass = 0;\n  }\n}\n\nexport function unpinParticle(cloth, index) {\n  if (cloth.particles[index]) {\n    cloth.particles[index].pinned = false;\n    cloth.particles[index].invMass = 1 / cloth.particles[index].mass;\n  }\n}\n\nexport function pinTopRow(cloth, mesh) {\n  const pos = mesh.geometry.attributes.position;\n  let maxY = -Infinity;\n  for (let i = 0; i < pos.count; i++) maxY = Math.max(maxY, pos.getY(i));\n  for (let i = 0; i < pos.count; i++) {\n    if (Math.abs(pos.getY(i) - maxY) < 0.01) pinParticle(cloth, i);\n  }\n}\n\n// ─── Simulation Step ──────────────────────────────────────────────────────────\n\nexport function stepCloth(cloth, dt = 1/60) {\n  const { particles, constraints, gravity, damping, windForce, iterations, colliders, airResistance } = cloth;\n\n  const gravVec = new THREE.Vector3(0, gravity * dt * dt, 0);\n  const windVec = windForce.clone().multiplyScalar(dt * dt);\n\n  // Apply external forces (Verlet integration)\n  particles.forEach(p => {\n    if (p.pinned) return;\n\n    const vel = p.position.clone().sub(p.prevPos);\n    vel.multiplyScalar(damping);\n\n    // Air resistance\n    const speed = vel.length();\n    if (speed > 0) vel.addScaledVector(vel, -airResistance * speed);\n\n    p.prevPos.copy(p.position);\n    p.position.add(vel).add(gravVec).add(windVec);\n  });\n\n  // Solve constraints\n  for (let iter = 0; iter < iterations; iter++) {\n    constraints.forEach(c => {\n      if (c.broken) return;\n      const pa = particles[c.a], pb = particles[c.b];\n      if (!pa || !pb) return;\n\n      const diff = pb.position.clone().sub(pa.position);\n      const dist = diff.length();\n      if (dist < 0.0001) return;\n\n      const correction = diff.multiplyScalar((dist - c.restLen) / dist);\n\n      // Tearing\n      if (cloth.tearing && dist > c.restLen * c.maxStretch) {\n        c.broken = true;\n        return;\n      }\n\n      const totalInvMass = pa.invMass + pb.invMass;\n      if (totalInvMass === 0) return;\n\n      const stiffnessFactor = c.stiffness;\n      if (pa.invMass > 0) pa.position.addScaledVector(correction, pa.invMass / totalInvMass * stiffnessFactor);\n      if (pb.invMass > 0) pb.position.addScaledVector(correction, -pb.invMass / totalInvMass * stiffnessFactor);\n    });\n\n    // Collision response\n    colliders.forEach(col => {\n      particles.forEach(p => {\n        if (p.pinned) return;\n        _resolveClothCollider(p, col);\n      });\n    });\n\n    // Self-collision\n    if (cloth.selfCollision) {\n      _resolveSelfCollision(particles, cloth.selfCollisionRadius);\n    }\n  }\n}\n\nfunction _resolveClothCollider(particle, col) {\n  if (col.type === 'sphere') {\n    const d = particle.position.clone().sub(col.center);\n    const dist = d.length();\n    if (dist < col.radius + 0.001) {\n      particle.position.copy(col.center).addScaledVector(d.normalize(), col.radius + 0.001);\n    }\n  } else if (col.type === 'plane') {\n    const d = particle.position.clone().sub(col.point).dot(col.normal);\n    if (d < 0) particle.position.addScaledVector(col.normal, -d);\n  } else if (col.type === 'capsule') {\n    const ab = col.end.clone().sub(col.start);\n    const t = Math.max(0, Math.min(1, particle.position.clone().sub(col.start).dot(ab) / ab.lengthSq()));\n    const closest = col.start.clone().addScaledVector(ab, t);\n    const d = particle.position.clone().sub(closest);\n    const dist = d.length();\n    if (dist < col.radius + 0.001) {\n      particle.position.copy(closest).addScaledVector(d.normalize(), col.radius + 0.001);\n    }\n  }\n}\n\nfunction _resolveSelfCollision(particles, radius) {\n  // Spatial hashing for performance\n  for (let i = 0; i < particles.length; i++) {\n    for (let j = i + 1; j < particles.length; j++) {\n      const d = particles[i].position.clone().sub(particles[j].position);\n      const dist = d.length();\n      if (dist < radius * 2 && dist > 0.0001) {\n        const correction = d.normalize().multiplyScalar((radius * 2 - dist) * 0.5);\n        if (!particles[i].pinned) particles[i].position.add(correction);\n        if (!particles[j].pinned) particles[j].position.sub(correction);\n      }\n    }\n  }\n}\n\n// ─── Apply to Mesh ────────────────────────────────────────────────────────────\n\nexport function applyClothToMesh(cloth) {\n  const pos = cloth.mesh.geometry.attributes.position;\n  const mat = cloth.mesh.matrixWorld.clone().invert();\n  cloth.particles.forEach((p, i) => {\n    const local = p.position.clone().applyMatrix4(mat);\n    pos.setXYZ(i, local.x, local.y, local.z);\n  });\n  pos.needsUpdate = true;\n  cloth.mesh.geometry.computeVertexNormals();\n}\n\n// ─── Colliders ────────────────────────────────────────────────────────────────\n\nexport function addSphereCollider(cloth, center, radius) {\n  cloth.colliders.push({ type: 'sphere', center: center.clone(), radius });\n}\n\nexport function addCapsuleCollider(cloth, start, end, radius) {\n  cloth.colliders.push({ type: 'capsule', start: start.clone(), end: end.clone(), radius });\n}\n\nexport function addPlaneCollider(cloth, point, normal) {\n  cloth.colliders.push({ type: 'plane', point: point.clone(), normal: normal.clone().normalize() });\n}\n\nexport function addGroundPlane(cloth, y = 0) {\n  addPlaneCollider(cloth, new THREE.Vector3(0, y, 0), new THREE.Vector3(0, 1, 0));\n}\n\n// ─── Wind ─────────────────────────────────────────────────────────────────────\n\nexport function setClothWind(cloth, direction, strength) {\n  cloth.windForce = direction.clone().normalize().multiplyScalar(strength);\n}\n\n// ─── Presets ──────────────────────────────────────────────────────────────────\n\nexport function clothPreset(type) {\n  const presets = {\n    silk:    { stiffness: 0.7, shearStiff: 0.5, bendStiff: 0.1, damping: 0.999, mass: 0.3 },\n    cotton:  { stiffness: 0.9, shearStiff: 0.8, bendStiff: 0.4, damping: 0.99,  mass: 0.8 },\n    denim:   { stiffness: 0.98,shearStiff: 0.9, bendStiff: 0.7, damping: 0.98,  mass: 1.5 },\n    leather: { stiffness: 0.99,shearStiff: 0.95,bendStiff: 0.9, damping: 0.97,  mass: 2.0 },\n    rubber:  { stiffness: 0.6, shearStiff: 0.6, bendStiff: 0.2, damping: 0.995, mass: 1.2 },\n    paper:   { stiffness: 0.95,shearStiff: 0.9, bendStiff: 0.8, damping: 0.95,  mass: 0.2 },\n  };\n  return presets[type] ?? presets.cotton;\n}\n\nexport default {\n  createClothParticle, createCloth,\n  pinParticle, unpinParticle, pinTopRow,\n  stepCloth, applyClothToMesh,\n  addSphereCollider, addCapsuleCollider, addPlaneCollider, addGroundPlane,\n  setClothWind, clothPreset, CONSTRAINT,\n};\n\nexport function applyClothPreset(cloth, type) { const p = clothPreset(type); Object.assign(cloth, p); return cloth; }\nexport function resetCloth(cloth) { cloth.particles.forEach(p => { p.position.copy(p.prevPos); p.velocity.set(0,0,0); }); }\nexport function getClothStats(cloth) { return { particles: cloth.particles.length, constraints: cloth.constraints.length, broken: cloth.constraints.filter(c=>c.broken).length, pinned: cloth.particles.filter(p=>p.pinned).length }; }\nexport const CLOTH_PRESETS = { silk: clothPreset('silk'), cotton: clothPreset('cotton'), denim: clothPreset('denim'), leather: clothPreset('leather'), rubber: clothPreset('rubber'), paper: clothPreset('paper') };
+import * as THREE from 'three';
+
+// ─── Particle ────────────────────────────────────────────────────────────────
+
+export function createClothParticle(position, mass = 1.0) {
+  return {
+    position: position.clone(),
+    prevPos:  position.clone(),
+    velocity: new THREE.Vector3(),
+    force:    new THREE.Vector3(),
+    mass,
+    invMass:  mass > 0 ? 1 / mass : 0,
+    pinned:   false,
+    pinWeight: 0,
+    friction: 0.5,
+  };
+}
+
+// ─── Constraint Types ─────────────────────────────────────────────────────────
+
+const CONSTRAINT = { STRETCH: 'stretch', SHEAR: 'shear', BEND: 'bend' };
+
+function createConstraint(a, b, restLen, stiffness, type = CONSTRAINT.STRETCH, maxStretch = 1.1) {
+  return { a, b, restLen, stiffness, type, maxStretch, broken: false };
+}
+
+// ─── Cloth Creation ───────────────────────────────────────────────────────────
+
+export function createCloth(mesh, options = {}) {
+  const {
+    mass        = 1.0,
+    stiffness   = 0.95,
+    shearStiff  = 0.8,
+    bendStiff   = 0.3,
+    damping     = 0.99,
+    gravity     = -9.8,
+    iterations  = 12,
+    windForce   = new THREE.Vector3(0, 0, 0),
+    tearing     = false,
+    tearThreshold = 2.5,
+    selfCollision = false,
+    selfCollisionRadius = 0.02,
+  } = options;
+
+  const geo = mesh.geometry;
+  const pos = geo.attributes.position;
+  const idx = geo.index;
+  if (!pos) return null;
+
+  const mat = mesh.matrixWorld;
+  const particles = [];
+
+  for (let i = 0; i < pos.count; i++) {
+    const p = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(mat);
+    particles.push(createClothParticle(p, mass));
+  }
+
+  const constraints = [];
+  const edgeSet = new Set();
+
+  if (idx) {
+    const arr = idx.array;
+    for (let i = 0; i < arr.length; i += 3) {
+      const a = arr[i], b = arr[i+1], c = arr[i+2];
+
+      // Stretch constraints (edges)
+      for (let k = 0; k < 3; k++) {
+        const va = arr[i+k], vb = arr[i+(k+1)%3];
+        const key = Math.min(va,vb) + '_' + Math.max(va,vb);
+        if (!edgeSet.has(key)) {
+          edgeSet.add(key);
+          const restLen = particles[va].position.distanceTo(particles[vb].position);
+          constraints.push(createConstraint(va, vb, restLen, stiffness, CONSTRAINT.STRETCH, tearThreshold));
+        }
+      }
+
+      // Shear constraints (face diagonals)
+      const shearKey = Math.min(a,c) + '_' + Math.max(a,c) + '_s';
+      if (!edgeSet.has(shearKey)) {
+        edgeSet.add(shearKey);
+        const restLen = particles[a].position.distanceTo(particles[c].position);
+        constraints.push(createConstraint(a, c, restLen, shearStiff, CONSTRAINT.SHEAR));
+      }
+    }
+
+    // Bend constraints (skip-one-vertex connections)
+    const vertFaces = new Map();
+    for (let i = 0; i < arr.length; i += 3) {
+      for (let k = 0; k < 3; k++) {
+        const v = arr[i+k];
+        if (!vertFaces.has(v)) vertFaces.set(v, []);
+        vertFaces.get(v).push(i/3);
+      }
+    }
+
+    edgeSet.forEach(key => {
+      if (key.includes('_s')) return;
+      const [va, vb] = key.split('_').map(Number);
+      const facesA = vertFaces.get(va) ?? [];
+      const facesB = vertFaces.get(vb) ?? [];
+      const shared = facesA.filter(f => facesB.includes(f));
+      if (shared.length === 2) {
+        // Find the two non-shared vertices
+        const faceVerts = (fi) => [arr[fi*3], arr[fi*3+1], arr[fi*3+2]];
+        const v0 = faceVerts(shared[0]).find(v => v !== va && v !== vb);
+        const v1 = faceVerts(shared[1]).find(v => v !== va && v !== vb);
+        if (v0 !== undefined && v1 !== undefined) {
+          const bendKey = Math.min(v0,v1) + '_' + Math.max(v0,v1) + '_b';
+          if (!edgeSet.has(bendKey)) {
+            edgeSet.add(bendKey);
+            const restLen = particles[v0].position.distanceTo(particles[v1].position);
+            constraints.push(createConstraint(v0, v1, restLen, bendStiff, CONSTRAINT.BEND));
+          }
+        }
+      }
+    });
+  }
+
+  return {
+    particles, constraints, mesh,
+    stiffness, damping, gravity, iterations, windForce,
+    tearing, tearThreshold, selfCollision, selfCollisionRadius,
+    colliders: [],
+    friction: 0.5,
+    airResistance: 0.02,
+  };
+}
+
+// ─── Pin Vertices ─────────────────────────────────────────────────────────────
+
+export function pinParticle(cloth, index, weight = 1.0) {
+  if (cloth.particles[index]) {
+    cloth.particles[index].pinned = true;
+    cloth.particles[index].pinWeight = weight;
+    cloth.particles[index].invMass = 0;
+  }
+}
+
+export function unpinParticle(cloth, index) {
+  if (cloth.particles[index]) {
+    cloth.particles[index].pinned = false;
+    cloth.particles[index].invMass = 1 / cloth.particles[index].mass;
+  }
+}
+
+export function pinTopRow(cloth, mesh) {
+  const pos = mesh.geometry.attributes.position;
+  let maxY = -Infinity;
+  for (let i = 0; i < pos.count; i++) maxY = Math.max(maxY, pos.getY(i));
+  for (let i = 0; i < pos.count; i++) {
+    if (Math.abs(pos.getY(i) - maxY) < 0.01) pinParticle(cloth, i);
+  }
+}
+
+// ─── Simulation Step ──────────────────────────────────────────────────────────
+
+export function stepCloth(cloth, dt = 1/60) {
+  const { particles, constraints, gravity, damping, windForce, iterations, colliders, airResistance } = cloth;
+
+  const gravVec = new THREE.Vector3(0, gravity * dt * dt, 0);
+  const windVec = windForce.clone().multiplyScalar(dt * dt);
+
+  // Apply external forces (Verlet integration)
+  particles.forEach(p => {
+    if (p.pinned) return;
+
+    const vel = p.position.clone().sub(p.prevPos);
+    vel.multiplyScalar(damping);
+
+    // Air resistance
+    const speed = vel.length();
+    if (speed > 0) vel.addScaledVector(vel, -airResistance * speed);
+
+    p.prevPos.copy(p.position);
+    p.position.add(vel).add(gravVec).add(windVec);
+  });
+
+  // Solve constraints
+  for (let iter = 0; iter < iterations; iter++) {
+    constraints.forEach(c => {
+      if (c.broken) return;
+      const pa = particles[c.a], pb = particles[c.b];
+      if (!pa || !pb) return;
+
+      const diff = pb.position.clone().sub(pa.position);
+      const dist = diff.length();
+      if (dist < 0.0001) return;
+
+      const correction = diff.multiplyScalar((dist - c.restLen) / dist);
+
+      // Tearing
+      if (cloth.tearing && dist > c.restLen * c.maxStretch) {
+        c.broken = true;
+        return;
+      }
+
+      const totalInvMass = pa.invMass + pb.invMass;
+      if (totalInvMass === 0) return;
+
+      const stiffnessFactor = c.stiffness;
+      if (pa.invMass > 0) pa.position.addScaledVector(correction, pa.invMass / totalInvMass * stiffnessFactor);
+      if (pb.invMass > 0) pb.position.addScaledVector(correction, -pb.invMass / totalInvMass * stiffnessFactor);
+    });
+
+    // Collision response
+    colliders.forEach(col => {
+      particles.forEach(p => {
+        if (p.pinned) return;
+        _resolveClothCollider(p, col);
+      });
+    });
+
+    // Self-collision
+    if (cloth.selfCollision) {
+      _resolveSelfCollision(particles, cloth.selfCollisionRadius);
+    }
+  }
+}
+
+function _resolveClothCollider(particle, col) {
+  if (col.type === 'sphere') {
+    const d = particle.position.clone().sub(col.center);
+    const dist = d.length();
+    if (dist < col.radius + 0.001) {
+      particle.position.copy(col.center).addScaledVector(d.normalize(), col.radius + 0.001);
+    }
+  } else if (col.type === 'plane') {
+    const d = particle.position.clone().sub(col.point).dot(col.normal);
+    if (d < 0) particle.position.addScaledVector(col.normal, -d);
+  } else if (col.type === 'capsule') {
+    const ab = col.end.clone().sub(col.start);
+    const t = Math.max(0, Math.min(1, particle.position.clone().sub(col.start).dot(ab) / ab.lengthSq()));
+    const closest = col.start.clone().addScaledVector(ab, t);
+    const d = particle.position.clone().sub(closest);
+    const dist = d.length();
+    if (dist < col.radius + 0.001) {
+      particle.position.copy(closest).addScaledVector(d.normalize(), col.radius + 0.001);
+    }
+  }
+}
+
+function _resolveSelfCollision(particles, radius) {
+  // Spatial hashing for performance
+  for (let i = 0; i < particles.length; i++) {
+    for (let j = i + 1; j < particles.length; j++) {
+      const d = particles[i].position.clone().sub(particles[j].position);
+      const dist = d.length();
+      if (dist < radius * 2 && dist > 0.0001) {
+        const correction = d.normalize().multiplyScalar((radius * 2 - dist) * 0.5);
+        if (!particles[i].pinned) particles[i].position.add(correction);
+        if (!particles[j].pinned) particles[j].position.sub(correction);
+      }
+    }
+  }
+}
+
+// ─── Apply to Mesh ────────────────────────────────────────────────────────────
+
+export function applyClothToMesh(cloth) {
+  const pos = cloth.mesh.geometry.attributes.position;
+  const mat = cloth.mesh.matrixWorld.clone().invert();
+  cloth.particles.forEach((p, i) => {
+    const local = p.position.clone().applyMatrix4(mat);
+    pos.setXYZ(i, local.x, local.y, local.z);
+  });
+  pos.needsUpdate = true;
+  cloth.mesh.geometry.computeVertexNormals();
+}
+
+// ─── Colliders ────────────────────────────────────────────────────────────────
+
+export function addSphereCollider(cloth, center, radius) {
+  cloth.colliders.push({ type: 'sphere', center: center.clone(), radius });
+}
+
+export function addCapsuleCollider(cloth, start, end, radius) {
+  cloth.colliders.push({ type: 'capsule', start: start.clone(), end: end.clone(), radius });
+}
+
+export function addPlaneCollider(cloth, point, normal) {
+  cloth.colliders.push({ type: 'plane', point: point.clone(), normal: normal.clone().normalize() });
+}
+
+export function addGroundPlane(cloth, y = 0) {
+  addPlaneCollider(cloth, new THREE.Vector3(0, y, 0), new THREE.Vector3(0, 1, 0));
+}
+
+// ─── Wind ─────────────────────────────────────────────────────────────────────
+
+export function setClothWind(cloth, direction, strength) {
+  cloth.windForce = direction.clone().normalize().multiplyScalar(strength);
+}
+
+// ─── Presets ──────────────────────────────────────────────────────────────────
+
+export function clothPreset(type) {
+  const presets = {
+    silk:    { stiffness: 0.7, shearStiff: 0.5, bendStiff: 0.1, damping: 0.999, mass: 0.3 },
+    cotton:  { stiffness: 0.9, shearStiff: 0.8, bendStiff: 0.4, damping: 0.99,  mass: 0.8 },
+    denim:   { stiffness: 0.98,shearStiff: 0.9, bendStiff: 0.7, damping: 0.98,  mass: 1.5 },
+    leather: { stiffness: 0.99,shearStiff: 0.95,bendStiff: 0.9, damping: 0.97,  mass: 2.0 },
+    rubber:  { stiffness: 0.6, shearStiff: 0.6, bendStiff: 0.2, damping: 0.995, mass: 1.2 },
+    paper:   { stiffness: 0.95,shearStiff: 0.9, bendStiff: 0.8, damping: 0.95,  mass: 0.2 },
+  };
+  return presets[type] ?? presets.cotton;
+}
+
+export default {
+  createClothParticle, createCloth,
+  pinParticle, unpinParticle, pinTopRow,
+  stepCloth, applyClothToMesh,
+  addSphereCollider, addCapsuleCollider, addPlaneCollider, addGroundPlane,
+  setClothWind, clothPreset, CONSTRAINT,
+};
+
+export function applyClothPreset(cloth, type) { const p = clothPreset(type); Object.assign(cloth, p); return cloth; }
+export function resetCloth(cloth) { cloth.particles.forEach(p => { p.position.copy(p.prevPos); p.velocity.set(0,0,0); }); }
+export function getClothStats(cloth) { return { particles: cloth.particles.length, constraints: cloth.constraints.length, broken: cloth.constraints.filter(c=>c.broken).length, pinned: cloth.particles.filter(p=>p.pinned).length }; }
+export const CLOTH_PRESETS = { silk: clothPreset('silk'), cotton: clothPreset('cotton'), denim: clothPreset('denim'), leather: clothPreset('leather'), rubber: clothPreset('rubber'), paper: clothPreset('paper') };

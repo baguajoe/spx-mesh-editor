@@ -3,7 +3,104 @@
  * Wet hair shader with clumping, drip animation, Fresnel gloss,
  * environment reflection, and a WetHairController for animated updates.
  */
-import * as THREE from 'three';\n\n// ─── GLSL ─────────────────────────────────────────────────────────────────────\nconst WET_VERT = /* glsl */ `\n  uniform float uWetness;\n  uniform float uClumpStr;\n  uniform float uTime;\n  varying vec3  vNormal;\n  varying vec3  vViewDir;\n  varying vec2  vUv;\n  varying float vWet;\n\n  void main() {\n    vUv     = uv;\n    vWet    = uWetness;\n    // Clumping: pull strands toward base along normal\n    float clump    = uClumpStr * uWetness * (1.0 - uv.y) * 0.8;\n    vec3  clumped  = position - normal * clump * 0.006;\n    vec4  mv       = modelViewMatrix * vec4(clumped, 1.0);\n    vNormal        = normalize(normalMatrix * normal);\n    vViewDir       = normalize(-mv.xyz);\n    gl_Position    = projectionMatrix * mv;\n  }\n`;\n\nconst WET_FRAG = /* glsl */ `\n  uniform vec3  uBaseColor;\n  uniform vec3  uWetColor;\n  uniform vec3  uEnvColor;\n  uniform float uWetness;\n  uniform float uGloss;\n  uniform float uTime;\n  uniform float uDripSpeed;\n  uniform float uFresnelPow;\n\n  varying vec3  vNormal;\n  varying vec3  vViewDir;\n  varying vec2  vUv;\n  varying float vWet;\n\n  float fresnel(vec3 N, vec3 V, float power) {\n    return pow(1.0 - max(0.0, dot(N, V)), power);\n  }\n\n  float drip(vec2 uv, float t, float speed) {\n    float y = fract(uv.y - t * speed);\n    float x = sin(uv.x * 12.0) * 0.04;\n    float drop = smoothstep(0.05, 0.0, abs(y - 0.5 + x));\n    drop *= smoothstep(0.0, 0.3, uv.y) * smoothstep(1.0, 0.7, uv.y);\n    return drop;\n  }\n\n  void main() {\n    // Base color darkens when wet\n    vec3  color   = mix(uBaseColor, uWetColor, uWetness * 0.6);\n    // Fresnel gloss\n    float fr      = fresnel(vNormal, vViewDir, uFresnelPow) * uGloss * uWetness;\n    // Drip animation\n    float dp      = drip(vUv, uTime, uDripSpeed) * uWetness * 0.5;\n    // Env reflection approximation\n    vec3  refl    = uEnvColor * (fr + dp);\n    // Combine\n    vec3  final   = color + refl;\n    float alpha   = 1.0 - vUv.y * 0.15 * (1.0 - uWetness * 0.3);\n    gl_FragColor  = vec4(final, alpha);\n  }\n`;\n\n// ─── Factory ──────────────────────────────────────────────────────────────────\nexport function createWetHairMaterial(opts = {}) {\n  return new THREE.ShaderMaterial({\n    vertexShader:   WET_VERT,\n    fragmentShader: WET_FRAG,\n    uniforms: {\n      uBaseColor:  { value: new THREE.Color(opts.baseColor  ?? '#1a1010') },\n      uWetColor:   { value: new THREE.Color(opts.wetColor   ?? '#0a0808') },\n      uEnvColor:   { value: new THREE.Color(opts.envColor   ?? '#8899bb') },\n      uWetness:    { value: opts.wetness    ?? 0.8 },\n      uGloss:      { value: opts.gloss      ?? 0.9 },\n      uClumpStr:   { value: opts.clumpStr   ?? 0.6 },\n      uDripSpeed:  { value: opts.dripSpeed  ?? 0.3 },\n      uFresnelPow: { value: opts.fresnelPow ?? 3.0 },\n      uTime:       { value: 0 },\n    },\n    transparent: true,\n    side: THREE.DoubleSide,\n    depthWrite: false,\n  });\n}\n\n// ─── WetHairController ────────────────────────────────────────────────────────\nexport class WetHairController {\n  constructor(opts = {}) {\n    this.materials    = [];\n    this.wetness      = opts.wetness     ?? 0.0;\n    this.dryRate      = opts.dryRate     ?? 0.05;  // per second\n    this.wetRate      = opts.wetRate     ?? 1.0;   // per second\n    this.envColor     = opts.envColor    ?? new THREE.Color('#8899bb');
+import * as THREE from 'three';
+
+// ─── GLSL ─────────────────────────────────────────────────────────────────────
+const WET_VERT = /* glsl */ `
+  uniform float uWetness;
+  uniform float uClumpStr;
+  uniform float uTime;
+  varying vec3  vNormal;
+  varying vec3  vViewDir;
+  varying vec2  vUv;
+  varying float vWet;
+
+  void main() {
+    vUv     = uv;
+    vWet    = uWetness;
+    // Clumping: pull strands toward base along normal
+    float clump    = uClumpStr * uWetness * (1.0 - uv.y) * 0.8;
+    vec3  clumped  = position - normal * clump * 0.006;
+    vec4  mv       = modelViewMatrix * vec4(clumped, 1.0);
+    vNormal        = normalize(normalMatrix * normal);
+    vViewDir       = normalize(-mv.xyz);
+    gl_Position    = projectionMatrix * mv;
+  }
+`;
+
+const WET_FRAG = /* glsl */ `
+  uniform vec3  uBaseColor;
+  uniform vec3  uWetColor;
+  uniform vec3  uEnvColor;
+  uniform float uWetness;
+  uniform float uGloss;
+  uniform float uTime;
+  uniform float uDripSpeed;
+  uniform float uFresnelPow;
+
+  varying vec3  vNormal;
+  varying vec3  vViewDir;
+  varying vec2  vUv;
+  varying float vWet;
+
+  float fresnel(vec3 N, vec3 V, float power) {
+    return pow(1.0 - max(0.0, dot(N, V)), power);
+  }
+
+  float drip(vec2 uv, float t, float speed) {
+    float y = fract(uv.y - t * speed);
+    float x = sin(uv.x * 12.0) * 0.04;
+    float drop = smoothstep(0.05, 0.0, abs(y - 0.5 + x));
+    drop *= smoothstep(0.0, 0.3, uv.y) * smoothstep(1.0, 0.7, uv.y);
+    return drop;
+  }
+
+  void main() {
+    // Base color darkens when wet
+    vec3  color   = mix(uBaseColor, uWetColor, uWetness * 0.6);
+    // Fresnel gloss
+    float fr      = fresnel(vNormal, vViewDir, uFresnelPow) * uGloss * uWetness;
+    // Drip animation
+    float dp      = drip(vUv, uTime, uDripSpeed) * uWetness * 0.5;
+    // Env reflection approximation
+    vec3  refl    = uEnvColor * (fr + dp);
+    // Combine
+    vec3  final   = color + refl;
+    float alpha   = 1.0 - vUv.y * 0.15 * (1.0 - uWetness * 0.3);
+    gl_FragColor  = vec4(final, alpha);
+  }
+`;
+
+// ─── Factory ──────────────────────────────────────────────────────────────────
+export function createWetHairMaterial(opts = {}) {
+  return new THREE.ShaderMaterial({
+    vertexShader:   WET_VERT,
+    fragmentShader: WET_FRAG,
+    uniforms: {
+      uBaseColor:  { value: new THREE.Color(opts.baseColor  ?? '#1a1010') },
+      uWetColor:   { value: new THREE.Color(opts.wetColor   ?? '#0a0808') },
+      uEnvColor:   { value: new THREE.Color(opts.envColor   ?? '#8899bb') },
+      uWetness:    { value: opts.wetness    ?? 0.8 },
+      uGloss:      { value: opts.gloss      ?? 0.9 },
+      uClumpStr:   { value: opts.clumpStr   ?? 0.6 },
+      uDripSpeed:  { value: opts.dripSpeed  ?? 0.3 },
+      uFresnelPow: { value: opts.fresnelPow ?? 3.0 },
+      uTime:       { value: 0 },
+    },
+    transparent: true,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+}
+
+// ─── WetHairController ────────────────────────────────────────────────────────
+export class WetHairController {
+  constructor(opts = {}) {
+    this.materials    = [];
+    this.wetness      = opts.wetness     ?? 0.0;
+    this.dryRate      = opts.dryRate     ?? 0.05;  // per second
+    this.wetRate      = opts.wetRate     ?? 1.0;   // per second
+    this.envColor     = opts.envColor    ?? new THREE.Color('#8899bb');
     this._drying      = false;
     this._wetting     = false;
     this._clock       = new THREE.Clock(false);

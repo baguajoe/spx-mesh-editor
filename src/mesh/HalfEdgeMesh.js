@@ -342,7 +342,256 @@ export class HalfEdgeMesh {
 
   // ── Plane Cut (reliable alternative to edge loop traversal) ──────────────
   // Cuts mesh with an axis-aligned plane — always produces clean results
-  planeCut(axis='y', position=0, t=0.5) {\n    const newVerts = [];\n    const processed = new Set();\n\n    this.halfEdges.forEach(e => {\n      if (!e.twin) return;\n      if (processed.has(e.id) || processed.has(e.twin.id)) return;\n      processed.add(e.id); processed.add(e.twin.id);\n\n      const vA = e.vertex;\n      const vB = e.twin.vertex;\n\n      const aVal = axis==='x' ? vA.x : axis==='y' ? vA.y : vA.z;\n      const bVal = axis==='x' ? vB.x : axis==='y' ? vB.y : vB.z;\n\n      // Edge crosses the cut plane\n      if ((aVal < position && bVal > position) ||\n          (aVal > position && bVal < position)) {\n        const localT = (position - aVal) / (bVal - aVal);\n        const nv = this.addVertex(\n          vA.x + (vB.x - vA.x) * localT,\n          vA.y + (vB.y - vA.y) * localT,\n          vA.z + (vB.z - vA.z) * localT,\n        );\n        this._splitEdge(e, nv);\n        newVerts.push(nv);\n      }\n    });\n\n    return newVerts;\n  }\n\n  // ── Subdivision Surface (Catmull-Clark simplified) ──────────────────────\n  subdivide() {\n    const newMesh = new HalfEdgeMesh();\n    // For each face: add face centroid\n    const faceCentroids = new Map();\n    this.faces.forEach(face => {\n      const verts = face.vertices();\n      const cx = verts.reduce((s,v)=>s+v.x,0)/verts.length;\n      const cy = verts.reduce((s,v)=>s+v.y,0)/verts.length;\n      const cz = verts.reduce((s,v)=>s+v.z,0)/verts.length;\n      faceCentroids.set(face.id, newMesh.addVertex(cx,cy,cz));\n    });\n\n    // For each edge: add edge midpoint\n    const edgeMids = new Map();\n    const seen = new Set();\n    this.halfEdges.forEach(e => {\n      if (!e.twin || seen.has(e.id) || seen.has(e.twin.id)) return;\n      seen.add(e.id);\n      const a = e.vertex, b = e.twin.vertex;\n      const mid = newMesh.addVertex((a.x+b.x)/2,(a.y+b.y)/2,(a.z+b.z)/2);\n      edgeMids.set(e.id, mid); edgeMids.set(e.twin.id, mid);\n    });\n\n    // For each original vertex: add smoothed position\n    const smoothVerts = new Map();\n    this.vertices.forEach(v => {\n      // Average of adjacent face centroids and edge midpoints\n      const adjFaces = []; const adjEdgeMids = [];\n      let e = v.halfEdge;\n      let guard = 0;\n      do {\n        if (e.face) adjFaces.push(faceCentroids.get(e.face.id));\n        const mid = edgeMids.get(e.id);\n        if (mid) adjEdgeMids.push(mid);\n        if (!e.twin) break;\n        e = e.twin.next;\n        guard++;\n      } while (e !== v.halfEdge && guard < 100);\n\n      const n = adjFaces.length;\n      if (n === 0) { smoothVerts.set(v.id, newMesh.addVertex(v.x,v.y,v.z)); return; }\n      const fx = adjFaces.reduce((s,f)=>s+(f?.x||0),0)/n;\n      const fy = adjFaces.reduce((s,f)=>s+(f?.y||0),0)/n;\n      const fz = adjFaces.reduce((s,f)=>s+(f?.z||0),0)/n;\n      const mx = adjEdgeMids.reduce((s,m)=>s+(m?.x||0),0)/Math.max(adjEdgeMids.length,1);\n      const my = adjEdgeMids.reduce((s,m)=>s+(m?.y||0),0)/Math.max(adjEdgeMids.length,1);\n      const mz = adjEdgeMids.reduce((s,m)=>s+(m?.z||0),0)/Math.max(adjEdgeMids.length,1);\n      const sv = newMesh.addVertex(\n        (fx + 2*mx + (n-3)*v.x)/n,\n        (fy + 2*my + (n-3)*v.y)/n,\n        (fz + 2*mz + (n-3)*v.z)/n,\n      );\n      smoothVerts.set(v.id, sv);\n    });\n\n    // Build new quads: for each original face, for each original vertex in face\n    // create quad: smoothVert -> edgeMid -> faceCentroid -> prevEdgeMid\n    this.faces.forEach(face => {\n      const fc = faceCentroids.get(face.id);\n      const edges = face.halfEdge.faceLoop();\n      for (let i=0; i<edges.length; i++) {\n        const e    = edges[i];\n        const ePrev= edges[(i+edges.length-1)%edges.length];\n        const sv   = smoothVerts.get(e.vertex.id);\n        const em   = edgeMids.get(e.id);\n        const epm  = edgeMids.get(ePrev.id);\n        if (!sv||!em||!fc||!epm) return;\n        // quad: sv, em, fc, epm\n        const f = newMesh.addFace();\n        const he0=newMesh.addHalfEdge(); he0.vertex=sv; he0.face=f;\n        const he1=newMesh.addHalfEdge(); he1.vertex=em; he1.face=f;\n        const he2=newMesh.addHalfEdge(); he2.vertex=fc; he2.face=f;\n        const he3=newMesh.addHalfEdge(); he3.vertex=epm;he3.face=f;\n        he0.next=he1; he1.next=he2; he2.next=he3; he3.next=he0;\n        he0.prev=he3; he1.prev=he0; he2.prev=he1; he3.prev=he2;\n        f.halfEdge=he0;\n        if (!sv.halfEdge) sv.halfEdge=he0;\n        if (!em.halfEdge) em.halfEdge=he1;\n        if (!fc.halfEdge) fc.halfEdge=he2;\n        if (!epm.halfEdge) epm.halfEdge=he3;\n      }\n    });\n    return newMesh;\n  }\n\n  // ── Extrude selected faces ────────────────────────────────────────────────\n  extrudeFaces(faceIds, amount=0.3) {\n    const newVerts = new Map(); // oldVertId -> newVertId\n    faceIds.forEach(faceIdx => {\n      const face = [...this.faces.values()][faceIdx];\n      if (!face) return;\n      const normal = face.normal();\n      const verts  = face.vertices();\n      verts.forEach(v => {\n        if (!newVerts.has(v.id)) {\n          const nv = this.addVertex(\n            v.x + normal.x*amount,\n            v.y + normal.y*amount,\n            v.z + normal.z*amount,\n          );\n          newVerts.set(v.id, nv);\n        }\n      });\n      // Replace face vertices with extruded vertices\n      face.halfEdge.faceLoop().forEach(e => {\n        const nv = newVerts.get(e.vertex.id);\n        if (nv) e.vertex = nv;\n      });\n      // Create side faces connecting original to extruded\n      const origVerts = verts;\n      for (let i=0;i<origVerts.length;i++) {\n        const a  = origVerts[i];\n        const b  = origVerts[(i+1)%origVerts.length];\n        const na = newVerts.get(a.id);\n        const nb = newVerts.get(b.id);\n        if (!na||!nb) continue;\n        const sf = this.addFace();\n        const e0=this.addHalfEdge(); e0.vertex=a;  e0.face=sf;\n        const e1=this.addHalfEdge(); e1.vertex=b;  e1.face=sf;\n        const e2=this.addHalfEdge(); e2.vertex=nb; e2.face=sf;\n        const e3=this.addHalfEdge(); e3.vertex=na; e3.face=sf;\n        e0.next=e1; e1.next=e2; e2.next=e3; e3.next=e0;\n        e0.prev=e3; e1.prev=e0; e2.prev=e1; e3.prev=e2;\n        sf.halfEdge=e0;\n      }\n    });\n    return newVerts;\n  }\n\n  // ── Merge vertices by distance (weld) ────────────────────────────────────\n  mergeByDistance(threshold=0.001) {\n    let merged = 0;\n    const verts = [...this.vertices.values()];\n    const remap = new Map();\n    for (let i=0;i<verts.length;i++) {\n      for (let j=i+1;j<verts.length;j++) {\n        if (verts[i].distanceTo(verts[j]) < threshold) {\n          remap.set(verts[j].id, verts[i]);\n          merged++;\n        }\n      }\n    }\n    this.halfEdges.forEach(e => {\n      if (remap.has(e.vertex.id)) e.vertex = remap.get(e.vertex.id);\n    });\n    remap.forEach((_,id)=>this.vertices.delete(id));\n    return merged;\n  }\n\n\n\n  // ── Mirror ────────────────────────────────────────────────────────────────\n  mirror(axis='x') {\n    const original = [...this.vertices.values()];\n    const mirrorMap = new Map();\n    original.forEach(v => {\n      const nv = this.addVertex(\n        axis==='x' ? -v.x : v.x,\n        axis==='y' ? -v.y : v.y,\n        axis==='z' ? -v.z : v.z,\n      );\n      mirrorMap.set(v.id, nv);\n    });\n    // Mirror all faces (reversed winding for correct normals)\n    const origFaces = [...this.faces.values()];\n    origFaces.forEach(face => {\n      const verts = face.vertices().reverse();\n      const mf    = this.addFace();\n      const edges = verts.map(() => this.addHalfEdge());\n      verts.forEach((v,i) => {\n        edges[i].vertex = mirrorMap.get(v.id) || v;\n        edges[i].face   = mf;\n      });\n      for (let i=0;i<edges.length;i++) {\n        edges[i].next = edges[(i+1)%edges.length];\n        edges[i].prev = edges[(i+edges.length-1)%edges.length];\n      }\n      mf.halfEdge = edges[0];\n      edges.forEach(e => { if (!e.vertex.halfEdge) e.vertex.halfEdge = e; });\n    });\n    return this;\n  }\n\n  // ── Bevel edges ───────────────────────────────────────────────────────────\n  bevelEdges(amount=0.1) {\n    const newVerts = [];\n    const seen = new Set();\n    this.halfEdges.forEach(e => {\n      if (!e.twin || seen.has(e.id) || seen.has(e.twin.id)) return;\n      seen.add(e.id); seen.add(e.twin.id);\n      const a = e.vertex, b = e.twin.vertex;\n      // Create two new verts offset from each end\n      const dx=b.x-a.x, dy=b.y-a.y, dz=b.z-a.z;\n      const len=Math.sqrt(dx*dx+dy*dy+dz*dz)||1;\n      const nx=dx/len, ny=dy/len, nz=dz/len;\n      const va = this.addVertex(a.x+nx*amount, a.y+ny*amount, a.z+nz*amount);\n      const vb = this.addVertex(b.x-nx*amount, b.y-ny*amount, b.z-nz*amount);\n      newVerts.push({orig_a:a, orig_b:b, va, vb, edge:e});\n    });\n    return newVerts.length;\n  }\n\n  // ── Inset faces ───────────────────────────────────────────────────────────\n  insetFaces(faceIds, amount=0.1) {\n    const newVerts = new Map();\n    faceIds.forEach(faceIdx => {\n      const face = [...this.faces.values()][faceIdx];\n      if (!face) return;\n      const verts    = face.vertices();\n      const centroid = face.centroid();\n      // Move each vertex toward centroid by amount\n      const insetVs = verts.map(v => {\n        const nx = v.x + (centroid.x - v.x) * amount;\n        const ny = v.y + (centroid.y - v.y) * amount;\n        const nz = v.z + (centroid.z - v.z) * amount;\n        const nv = this.addVertex(nx, ny, nz);\n        newVerts.set(v.id + '_' + faceIdx, nv);
+  planeCut(axis='y', position=0, t=0.5) {
+    const newVerts = [];
+    const processed = new Set();
+
+    this.halfEdges.forEach(e => {
+      if (!e.twin) return;
+      if (processed.has(e.id) || processed.has(e.twin.id)) return;
+      processed.add(e.id); processed.add(e.twin.id);
+
+      const vA = e.vertex;
+      const vB = e.twin.vertex;
+
+      const aVal = axis==='x' ? vA.x : axis==='y' ? vA.y : vA.z;
+      const bVal = axis==='x' ? vB.x : axis==='y' ? vB.y : vB.z;
+
+      // Edge crosses the cut plane
+      if ((aVal < position && bVal > position) ||
+          (aVal > position && bVal < position)) {
+        const localT = (position - aVal) / (bVal - aVal);
+        const nv = this.addVertex(
+          vA.x + (vB.x - vA.x) * localT,
+          vA.y + (vB.y - vA.y) * localT,
+          vA.z + (vB.z - vA.z) * localT,
+        );
+        this._splitEdge(e, nv);
+        newVerts.push(nv);
+      }
+    });
+
+    return newVerts;
+  }
+
+  // ── Subdivision Surface (Catmull-Clark simplified) ──────────────────────
+  subdivide() {
+    const newMesh = new HalfEdgeMesh();
+    // For each face: add face centroid
+    const faceCentroids = new Map();
+    this.faces.forEach(face => {
+      const verts = face.vertices();
+      const cx = verts.reduce((s,v)=>s+v.x,0)/verts.length;
+      const cy = verts.reduce((s,v)=>s+v.y,0)/verts.length;
+      const cz = verts.reduce((s,v)=>s+v.z,0)/verts.length;
+      faceCentroids.set(face.id, newMesh.addVertex(cx,cy,cz));
+    });
+
+    // For each edge: add edge midpoint
+    const edgeMids = new Map();
+    const seen = new Set();
+    this.halfEdges.forEach(e => {
+      if (!e.twin || seen.has(e.id) || seen.has(e.twin.id)) return;
+      seen.add(e.id);
+      const a = e.vertex, b = e.twin.vertex;
+      const mid = newMesh.addVertex((a.x+b.x)/2,(a.y+b.y)/2,(a.z+b.z)/2);
+      edgeMids.set(e.id, mid); edgeMids.set(e.twin.id, mid);
+    });
+
+    // For each original vertex: add smoothed position
+    const smoothVerts = new Map();
+    this.vertices.forEach(v => {
+      // Average of adjacent face centroids and edge midpoints
+      const adjFaces = []; const adjEdgeMids = [];
+      let e = v.halfEdge;
+      let guard = 0;
+      do {
+        if (e.face) adjFaces.push(faceCentroids.get(e.face.id));
+        const mid = edgeMids.get(e.id);
+        if (mid) adjEdgeMids.push(mid);
+        if (!e.twin) break;
+        e = e.twin.next;
+        guard++;
+      } while (e !== v.halfEdge && guard < 100);
+
+      const n = adjFaces.length;
+      if (n === 0) { smoothVerts.set(v.id, newMesh.addVertex(v.x,v.y,v.z)); return; }
+      const fx = adjFaces.reduce((s,f)=>s+(f?.x||0),0)/n;
+      const fy = adjFaces.reduce((s,f)=>s+(f?.y||0),0)/n;
+      const fz = adjFaces.reduce((s,f)=>s+(f?.z||0),0)/n;
+      const mx = adjEdgeMids.reduce((s,m)=>s+(m?.x||0),0)/Math.max(adjEdgeMids.length,1);
+      const my = adjEdgeMids.reduce((s,m)=>s+(m?.y||0),0)/Math.max(adjEdgeMids.length,1);
+      const mz = adjEdgeMids.reduce((s,m)=>s+(m?.z||0),0)/Math.max(adjEdgeMids.length,1);
+      const sv = newMesh.addVertex(
+        (fx + 2*mx + (n-3)*v.x)/n,
+        (fy + 2*my + (n-3)*v.y)/n,
+        (fz + 2*mz + (n-3)*v.z)/n,
+      );
+      smoothVerts.set(v.id, sv);
+    });
+
+    // Build new quads: for each original face, for each original vertex in face
+    // create quad: smoothVert -> edgeMid -> faceCentroid -> prevEdgeMid
+    this.faces.forEach(face => {
+      const fc = faceCentroids.get(face.id);
+      const edges = face.halfEdge.faceLoop();
+      for (let i=0; i<edges.length; i++) {
+        const e    = edges[i];
+        const ePrev= edges[(i+edges.length-1)%edges.length];
+        const sv   = smoothVerts.get(e.vertex.id);
+        const em   = edgeMids.get(e.id);
+        const epm  = edgeMids.get(ePrev.id);
+        if (!sv||!em||!fc||!epm) return;
+        // quad: sv, em, fc, epm
+        const f = newMesh.addFace();
+        const he0=newMesh.addHalfEdge(); he0.vertex=sv; he0.face=f;
+        const he1=newMesh.addHalfEdge(); he1.vertex=em; he1.face=f;
+        const he2=newMesh.addHalfEdge(); he2.vertex=fc; he2.face=f;
+        const he3=newMesh.addHalfEdge(); he3.vertex=epm;he3.face=f;
+        he0.next=he1; he1.next=he2; he2.next=he3; he3.next=he0;
+        he0.prev=he3; he1.prev=he0; he2.prev=he1; he3.prev=he2;
+        f.halfEdge=he0;
+        if (!sv.halfEdge) sv.halfEdge=he0;
+        if (!em.halfEdge) em.halfEdge=he1;
+        if (!fc.halfEdge) fc.halfEdge=he2;
+        if (!epm.halfEdge) epm.halfEdge=he3;
+      }
+    });
+    return newMesh;
+  }
+
+  // ── Extrude selected faces ────────────────────────────────────────────────
+  extrudeFaces(faceIds, amount=0.3) {
+    const newVerts = new Map(); // oldVertId -> newVertId
+    faceIds.forEach(faceIdx => {
+      const face = [...this.faces.values()][faceIdx];
+      if (!face) return;
+      const normal = face.normal();
+      const verts  = face.vertices();
+      verts.forEach(v => {
+        if (!newVerts.has(v.id)) {
+          const nv = this.addVertex(
+            v.x + normal.x*amount,
+            v.y + normal.y*amount,
+            v.z + normal.z*amount,
+          );
+          newVerts.set(v.id, nv);
+        }
+      });
+      // Replace face vertices with extruded vertices
+      face.halfEdge.faceLoop().forEach(e => {
+        const nv = newVerts.get(e.vertex.id);
+        if (nv) e.vertex = nv;
+      });
+      // Create side faces connecting original to extruded
+      const origVerts = verts;
+      for (let i=0;i<origVerts.length;i++) {
+        const a  = origVerts[i];
+        const b  = origVerts[(i+1)%origVerts.length];
+        const na = newVerts.get(a.id);
+        const nb = newVerts.get(b.id);
+        if (!na||!nb) continue;
+        const sf = this.addFace();
+        const e0=this.addHalfEdge(); e0.vertex=a;  e0.face=sf;
+        const e1=this.addHalfEdge(); e1.vertex=b;  e1.face=sf;
+        const e2=this.addHalfEdge(); e2.vertex=nb; e2.face=sf;
+        const e3=this.addHalfEdge(); e3.vertex=na; e3.face=sf;
+        e0.next=e1; e1.next=e2; e2.next=e3; e3.next=e0;
+        e0.prev=e3; e1.prev=e0; e2.prev=e1; e3.prev=e2;
+        sf.halfEdge=e0;
+      }
+    });
+    return newVerts;
+  }
+
+  // ── Merge vertices by distance (weld) ────────────────────────────────────
+  mergeByDistance(threshold=0.001) {
+    let merged = 0;
+    const verts = [...this.vertices.values()];
+    const remap = new Map();
+    for (let i=0;i<verts.length;i++) {
+      for (let j=i+1;j<verts.length;j++) {
+        if (verts[i].distanceTo(verts[j]) < threshold) {
+          remap.set(verts[j].id, verts[i]);
+          merged++;
+        }
+      }
+    }
+    this.halfEdges.forEach(e => {
+      if (remap.has(e.vertex.id)) e.vertex = remap.get(e.vertex.id);
+    });
+    remap.forEach((_,id)=>this.vertices.delete(id));
+    return merged;
+  }
+
+
+
+  // ── Mirror ────────────────────────────────────────────────────────────────
+  mirror(axis='x') {
+    const original = [...this.vertices.values()];
+    const mirrorMap = new Map();
+    original.forEach(v => {
+      const nv = this.addVertex(
+        axis==='x' ? -v.x : v.x,
+        axis==='y' ? -v.y : v.y,
+        axis==='z' ? -v.z : v.z,
+      );
+      mirrorMap.set(v.id, nv);
+    });
+    // Mirror all faces (reversed winding for correct normals)
+    const origFaces = [...this.faces.values()];
+    origFaces.forEach(face => {
+      const verts = face.vertices().reverse();
+      const mf    = this.addFace();
+      const edges = verts.map(() => this.addHalfEdge());
+      verts.forEach((v,i) => {
+        edges[i].vertex = mirrorMap.get(v.id) || v;
+        edges[i].face   = mf;
+      });
+      for (let i=0;i<edges.length;i++) {
+        edges[i].next = edges[(i+1)%edges.length];
+        edges[i].prev = edges[(i+edges.length-1)%edges.length];
+      }
+      mf.halfEdge = edges[0];
+      edges.forEach(e => { if (!e.vertex.halfEdge) e.vertex.halfEdge = e; });
+    });
+    return this;
+  }
+
+  // ── Bevel edges ───────────────────────────────────────────────────────────
+  bevelEdges(amount=0.1) {
+    const newVerts = [];
+    const seen = new Set();
+    this.halfEdges.forEach(e => {
+      if (!e.twin || seen.has(e.id) || seen.has(e.twin.id)) return;
+      seen.add(e.id); seen.add(e.twin.id);
+      const a = e.vertex, b = e.twin.vertex;
+      // Create two new verts offset from each end
+      const dx=b.x-a.x, dy=b.y-a.y, dz=b.z-a.z;
+      const len=Math.sqrt(dx*dx+dy*dy+dz*dz)||1;
+      const nx=dx/len, ny=dy/len, nz=dz/len;
+      const va = this.addVertex(a.x+nx*amount, a.y+ny*amount, a.z+nz*amount);
+      const vb = this.addVertex(b.x-nx*amount, b.y-ny*amount, b.z-nz*amount);
+      newVerts.push({orig_a:a, orig_b:b, va, vb, edge:e});
+    });
+    return newVerts.length;
+  }
+
+  // ── Inset faces ───────────────────────────────────────────────────────────
+  insetFaces(faceIds, amount=0.1) {
+    const newVerts = new Map();
+    faceIds.forEach(faceIdx => {
+      const face = [...this.faces.values()][faceIdx];
+      if (!face) return;
+      const verts    = face.vertices();
+      const centroid = face.centroid();
+      // Move each vertex toward centroid by amount
+      const insetVs = verts.map(v => {
+        const nx = v.x + (centroid.x - v.x) * amount;
+        const ny = v.y + (centroid.y - v.y) * amount;
+        const nz = v.z + (centroid.z - v.z) * amount;
+        const nv = this.addVertex(nx, ny, nz);
+        newVerts.set(v.id + '_' + faceIdx, nv);
         return nv;
       });
       // Create inner face

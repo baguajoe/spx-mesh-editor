@@ -3,7 +3,385 @@
  * Groom tools: comb, push, pull, smooth, twist, cut, grow, relax, puff, flatten.
  * Operates on strand arrays with brush falloff, X-mirror, and undo/redo.
  */
-import * as THREE from 'three';\n\nconst clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));\nconst lerp  = (a, b, t)   => a + (b - a) * t;\n\n// ─── Brush falloff ─────────────────────────────────────────────────────────\nexport function brushFalloff(dist, radius, falloff = 0.6) {\n  if (dist >= radius) return 0;\n  const t = dist / radius;\n  return Math.pow(1 - t, 2) * (1 - falloff) + (1 - t) * falloff;\n}\n\n// ─── Groom tools ──────────────────────────────────────────────────────────\nexport const GroomTools = {\n\n  comb(strands, brushPos, radius, strength, direction, falloff = 0.6) {\n    return strands.map(strand => {\n      const dist = brushPos.distanceTo(strand.rootPos);\n      const w    = brushFalloff(dist, radius, falloff) * strength;\n      if (w < 0.001) return strand;\n      const newCurve = strand.curve.map((pt, i) => {\n        if (i === 0) return pt.clone();\n        const t = i / (strand.curve.length - 1);\n        return pt.clone().add(direction.clone().multiplyScalar(w * t * 0.02));\n      });\n      return { ...strand, curve: newCurve };\n    });\n  },\n\n  push(strands, brushPos, radius, strength, falloff = 0.6) {\n    return strands.map(strand => {\n      const dist = brushPos.distanceTo(strand.rootPos);\n      const w    = brushFalloff(dist, radius, falloff) * strength;\n      if (w < 0.001) return strand;\n      const pushDir = strand.rootPos.clone().sub(brushPos).normalize();\n      const offset  = pushDir.multiplyScalar(w * 0.015);\n      return { ...strand, rootPos: strand.rootPos.clone().add(offset) };\n    });\n  },\n\n  pull(strands, brushPos, radius, strength, falloff = 0.6) {\n    return strands.map(strand => {\n      const dist = brushPos.distanceTo(strand.rootPos);\n      const w    = brushFalloff(dist, radius, falloff) * strength;\n      if (w < 0.001) return strand;\n      const pullDir = brushPos.clone().sub(strand.rootPos).normalize();\n      const offset  = pullDir.multiplyScalar(w * 0.015);\n      return { ...strand, rootPos: strand.rootPos.clone().add(offset) };\n    });\n  },\n\n  smooth(strands, brushPos, radius, strength, falloff = 0.6) {\n    const affected = strands.filter(s => brushPos.distanceTo(s.rootPos) < radius);\n    if (affected.length < 2) return strands;\n    const avgDir = new THREE.Vector3();\n    affected.forEach(s => {\n      const tip = s.curve[s.curve.length - 1];\n      avgDir.add(tip.clone().sub(s.rootPos).normalize());\n    });\n    avgDir.divideScalar(affected.length).normalize();\n    return strands.map(strand => {\n      const dist = brushPos.distanceTo(strand.rootPos);\n      const w    = brushFalloff(dist, radius, falloff) * strength;\n      if (w < 0.001) return strand;\n      const newCurve = strand.curve.map((pt, i) => {\n        if (i === 0) return pt.clone();\n        const t     = i / (strand.curve.length - 1);\n        const ideal = strand.rootPos.clone().add(avgDir.clone().multiplyScalar(strand.length * t));\n        return pt.clone().lerp(ideal, w * 0.3);\n      });\n      return { ...strand, curve: newCurve };\n    });\n  },\n\n  twist(strands, brushPos, radius, strength, angle, falloff = 0.6) {\n    return strands.map(strand => {\n      const dist = brushPos.distanceTo(strand.rootPos);\n      const w    = brushFalloff(dist, radius, falloff) * strength;\n      if (w < 0.001) return strand;\n      const axis = strand.rootNormal.clone().normalize();\n      const newCurve = strand.curve.map((pt, i) => {\n        if (i === 0) return pt.clone();\n        const t       = i / (strand.curve.length - 1);\n        const rotAngle = angle * w * t;\n        return pt.clone().applyAxisAngle(axis, rotAngle);\n      });\n      return { ...strand, curve: newCurve };\n    });\n  },\n\n  cut(strands, brushPos, radius, strength, cutLength, falloff = 0.6) {\n    return strands.map(strand => {\n      const dist = brushPos.distanceTo(strand.rootPos);\n      const w    = brushFalloff(dist, radius, falloff) * strength;\n      if (w < 0.001) return strand;\n      const newLen = Math.max(0.01, strand.length * (1 - w * 0.6));\n      const ratio  = newLen / strand.length;\n      const newCurve = strand.curve.map((pt, i) => {\n        const t = i / (strand.curve.length - 1);\n        if (t > ratio) {\n          const root = strand.rootPos;\n          const dir  = strand.curve[strand.curve.length-1].clone().sub(root).normalize();\n          return root.clone().add(dir.multiplyScalar(newLen * t));\n        }\n        return pt.clone();\n      });\n      return { ...strand, curve: newCurve, length: newLen };\n    });\n  },\n\n  grow(strands, brushPos, radius, strength, maxLength, falloff = 0.6) {\n    return strands.map(strand => {\n      const dist = brushPos.distanceTo(strand.rootPos);\n      const w    = brushFalloff(dist, radius, falloff) * strength;\n      if (w < 0.001) return strand;\n      const newLen = Math.min(maxLength ?? 0.6, strand.length * (1 + w * 0.3));\n      const ratio  = newLen / strand.length;\n      const newCurve = strand.curve.map((pt, i) => {\n        const t = i / (strand.curve.length - 1);\n        const root = strand.rootPos;\n        const dir  = strand.curve[strand.curve.length-1].clone().sub(root).normalize();\n        return root.clone().add(dir.clone().multiplyScalar(newLen * t));\n      });\n      return { ...strand, curve: newCurve, length: newLen };\n    });\n  },\n\n  relax(strands, brushPos, radius, strength, falloff = 0.6) {\n    return strands.map(strand => {\n      const dist = brushPos.distanceTo(strand.rootPos);\n      const w    = brushFalloff(dist, radius, falloff) * strength;\n      if (w < 0.001) return strand;\n      const restCurve = [];\n      const dir = strand.rootNormal.clone();\n      for (let i = 0; i < strand.curve.length; i++) {\n        const t = i / (strand.curve.length - 1);\n        restCurve.push(strand.rootPos.clone().add(dir.clone().multiplyScalar(t * strand.length)));\n      }\n      const newCurve = strand.curve.map((pt, i) => pt.clone().lerp(restCurve[i], w * 0.4));\n      return { ...strand, curve: newCurve };\n    });\n  },\n\n  puff(strands, brushPos, radius, strength, falloff = 0.6) {\n    return strands.map(strand => {\n      const dist = brushPos.distanceTo(strand.rootPos);\n      const w    = brushFalloff(dist, radius, falloff) * strength;\n      if (w < 0.001) return strand;\n      const awayFromCenter = strand.rootPos.clone().normalize();\n      const offset = awayFromCenter.multiplyScalar(w * 0.012);\n      const newCurve = strand.curve.map((pt, i) => {\n        const t = i / (strand.curve.length - 1);\n        return pt.clone().add(offset.clone().multiplyScalar(t));\n      });\n      return { ...strand, curve: newCurve };\n    });\n  },\n\n  flatten(strands, brushPos, radius, strength, normal, falloff = 0.6) {\n    const flatNormal = normal ?? new THREE.Vector3(0, 1, 0);\n    return strands.map(strand => {\n      const dist = brushPos.distanceTo(strand.rootPos);\n      const w    = brushFalloff(dist, radius, falloff) * strength;\n      if (w < 0.001) return strand;\n      const newCurve = strand.curve.map((pt, i) => {\n        if (i === 0) return pt.clone();\n        const proj = pt.clone().sub(flatNormal.clone().multiplyScalar(pt.dot(flatNormal)));\n        return pt.clone().lerp(proj, w * 0.5);\n      });\n      return { ...strand, curve: newCurve };\n    });\n  },\n};\n\n// ─── X-Mirror helper ──────────────────────────────────────────────────────\nexport function mirrorBrushPos(pos) {\n  return new THREE.Vector3(-pos.x, pos.y, pos.z);\n}\n\nexport function applyWithMirror(strands, brushPos, toolFn, ...args) {\n  const pass1 = toolFn(strands, brushPos, ...args);\n  return toolFn(pass1, mirrorBrushPos(brushPos), ...args);\n}\n\n// ─── Undo / Redo stack ───────────────────────────────────────────────────\nexport class GroomHistory {\n  constructor(maxLength = 32) {\n    this._stack   = [];\n    this._pos     = -1;\n    this._maxLen  = maxLength;\n  }\n\n  push(strands) {\n    this._stack = this._stack.slice(0, this._pos + 1);\n    this._stack.push(strands.map(s => ({\n      ...s,\n      rootPos: s.rootPos.clone(),\n      curve:   s.curve.map(p => p.clone()),\n    })));\n    if (this._stack.length > this._maxLen) this._stack.shift();\n    this._pos = this._stack.length - 1;\n  }\n\n  undo() {\n    if (this._pos <= 0) return null;\n    this._pos--;\n    return this._restore(this._stack[this._pos]);\n  }\n\n  redo() {\n    if (this._pos >= this._stack.length - 1) return null;\n    this._pos++;\n    return this._restore(this._stack[this._pos]);\n  }\n\n  _restore(snapshot) {\n    return snapshot.map(s => ({\n      ...s,\n      rootPos: s.rootPos.clone(),\n      curve:   s.curve.map(p => p.clone()),\n    }));\n  }\n\n  canUndo() { return this._pos > 0; }\n  canRedo() { return this._pos < this._stack.length - 1; }\n  get length() { return this._stack.length; }\n  clear() { this._stack = []; this._pos = -1; }\n}\n\n// ─── HairGroomingSession ─────────────────────────────────────────────────\nexport class HairGroomingSession {\n  constructor(hairSystem) {\n    this.hairSystem  = hairSystem;\n    this.history     = new GroomHistory();\n    this.activeTool  = 'comb';\n    this.brushRadius = 0.08;\n    this.brushStr    = 0.50;\n    this.brushFalloff= 0.60;\n    this.xMirror     = true;\n    this.strands     = [];\n  }\n\n  setTool(name) { this.activeTool = name; }\n  setBrush(radius, strength, falloff) {\n    this.brushRadius  = radius;\n    this.brushStr     = strength;\n    this.brushFalloff = falloff;\n  }\n\n  stroke(brushPos, extraArgs = []) {\n    this.history.push(this.strands);\n    const tool   = GroomTools[this.activeTool];\n    if (!tool) return;\n    const args   = [brushPos, this.brushRadius, this.brushStr, ...extraArgs, this.brushFalloff];\n    let result   = tool(this.strands, ...args);\n    if (this.xMirror) {\n      result = tool(result, mirrorBrushPos(brushPos), this.brushRadius, this.brushStr, ...extraArgs, this.brushFalloff);\n    }\n    this.strands = result;\n    this._rebuildGeometries();\n  }\n\n  undo() { const s = this.history.undo(); if (s) { this.strands = s; this._rebuildGeometries(); } }\n  redo() { const s = this.history.redo(); if (s) { this.strands = s; this._rebuildGeometries(); } }\n\n  _rebuildGeometries() {\n    this.hairSystem?.emit?.('groomed', this.strands);\n  }\n\n  toJSON() {\n    return { activeTool: this.activeTool, brushRadius: this.brushRadius,\n      brushStr: this.brushStr, xMirror: this.xMirror, strandCount: this.strands.length };\n  }\n}\n\nexport default HairGroomingSession;\n\nexport function computeAverageDirection(strands) {\n  if (!strands.length) return new THREE.Vector3(0, 1, 0);\n  const avg = new THREE.Vector3();\n  strands.forEach(s => {\n    const dir = s.curve[s.curve.length-1].clone().sub(s.rootPos).normalize();\n    avg.add(dir);\n  });\n  return avg.divideScalar(strands.length).normalize();\n}\n\nexport function getStrandLength(strand) {\n  let len = 0;\n  for (let i = 1; i < strand.curve.length; i++) {\n    len += strand.curve[i].distanceTo(strand.curve[i-1]);\n  }\n  return len;\n}\n\nexport function resampleCurve(curve, targetSegments) {\n  if (curve.length <= 1) return curve;\n  const totalLen = curve.reduce((s, p, i) => i === 0 ? 0 : s + p.distanceTo(curve[i-1]), 0);\n  const segLen   = totalLen / targetSegments;\n  const result   = [curve[0].clone()];\n  let   traveled = 0, curIdx = 0;\n  for (let seg = 1; seg < targetSegments; seg++) {\n    const target = seg * segLen;\n    while (curIdx < curve.length - 1) {\n      const d = curve[curIdx+1].distanceTo(curve[curIdx]);\n      if (traveled + d >= target) {\n        const t = (target - traveled) / d;\n        result.push(curve[curIdx].clone().lerp(curve[curIdx+1], t));\n        break;\n      }\n      traveled += d; curIdx++;\n    }\n  }\n  result.push(curve[curve.length-1].clone());\n  return result;\n}\n\nexport function snapStrandsToSurface(strands, scalp) {\n  if (!scalp?.geometry) return strands;\n  return strands.map(strand => {\n    const rootOffset = strand.rootPos.clone().normalize().multiplyScalar(0.002);\n    return { ...strand, rootPos: strand.rootPos.clone().add(rootOffset) };\n  });\n}\n\nexport function filterStrandsByLength(strands, minLen, maxLen) {\n  return strands.filter(s => {\n    const len = getStrandLength(s);\n    return len >= minLen && len <= maxLen;\n  });\n}\n\nexport function interpolateStrandDensity(strands, densityMap) {\n  return strands.filter((s, i) => (densityMap.get(i) ?? 1.0) > 0.5);\n}\n\nexport function getGroomingStats(strands) {\n  if (!strands.length) return { count:0, avgLen:0, minLen:0, maxLen:0 };\n  const lengths = strands.map(getStrandLength);\n  return {\n    count:  strands.length,\n    avgLen: lengths.reduce((a,b)=>a+b,0)/lengths.length,\n    minLen: Math.min(...lengths),\n    maxLen: Math.max(...lengths),\n  };\n}\n\nexport function buildGroomPreset(name) {\n  const presets = {\n    Natural:  { activeTool:'comb',   brushRadius:0.08, brushStr:0.4, falloff:0.6, xMirror:true  },\n    Slicked:  { activeTool:'smooth', brushRadius:0.12, brushStr:0.6, falloff:0.7, xMirror:true  },\n    Wild:     { activeTool:'puff',   brushRadius:0.10, brushStr:0.5, falloff:0.5, xMirror:false },\n    Trimmed:  { activeTool:'cut',    brushRadius:0.05, brushStr:0.8, falloff:0.8, xMirror:true  },\n    Fluffy:   { activeTool:'puff',   brushRadius:0.15, brushStr:0.6, falloff:0.4, xMirror:true  },\n  };\n  return presets[name] ?? presets.Natural;\n}\nexport function applyGroomPreset(session, presetName) {\n  const p = buildGroomPreset(presetName);\n  session.setTool(p.activeTool);\n  session.setBrush(p.brushRadius, p.brushStr, p.falloff);\n  session.xMirror = p.xMirror;\n  return p;\n}\nexport function computeGroomProgress(strands, targetStyle) {\n  const stats   = getGroomingStats(strands);\n  const targets = { Natural:0.25, Long:0.40, Short:0.06, Curly:0.20 };\n  const target  = targets[targetStyle] ?? 0.25;\n  const diff    = Math.abs(stats.avgLen - target);\n  return Math.max(0, 1 - diff / target);\n}\nexport function exportGroomData(session) {\n  return JSON.stringify({ tool:session.activeTool, radius:session.brushRadius,\n    strength:session.brushStr, xMirror:session.xMirror,\n    strandCount:session.strands.length, historyLength:session.history.length });\n}\nexport function getGroomBrushPreview(tool, radius) {\n  return { tool, radius, color: tool==='cut'?'#FF6600':tool==='grow'?'#00ffc8':'#ffffff',\n    icon: {comb:'🔀',push:'👋',pull:'✋',smooth:'✨',cut:'✂️',grow:'🌱',puff:'💨',flatten:'▬',relax:'😌',twist:'🌀'}[tool]??'⚙' };
+import * as THREE from 'three';
+
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const lerp  = (a, b, t)   => a + (b - a) * t;
+
+// ─── Brush falloff ─────────────────────────────────────────────────────────
+export function brushFalloff(dist, radius, falloff = 0.6) {
+  if (dist >= radius) return 0;
+  const t = dist / radius;
+  return Math.pow(1 - t, 2) * (1 - falloff) + (1 - t) * falloff;
+}
+
+// ─── Groom tools ──────────────────────────────────────────────────────────
+export const GroomTools = {
+
+  comb(strands, brushPos, radius, strength, direction, falloff = 0.6) {
+    return strands.map(strand => {
+      const dist = brushPos.distanceTo(strand.rootPos);
+      const w    = brushFalloff(dist, radius, falloff) * strength;
+      if (w < 0.001) return strand;
+      const newCurve = strand.curve.map((pt, i) => {
+        if (i === 0) return pt.clone();
+        const t = i / (strand.curve.length - 1);
+        return pt.clone().add(direction.clone().multiplyScalar(w * t * 0.02));
+      });
+      return { ...strand, curve: newCurve };
+    });
+  },
+
+  push(strands, brushPos, radius, strength, falloff = 0.6) {
+    return strands.map(strand => {
+      const dist = brushPos.distanceTo(strand.rootPos);
+      const w    = brushFalloff(dist, radius, falloff) * strength;
+      if (w < 0.001) return strand;
+      const pushDir = strand.rootPos.clone().sub(brushPos).normalize();
+      const offset  = pushDir.multiplyScalar(w * 0.015);
+      return { ...strand, rootPos: strand.rootPos.clone().add(offset) };
+    });
+  },
+
+  pull(strands, brushPos, radius, strength, falloff = 0.6) {
+    return strands.map(strand => {
+      const dist = brushPos.distanceTo(strand.rootPos);
+      const w    = brushFalloff(dist, radius, falloff) * strength;
+      if (w < 0.001) return strand;
+      const pullDir = brushPos.clone().sub(strand.rootPos).normalize();
+      const offset  = pullDir.multiplyScalar(w * 0.015);
+      return { ...strand, rootPos: strand.rootPos.clone().add(offset) };
+    });
+  },
+
+  smooth(strands, brushPos, radius, strength, falloff = 0.6) {
+    const affected = strands.filter(s => brushPos.distanceTo(s.rootPos) < radius);
+    if (affected.length < 2) return strands;
+    const avgDir = new THREE.Vector3();
+    affected.forEach(s => {
+      const tip = s.curve[s.curve.length - 1];
+      avgDir.add(tip.clone().sub(s.rootPos).normalize());
+    });
+    avgDir.divideScalar(affected.length).normalize();
+    return strands.map(strand => {
+      const dist = brushPos.distanceTo(strand.rootPos);
+      const w    = brushFalloff(dist, radius, falloff) * strength;
+      if (w < 0.001) return strand;
+      const newCurve = strand.curve.map((pt, i) => {
+        if (i === 0) return pt.clone();
+        const t     = i / (strand.curve.length - 1);
+        const ideal = strand.rootPos.clone().add(avgDir.clone().multiplyScalar(strand.length * t));
+        return pt.clone().lerp(ideal, w * 0.3);
+      });
+      return { ...strand, curve: newCurve };
+    });
+  },
+
+  twist(strands, brushPos, radius, strength, angle, falloff = 0.6) {
+    return strands.map(strand => {
+      const dist = brushPos.distanceTo(strand.rootPos);
+      const w    = brushFalloff(dist, radius, falloff) * strength;
+      if (w < 0.001) return strand;
+      const axis = strand.rootNormal.clone().normalize();
+      const newCurve = strand.curve.map((pt, i) => {
+        if (i === 0) return pt.clone();
+        const t       = i / (strand.curve.length - 1);
+        const rotAngle = angle * w * t;
+        return pt.clone().applyAxisAngle(axis, rotAngle);
+      });
+      return { ...strand, curve: newCurve };
+    });
+  },
+
+  cut(strands, brushPos, radius, strength, cutLength, falloff = 0.6) {
+    return strands.map(strand => {
+      const dist = brushPos.distanceTo(strand.rootPos);
+      const w    = brushFalloff(dist, radius, falloff) * strength;
+      if (w < 0.001) return strand;
+      const newLen = Math.max(0.01, strand.length * (1 - w * 0.6));
+      const ratio  = newLen / strand.length;
+      const newCurve = strand.curve.map((pt, i) => {
+        const t = i / (strand.curve.length - 1);
+        if (t > ratio) {
+          const root = strand.rootPos;
+          const dir  = strand.curve[strand.curve.length-1].clone().sub(root).normalize();
+          return root.clone().add(dir.multiplyScalar(newLen * t));
+        }
+        return pt.clone();
+      });
+      return { ...strand, curve: newCurve, length: newLen };
+    });
+  },
+
+  grow(strands, brushPos, radius, strength, maxLength, falloff = 0.6) {
+    return strands.map(strand => {
+      const dist = brushPos.distanceTo(strand.rootPos);
+      const w    = brushFalloff(dist, radius, falloff) * strength;
+      if (w < 0.001) return strand;
+      const newLen = Math.min(maxLength ?? 0.6, strand.length * (1 + w * 0.3));
+      const ratio  = newLen / strand.length;
+      const newCurve = strand.curve.map((pt, i) => {
+        const t = i / (strand.curve.length - 1);
+        const root = strand.rootPos;
+        const dir  = strand.curve[strand.curve.length-1].clone().sub(root).normalize();
+        return root.clone().add(dir.clone().multiplyScalar(newLen * t));
+      });
+      return { ...strand, curve: newCurve, length: newLen };
+    });
+  },
+
+  relax(strands, brushPos, radius, strength, falloff = 0.6) {
+    return strands.map(strand => {
+      const dist = brushPos.distanceTo(strand.rootPos);
+      const w    = brushFalloff(dist, radius, falloff) * strength;
+      if (w < 0.001) return strand;
+      const restCurve = [];
+      const dir = strand.rootNormal.clone();
+      for (let i = 0; i < strand.curve.length; i++) {
+        const t = i / (strand.curve.length - 1);
+        restCurve.push(strand.rootPos.clone().add(dir.clone().multiplyScalar(t * strand.length)));
+      }
+      const newCurve = strand.curve.map((pt, i) => pt.clone().lerp(restCurve[i], w * 0.4));
+      return { ...strand, curve: newCurve };
+    });
+  },
+
+  puff(strands, brushPos, radius, strength, falloff = 0.6) {
+    return strands.map(strand => {
+      const dist = brushPos.distanceTo(strand.rootPos);
+      const w    = brushFalloff(dist, radius, falloff) * strength;
+      if (w < 0.001) return strand;
+      const awayFromCenter = strand.rootPos.clone().normalize();
+      const offset = awayFromCenter.multiplyScalar(w * 0.012);
+      const newCurve = strand.curve.map((pt, i) => {
+        const t = i / (strand.curve.length - 1);
+        return pt.clone().add(offset.clone().multiplyScalar(t));
+      });
+      return { ...strand, curve: newCurve };
+    });
+  },
+
+  flatten(strands, brushPos, radius, strength, normal, falloff = 0.6) {
+    const flatNormal = normal ?? new THREE.Vector3(0, 1, 0);
+    return strands.map(strand => {
+      const dist = brushPos.distanceTo(strand.rootPos);
+      const w    = brushFalloff(dist, radius, falloff) * strength;
+      if (w < 0.001) return strand;
+      const newCurve = strand.curve.map((pt, i) => {
+        if (i === 0) return pt.clone();
+        const proj = pt.clone().sub(flatNormal.clone().multiplyScalar(pt.dot(flatNormal)));
+        return pt.clone().lerp(proj, w * 0.5);
+      });
+      return { ...strand, curve: newCurve };
+    });
+  },
+};
+
+// ─── X-Mirror helper ──────────────────────────────────────────────────────
+export function mirrorBrushPos(pos) {
+  return new THREE.Vector3(-pos.x, pos.y, pos.z);
+}
+
+export function applyWithMirror(strands, brushPos, toolFn, ...args) {
+  const pass1 = toolFn(strands, brushPos, ...args);
+  return toolFn(pass1, mirrorBrushPos(brushPos), ...args);
+}
+
+// ─── Undo / Redo stack ───────────────────────────────────────────────────
+export class GroomHistory {
+  constructor(maxLength = 32) {
+    this._stack   = [];
+    this._pos     = -1;
+    this._maxLen  = maxLength;
+  }
+
+  push(strands) {
+    this._stack = this._stack.slice(0, this._pos + 1);
+    this._stack.push(strands.map(s => ({
+      ...s,
+      rootPos: s.rootPos.clone(),
+      curve:   s.curve.map(p => p.clone()),
+    })));
+    if (this._stack.length > this._maxLen) this._stack.shift();
+    this._pos = this._stack.length - 1;
+  }
+
+  undo() {
+    if (this._pos <= 0) return null;
+    this._pos--;
+    return this._restore(this._stack[this._pos]);
+  }
+
+  redo() {
+    if (this._pos >= this._stack.length - 1) return null;
+    this._pos++;
+    return this._restore(this._stack[this._pos]);
+  }
+
+  _restore(snapshot) {
+    return snapshot.map(s => ({
+      ...s,
+      rootPos: s.rootPos.clone(),
+      curve:   s.curve.map(p => p.clone()),
+    }));
+  }
+
+  canUndo() { return this._pos > 0; }
+  canRedo() { return this._pos < this._stack.length - 1; }
+  get length() { return this._stack.length; }
+  clear() { this._stack = []; this._pos = -1; }
+}
+
+// ─── HairGroomingSession ─────────────────────────────────────────────────
+export class HairGroomingSession {
+  constructor(hairSystem) {
+    this.hairSystem  = hairSystem;
+    this.history     = new GroomHistory();
+    this.activeTool  = 'comb';
+    this.brushRadius = 0.08;
+    this.brushStr    = 0.50;
+    this.brushFalloff= 0.60;
+    this.xMirror     = true;
+    this.strands     = [];
+  }
+
+  setTool(name) { this.activeTool = name; }
+  setBrush(radius, strength, falloff) {
+    this.brushRadius  = radius;
+    this.brushStr     = strength;
+    this.brushFalloff = falloff;
+  }
+
+  stroke(brushPos, extraArgs = []) {
+    this.history.push(this.strands);
+    const tool   = GroomTools[this.activeTool];
+    if (!tool) return;
+    const args   = [brushPos, this.brushRadius, this.brushStr, ...extraArgs, this.brushFalloff];
+    let result   = tool(this.strands, ...args);
+    if (this.xMirror) {
+      result = tool(result, mirrorBrushPos(brushPos), this.brushRadius, this.brushStr, ...extraArgs, this.brushFalloff);
+    }
+    this.strands = result;
+    this._rebuildGeometries();
+  }
+
+  undo() { const s = this.history.undo(); if (s) { this.strands = s; this._rebuildGeometries(); } }
+  redo() { const s = this.history.redo(); if (s) { this.strands = s; this._rebuildGeometries(); } }
+
+  _rebuildGeometries() {
+    this.hairSystem?.emit?.('groomed', this.strands);
+  }
+
+  toJSON() {
+    return { activeTool: this.activeTool, brushRadius: this.brushRadius,
+      brushStr: this.brushStr, xMirror: this.xMirror, strandCount: this.strands.length };
+  }
+}
+
+export default HairGroomingSession;
+
+export function computeAverageDirection(strands) {
+  if (!strands.length) return new THREE.Vector3(0, 1, 0);
+  const avg = new THREE.Vector3();
+  strands.forEach(s => {
+    const dir = s.curve[s.curve.length-1].clone().sub(s.rootPos).normalize();
+    avg.add(dir);
+  });
+  return avg.divideScalar(strands.length).normalize();
+}
+
+export function getStrandLength(strand) {
+  let len = 0;
+  for (let i = 1; i < strand.curve.length; i++) {
+    len += strand.curve[i].distanceTo(strand.curve[i-1]);
+  }
+  return len;
+}
+
+export function resampleCurve(curve, targetSegments) {
+  if (curve.length <= 1) return curve;
+  const totalLen = curve.reduce((s, p, i) => i === 0 ? 0 : s + p.distanceTo(curve[i-1]), 0);
+  const segLen   = totalLen / targetSegments;
+  const result   = [curve[0].clone()];
+  let   traveled = 0, curIdx = 0;
+  for (let seg = 1; seg < targetSegments; seg++) {
+    const target = seg * segLen;
+    while (curIdx < curve.length - 1) {
+      const d = curve[curIdx+1].distanceTo(curve[curIdx]);
+      if (traveled + d >= target) {
+        const t = (target - traveled) / d;
+        result.push(curve[curIdx].clone().lerp(curve[curIdx+1], t));
+        break;
+      }
+      traveled += d; curIdx++;
+    }
+  }
+  result.push(curve[curve.length-1].clone());
+  return result;
+}
+
+export function snapStrandsToSurface(strands, scalp) {
+  if (!scalp?.geometry) return strands;
+  return strands.map(strand => {
+    const rootOffset = strand.rootPos.clone().normalize().multiplyScalar(0.002);
+    return { ...strand, rootPos: strand.rootPos.clone().add(rootOffset) };
+  });
+}
+
+export function filterStrandsByLength(strands, minLen, maxLen) {
+  return strands.filter(s => {
+    const len = getStrandLength(s);
+    return len >= minLen && len <= maxLen;
+  });
+}
+
+export function interpolateStrandDensity(strands, densityMap) {
+  return strands.filter((s, i) => (densityMap.get(i) ?? 1.0) > 0.5);
+}
+
+export function getGroomingStats(strands) {
+  if (!strands.length) return { count:0, avgLen:0, minLen:0, maxLen:0 };
+  const lengths = strands.map(getStrandLength);
+  return {
+    count:  strands.length,
+    avgLen: lengths.reduce((a,b)=>a+b,0)/lengths.length,
+    minLen: Math.min(...lengths),
+    maxLen: Math.max(...lengths),
+  };
+}
+
+export function buildGroomPreset(name) {
+  const presets = {
+    Natural:  { activeTool:'comb',   brushRadius:0.08, brushStr:0.4, falloff:0.6, xMirror:true  },
+    Slicked:  { activeTool:'smooth', brushRadius:0.12, brushStr:0.6, falloff:0.7, xMirror:true  },
+    Wild:     { activeTool:'puff',   brushRadius:0.10, brushStr:0.5, falloff:0.5, xMirror:false },
+    Trimmed:  { activeTool:'cut',    brushRadius:0.05, brushStr:0.8, falloff:0.8, xMirror:true  },
+    Fluffy:   { activeTool:'puff',   brushRadius:0.15, brushStr:0.6, falloff:0.4, xMirror:true  },
+  };
+  return presets[name] ?? presets.Natural;
+}
+export function applyGroomPreset(session, presetName) {
+  const p = buildGroomPreset(presetName);
+  session.setTool(p.activeTool);
+  session.setBrush(p.brushRadius, p.brushStr, p.falloff);
+  session.xMirror = p.xMirror;
+  return p;
+}
+export function computeGroomProgress(strands, targetStyle) {
+  const stats   = getGroomingStats(strands);
+  const targets = { Natural:0.25, Long:0.40, Short:0.06, Curly:0.20 };
+  const target  = targets[targetStyle] ?? 0.25;
+  const diff    = Math.abs(stats.avgLen - target);
+  return Math.max(0, 1 - diff / target);
+}
+export function exportGroomData(session) {
+  return JSON.stringify({ tool:session.activeTool, radius:session.brushRadius,
+    strength:session.brushStr, xMirror:session.xMirror,
+    strandCount:session.strands.length, historyLength:session.history.length });
+}
+export function getGroomBrushPreview(tool, radius) {
+  return { tool, radius, color: tool==='cut'?'#FF6600':tool==='grow'?'#00ffc8':'#ffffff',
+    icon: {comb:'🔀',push:'👋',pull:'✋',smooth:'✨',cut:'✂️',grow:'🌱',puff:'💨',flatten:'▬',relax:'😌',twist:'🌀'}[tool]??'⚙' };
 }
 
 export function buildGroomMask(strands, paintData) {
