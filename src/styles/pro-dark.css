@@ -147,7 +147,7 @@ input, select { font-family: inherit; }
 }
 
 /* ── Workspace tabs ──────────────────────────────────────────────────────── */
-.spx-workspaces {
+.spx-workspaces { background: #1a1a2e !important;
   display: flex; align-items: stretch; height: var(--tabs-h);
   background: var(--d1); border-bottom: 1px solid var(--b2);
   padding: 0 4px; gap: 1px; overflow-x: auto;
@@ -156,7 +156,7 @@ input, select { font-family: inherit; }
 .spx-workspaces::-webkit-scrollbar { display: none; }
 
 .spx-workspace {
-  display: flex; align-items: center; padding: 0 13px;
+  display: flex; align-items: center; padding: 0 13px; color: #00ffc8 !important; font-size: 11px !important; opacity: 1 !important;
   font-family: var(--mono); font-size: 9px; font-weight: 500;
   letter-spacing: 0.12em; text-transform: uppercase; color: var(--t1);
   background: transparent; border: none; color: #e0e0e0 !important;
