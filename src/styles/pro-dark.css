@@ -1287,3 +1287,8 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px s
   padding-bottom: 8px;
 }
 
+
+/* Fix left panel text clipping */
+.spx-left { min-width: 180px; }
+.spx-left .mesh-editor-panel,
+.spx-left > div { padding-left: 4px; }
