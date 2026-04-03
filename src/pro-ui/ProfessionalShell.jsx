@@ -60,6 +60,15 @@ const MENU_ITEMS = {
     { label: "Loop Cut",             fn: "loop_cut",           key: "Ctrl+R" },
     { label: "Bevel",                fn: "bevel",              key: "Ctrl+B" },
     { label: "Inset Faces",          fn: "inset",              key: "I" },
+    { label: "─", fn: null },
+    { label: "Target Weld",          fn: "target_weld",        key: "" },
+    { label: "Chamfer Vertex",       fn: "chamfer_vertex",     key: "" },
+    { label: "Average Vertex",       fn: "average_vertex",     key: "" },
+    { label: "Circularize",          fn: "circularize",        key: "" },
+    { label: "Connect Components",   fn: "connect_comps",      key: "" },
+    { label: "Poke Face",            fn: "poke_face",          key: "" },
+    { label: "Multi-Cut",            fn: "multi_cut",          key: "" },
+    { label: "Reorder Vertices",     fn: "reorder_verts",      key: "" },
     { label: "Knife",                fn: "knife",              key: "K" },
     { label: "Edge Slide",           fn: "edge_slide",         key: "G G" },
     { label: "─", fn: null },
@@ -255,7 +264,6 @@ export default function ProfessionalShell({
         ))}
       </div>
 
-      <WorkspaceToolsDock />
       {/* Main 3-col */}
       <div className="spx-main">
         <aside className="spx-left">{leftPanel}</aside>
