@@ -48,54 +48,6 @@ const PRESETS = { ...VEHICLE_CURVE_PRESETS, ...{
   'Off-Road':    {bodyLength:0.78,bodyHeight:0.78,bodyWidth:0.75,wheelSize:0.78,spoiler:false,groundClearance:0.62,primaryColor:'#3a4a2a',wheelCount:4},
 }};
 
-function buildCurvedVehicle(scene, p, meshesRef) {
-  meshesRef.current.forEach(m=>{scene.remove(m);m.geometry?.dispose();m.material?.dispose();});
-  meshesRef.current=[];
-  const ms=[];
-  if(!scene.getObjectByName('veh_amb')){
-    const a=new THREE.AmbientLight(0xffffff,0.6);a.name='veh_amb';scene.add(a);ms.push(a);
-    const d=new THREE.DirectionalLight(0xffeedd,1.2);d.name='veh_dir';d.position.set(8,15,8);d.castShadow=true;scene.add(d);ms.push(d);
-  }
-  const ground=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.MeshPhysicalMaterial({color:0x111811,roughness:0.95}));
-  ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);ms.push(ground);
-  const col=new THREE.Color(p.primaryColor);
-  const mat=(c,r=0.3,me=0.7)=>new THREE.MeshPhysicalMaterial({color:c,roughness:r,metalness:me});
-  const add=(geo,x,y,z,m=mat(col))=>{const mesh=new THREE.Mesh(geo,m);mesh.position.set(x,y,z);mesh.castShadow=true;scene.add(mesh);ms.push(mesh);return mesh;};
-  const bL=3+p.bodyLength*4, bH=0.6+p.bodyHeight*1.5, bW=1.2+p.bodyWidth*1.2;
-  const wR=0.25+p.wheelSize*0.35, gC=p.groundClearance*1.2+wR;
-  // Chassis
-  add(new THREE.BoxGeometry(bW,bH*0.45,bL),0,gC+bH*0.22,0);
-  // Cabin
-  if(p.wheelCount!==2){
-    add(new THREE.BoxGeometry(bW*0.85,bH*0.55,bL*0.48),0,gC+bH*0.72,-bL*0.05);
-    add(new THREE.BoxGeometry(bW*0.82,bH*0.5,0.08),0,gC+bH*0.68,bL*0.19,mat(0x88aabb,0.05,0.3));
-    add(new THREE.BoxGeometry(0.06,bH*0.42,bL*0.44),bW*0.43,gC+bH*0.7,-bL*0.05,mat(0x88aabb,0.05,0.3));
-    add(new THREE.BoxGeometry(0.06,bH*0.42,bL*0.44),-bW*0.43,gC+bH*0.7,-bL*0.05,mat(0x88aabb,0.05,0.3));
-  }
-  // Headlights
-  add(new THREE.BoxGeometry(bW*0.3,bH*0.12,0.08),bW*0.28,gC+bH*0.28,bL*0.5,mat(0xffffaa,0.1,0.0));
-  add(new THREE.BoxGeometry(bW*0.3,bH*0.12,0.08),-bW*0.28,gC+bH*0.28,bL*0.5,mat(0xffffaa,0.1,0.0));
-  // Taillights
-  add(new THREE.BoxGeometry(bW*0.25,bH*0.10,0.06),bW*0.3,gC+bH*0.28,-bL*0.5,mat(0xff2200,0.2,0.0));
-  add(new THREE.BoxGeometry(bW*0.25,bH*0.10,0.06),-bW*0.3,gC+bH*0.28,-bL*0.5,mat(0xff2200,0.2,0.0));
-  // Spoiler
-  if(p.spoiler){
-    add(new THREE.BoxGeometry(bW*0.9,0.06,0.35),0,gC+bH*0.82,-bL*0.45,mat(0x111111,0.3,0.6));
-    add(new THREE.BoxGeometry(0.06,0.28,0.35),bW*0.38,gC+bH*0.68,-bL*0.45,mat(0x111111,0.3,0.6));
-    add(new THREE.BoxGeometry(0.06,0.28,0.35),-bW*0.38,gC+bH*0.68,-bL*0.45,mat(0x111111,0.3,0.6));
-  }
-  // Wheels
-  const wMat=mat(0x111111,0.95,0.0), rMat=mat(0x888888,0.3,0.8);
-  const wPos=p.wheelCount===2?[[0,bL*0.38],[0,-bL*0.38]]:[[-bW*0.54,bL*0.34],[bW*0.54,bL*0.34],[-bW*0.54,-bL*0.34],[bW*0.54,-bL*0.34]];
-  wPos.forEach(([wx,wz])=>{
-    const tire=new THREE.Mesh(new THREE.CylinderGeometry(wR,wR,wR*0.7,16),wMat);
-    tire.rotation.z=Math.PI/2;tire.position.set(wx,wR*0.9,wz);tire.castShadow=true;scene.add(tire);ms.push(tire);
-    const rim=new THREE.Mesh(new THREE.CylinderGeometry(wR*0.55,wR*0.55,wR*0.72,10),rMat);
-    rim.rotation.z=Math.PI/2;rim.position.set(wx,wR*0.9,wz);scene.add(rim);ms.push(rim);
-  });
-  meshesRef.current=ms;
-  return ms.filter(m=>m.isMesh).length;
-}
 
 export default function VehicleGeneratorPanel({sceneRef,setStatus,onGenerate}) {
   const scene=sceneRef?.current;
