@@ -239,9 +239,9 @@ input, select { font-family: inherit; }
 .mep-mode-switch--active { color: var(--t0); background: var(--d4); border-bottom: 2px solid var(--ac); margin-bottom: -2px; }
 
 /* header */
-.mep-header { display: flex; align-items: baseline; justify-content: space-between; padding: 6px 8px; background: var(--d3); border-bottom: 1px solid var(--b1); }
+.mep-header { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 6px 8px; background: var(--d3); border-bottom: 1px solid var(--b1); }
 .mep-title { font-size: 10px; font-weight: 600; color: var(--ac-text); letter-spacing: 0.2em; text-transform: uppercase; }
-.mep-stats { font-size: 9px; color: var(--t3); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+.mep-stats { font-size: 9px; color: var(--t3); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* actions */
 .mep-actions { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1px; border-bottom: 1px solid var(--b1); }
