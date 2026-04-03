@@ -85,7 +85,7 @@ input, select { font-family: inherit; }
    ══════════════════════════════════════════════════════════════════════════ */
 .spx-shell {
   display: grid;
-  grid-template-rows: var(--mbar-h) var(--tabs-h) auto 1fr var(--bottom-h) var(--sbar-h);
+  grid-template-rows: var(--mbar-h) var(--tabs-h) 1fr var(--bottom-h) var(--sbar-h);
   width: 100vw; height: 100vh;
   overflow: hidden;
 }
