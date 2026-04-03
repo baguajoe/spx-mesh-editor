@@ -46,7 +46,8 @@
   --sans: 'DM Sans', system-ui, sans-serif;
 
   --mbar-h:   24px;
-  --tabs-h:   26px;
+  --tabs-h:   36px;
+  --subtabs-h: 0px;
   --bottom-h: 140px;
   --sbar-h:   20px;
   --left-w:   224px;
@@ -1222,23 +1223,9 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px s
   margin-top: 0;
 }
 
-/* Left sidebar — docked, starts below toolbars */
-.spx-left,
-.left-panel,
-[class*="left-panel"] {
-  top: 92px !important;
-  height: calc(100vh - 92px - var(--bottom-h, 140px)) !important;
-  z-index: 100 !important;
-}
-
-/* Right sidebar — docked */
-.spx-right,
-.right-panel,
-[class*="right-panel"] {
-  top: 92px !important;
-  height: calc(100vh - 92px - var(--bottom-h, 140px)) !important;
-  z-index: 100 !important;
-}
+/* Sidebar z-index */
+.spx-left  { z-index: 100; }
+.spx-right { z-index: 100; }
 
 /* Floating panels — above content, below tabs */
 .material-panel-float,
@@ -1288,12 +1275,6 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px s
   color: #8b949e;
 }
 
-/* ── Right + Left panel top fix ─────────────────────────────────────────── */
-.spx-right, .right-panel, .spx-props, .n-panel,
-[class*="right-panel"], [class*="spx-right"] {
-}
-.spx-left, .left-panel, [class*="left-panel"], [class*="spx-left"] {
-}
-/* Tab bar full width from left:0 */
-.spx-native-workspace-tabs {
-}
+/* ── Panel overflow fix ──────────────────────────────────────────────────── */
+.spx-right { overflow-y: auto; }
+.spx-left  { overflow-y: auto; }
