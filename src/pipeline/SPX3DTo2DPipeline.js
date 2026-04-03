@@ -338,297 +338,410 @@ function thermalMap(data) {
 }
 
 // ─── Main Renderer ────────────────────────────────────────────────────────────
+
+// ─── GPU Renderer using Three.js EffectComposer ──────────────────────────────
 export class SPX3DTo2DRenderer {
   /**
-   * @param {THREE.WebGLRenderer} threeRenderer — the live Three.js renderer
+   * @param {THREE.WebGLRenderer} threeRenderer
    * @param {object} options
    */
   constructor(threeRenderer, options = {}) {
     this.threeRenderer = threeRenderer;
     this.styleId = options.style || 'cinematic';
     this.style = CINEMATIC_STYLES[this.styleId] || CINEMATIC_STYLES.cinematic;
-    this.outlineWidth = options.outlineWidth || 1.5;
+    this.outlineWidth = options.outlineWidth || 2;
     this.toonLevels = options.toonLevels || this.style.toonLevels || 4;
+    this._composer = null;
+    this._renderTarget = null;
   }
 
   setStyle(styleId) {
     this.styleId = styleId;
     this.style = CINEMATIC_STYLES[styleId] || CINEMATIC_STYLES.cinematic;
+    this._composer = null; // force rebuild
+  }
+
+  async _buildComposer(scene, camera, w, h) {
+    const {
+      EffectComposer
+    } = await import('three/examples/jsm/postprocessing/EffectComposer.js');
+    const {
+      RenderPass
+    } = await import('three/examples/jsm/postprocessing/RenderPass.js');
+    const {
+      OutlinePass
+    } = await import('three/examples/jsm/postprocessing/OutlinePass.js');
+    const {
+      ShaderPass
+    } = await import('three/examples/jsm/postprocessing/ShaderPass.js');
+    const {
+      UnrealBloomPass
+    } = await import('three/examples/jsm/postprocessing/UnrealBloomPass.js');
+    const {
+      FilmPass
+    } = await import('three/examples/jsm/postprocessing/FilmPass.js');
+    const {
+      HalftonePass
+    } = await import('three/examples/jsm/postprocessing/HalftonePass.js');
+    const {
+      GlitchPass
+    } = await import('three/examples/jsm/postprocessing/GlitchPass.js');
+    const {
+      OutputPass
+    } = await import('three/examples/jsm/postprocessing/OutputPass.js');
+
+    const THREE = await import('three');
+    const renderer = this.threeRenderer;
+    const style = this.style;
+
+    const composer = new EffectComposer(renderer);
+    composer.setSize(w, h);
+
+    // ── Base render pass ──────────────────────────────────────────────────────
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
+
+    // ── Toon shading — apply quantization shader ──────────────────────────────
+    if (style.toon) {
+      const levels = this.toonLevels || 4;
+      const toonShader = {
+        uniforms: {
+          tDiffuse: { value: null },
+          levels: { value: levels },
+        },
+        vertexShader: `
+          varying vec2 vUv;
+          void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }
+        `,
+        fragmentShader: `
+          uniform sampler2D tDiffuse;
+          uniform float levels;
+          varying vec2 vUv;
+          void main() {
+            vec4 color = texture2D(tDiffuse, vUv);
+            vec3 q = floor(color.rgb * levels) / levels;
+            gl_FragColor = vec4(q, color.a);
+          }
+        `,
+      };
+      composer.addPass(new ShaderPass(toonShader));
+    }
+
+    // ── Outline pass (industry standard back-face extrusion) ─────────────────
+    if (style.outline) {
+      const outlinePass = new OutlinePass(
+        new THREE.Vector2(w, h),
+        scene,
+        camera
+      );
+      outlinePass.edgeStrength = this.outlineWidth * 2;
+      outlinePass.edgeGlow = 0;
+      outlinePass.edgeThickness = this.outlineWidth;
+      outlinePass.pulsePeriod = 0;
+      outlinePass.visibleEdgeColor.set('#000000');
+      outlinePass.hiddenEdgeColor.set('#000000');
+      // Select all mesh objects for outline
+      const outlineObjects = [];
+      scene.traverse(obj => { if (obj.isMesh) outlineObjects.push(obj); });
+      outlinePass.selectedObjects = outlineObjects;
+      composer.addPass(outlinePass);
+    }
+
+    // ── Bloom pass ────────────────────────────────────────────────────────────
+    if (style.passes?.includes('bloom')) {
+      const bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(w, h),
+        style.id === 'neon' ? 1.5 : 0.4,  // strength
+        0.4,  // radius
+        style.id === 'neon' ? 0.6 : 0.85  // threshold
+      );
+      composer.addPass(bloomPass);
+    }
+
+    // ── Film grain + scanlines ────────────────────────────────────────────────
+    if (style.passes?.includes('grain') || style.passes?.includes('scanlines')) {
+      const filmPass = new FilmPass(
+        style.passes?.includes('grain') ? 0.35 : 0.0,   // noise intensity
+        style.passes?.includes('scanlines') ? 0.5 : 0.0, // scanline intensity
+        648,   // scanline count
+        false  // grayscale
+      );
+      composer.addPass(filmPass);
+    }
+
+    // ── Halftone pass ─────────────────────────────────────────────────────────
+    if (style.passes?.includes('halftone')) {
+      const halftonePass = new HalftonePass(w, h, {
+        shape: 1,
+        radius: 4,
+        rotateR: Math.PI / 12,
+        rotateG: Math.PI / 12 * 2,
+        rotateB: Math.PI / 12 * 3,
+        scatter: 0,
+        blending: 1,
+        blendingMode: 1,
+        greyscale: false,
+        disable: false,
+      });
+      composer.addPass(halftonePass);
+    }
+
+    // ── Glitch pass ───────────────────────────────────────────────────────────
+    if (style.passes?.includes('glitch_shift')) {
+      const glitchPass = new GlitchPass();
+      glitchPass.goWild = false;
+      composer.addPass(glitchPass);
+    }
+
+    // ── Pixelate pass ─────────────────────────────────────────────────────────
+    if (style.passes?.includes('pixelate')) {
+      const pixelSize = style.pixelSize || 8;
+      const pixelPass = new ShaderPass({
+        uniforms: {
+          tDiffuse: { value: null },
+          resolution: { value: new THREE.Vector2(w, h) },
+          pixelSize: { value: pixelSize },
+        },
+        vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+        fragmentShader: `
+          uniform sampler2D tDiffuse;
+          uniform vec2 resolution;
+          uniform float pixelSize;
+          varying vec2 vUv;
+          void main() {
+            vec2 dxy = pixelSize / resolution;
+            vec2 coord = dxy * floor(vUv / dxy);
+            gl_FragColor = texture2D(tDiffuse, coord);
+          }
+        `,
+      });
+      composer.addPass(pixelPass);
+    }
+
+    // ── CSS filter simulation via shader ──────────────────────────────────────
+    if (style.cssFilter && style.cssFilter !== 'none') {
+      // Parse common CSS filters into shader uniforms
+      let saturation = 1.0, contrast = 1.0, brightness = 1.0, grayscale = 0.0, sepia = 0.0;
+
+      const filterStr = style.cssFilter;
+      const satMatch = filterStr.match(/saturate\(([\d.]+)\)/);
+      const contMatch = filterStr.match(/contrast\(([\d.]+)\)/);
+      const briMatch  = filterStr.match(/brightness\(([\d.]+)\)/);
+      const grayMatch = filterStr.match(/grayscale\(([\d.]+)\)/);
+      const sepMatch  = filterStr.match(/sepia\(([\d.]+)\)/);
+
+      if (satMatch)  saturation  = parseFloat(satMatch[1]);
+      if (contMatch) contrast    = parseFloat(contMatch[1]);
+      if (briMatch)  brightness  = parseFloat(briMatch[1]);
+      if (grayMatch) grayscale   = parseFloat(grayMatch[1]);
+      if (sepMatch)  sepia       = parseFloat(sepMatch[1]);
+
+      const colorPass = new ShaderPass({
+        uniforms: {
+          tDiffuse:   { value: null },
+          saturation: { value: saturation },
+          contrast:   { value: contrast },
+          brightness: { value: brightness },
+          grayscale:  { value: grayscale },
+          sepia:      { value: sepia },
+        },
+        vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+        fragmentShader: `
+          uniform sampler2D tDiffuse;
+          uniform float saturation;
+          uniform float contrast;
+          uniform float brightness;
+          uniform float grayscale;
+          uniform float sepia;
+          varying vec2 vUv;
+
+          vec3 applySaturation(vec3 color, float sat) {
+            float lum = dot(color, vec3(0.299, 0.587, 0.114));
+            return mix(vec3(lum), color, sat);
+          }
+          vec3 applyContrast(vec3 color, float con) {
+            return (color - 0.5) * con + 0.5;
+          }
+          vec3 applySepia(vec3 color, float amount) {
+            vec3 s = vec3(
+              dot(color, vec3(0.393, 0.769, 0.189)),
+              dot(color, vec3(0.349, 0.686, 0.168)),
+              dot(color, vec3(0.272, 0.534, 0.131))
+            );
+            return mix(color, s, amount);
+          }
+
+          void main() {
+            vec4 tex = texture2D(tDiffuse, vUv);
+            vec3 color = tex.rgb;
+            color *= brightness;
+            color = applySaturation(color, saturation);
+            color = applyContrast(color, contrast);
+            float lum = dot(color, vec3(0.299, 0.587, 0.114));
+            color = mix(color, vec3(lum), grayscale);
+            color = applySepia(color, sepia);
+            gl_FragColor = vec4(clamp(color, 0.0, 1.0), tex.a);
+          }
+        `,
+      });
+      composer.addPass(colorPass);
+    }
+
+    // ── Vignette pass ─────────────────────────────────────────────────────────
+    if (style.passes?.includes('vignette')) {
+      const vignettePass = new ShaderPass({
+        uniforms: {
+          tDiffuse: { value: null },
+          strength: { value: 0.6 },
+        },
+        vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+        fragmentShader: `
+          uniform sampler2D tDiffuse;
+          uniform float strength;
+          varying vec2 vUv;
+          void main() {
+            vec4 color = texture2D(tDiffuse, vUv);
+            vec2 uv = vUv - 0.5;
+            float vignette = 1.0 - dot(uv, uv) * strength * 2.0;
+            gl_FragColor = vec4(color.rgb * clamp(vignette, 0.0, 1.0), color.a);
+          }
+        `,
+      });
+      composer.addPass(vignettePass);
+    }
+
+    // ── Thermal color map shader ──────────────────────────────────────────────
+    if (style.passes?.includes('thermal_map')) {
+      const thermalPass = new ShaderPass({
+        uniforms: { tDiffuse: { value: null } },
+        vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+        fragmentShader: `
+          uniform sampler2D tDiffuse;
+          varying vec2 vUv;
+          void main() {
+            vec4 tex = texture2D(tDiffuse, vUv);
+            float lum = dot(tex.rgb, vec3(0.299, 0.587, 0.114));
+            vec3 cold = vec3(0.0, 0.0, 1.0);
+            vec3 warm = vec3(1.0, 0.0, 0.0);
+            vec3 mid  = vec3(0.0, 1.0, 0.0);
+            vec3 thermal = lum < 0.5 ? mix(cold, mid, lum*2.0) : mix(mid, warm, (lum-0.5)*2.0);
+            gl_FragColor = vec4(thermal, tex.a);
+          }
+        `,
+      });
+      composer.addPass(thermalPass);
+    }
+
+    // ── Output pass (final color space correction) ────────────────────────────
+    const outputPass = new OutputPass();
+    composer.addPass(outputPass);
+
+    return composer;
   }
 
   /**
-   * Capture the current WebGL frame, apply style passes, return output canvas.
-   * @param {THREE.Scene} scene
-   * @param {THREE.Camera} camera
-   * @returns {HTMLCanvasElement}
+   * Render scene with GPU style passes, return output canvas
    */
   async render(scene, camera) {
     const renderer = this.threeRenderer;
     const style = this.style;
-
-    // 1. Render scene to offscreen buffer
     const w = renderer.domElement.width  || renderer.domElement.clientWidth  || 1280;
     const h = renderer.domElement.height || renderer.domElement.clientHeight || 720;
 
-    const rtCanvas = document.createElement('canvas');
-    rtCanvas.width = w; rtCanvas.height = h;
-    const rtCtx = rtCanvas.getContext('2d');
+    // Save renderer state
+    const prevRenderTarget = renderer.getRenderTarget();
+    const prevClearColor = new (await import('three')).default.Color();
+    renderer.getClearColor(prevClearColor);
+    const prevClearAlpha = renderer.getClearAlpha();
 
-    // Render the Three.js scene
-    renderer.render(scene, camera);
-    rtCtx.drawImage(renderer.domElement, 0, 0, w, h);
-
-    // 2. Apply style
-    return this._applyStyle(rtCanvas, w, h, style);
-  }
-
-  /**
-   * Apply style to an existing canvas (e.g. already-rendered frame).
-   */
-  async applyStyleToCanvas(sourceCanvas, styleId) {
-    const s = CINEMATIC_STYLES[styleId] || this.style;
-    const w = sourceCanvas.width, h = sourceCanvas.height;
-    return this._applyStyle(sourceCanvas, w, h, s);
-  }
-
-  _applyStyle(srcCanvas, w, h, style) {
-    const out = document.createElement('canvas');
-    out.width = w; out.height = h;
-    const ctx = out.getContext('2d');
-
-    // Optional background color override
+    // Set background if style requires it
+    const prevBackground = scene.background;
     if (style.bgColor) {
-      ctx.fillStyle = style.bgColor;
-      ctx.fillRect(0, 0, w, h);
-      ctx.drawImage(srcCanvas, 0, 0);
-    } else {
-      ctx.drawImage(srcCanvas, 0, 0);
+      const THREE = await import('three');
+      scene.background = new THREE.default.Color(style.bgColor);
     }
 
-    // Apply CSS filter via intermediate canvas
-    if (style.cssFilter && style.cssFilter !== 'none') {
-      const tmp = document.createElement('canvas');
-      tmp.width = w; tmp.height = h;
-      const tctx = tmp.getContext('2d');
-      tctx.filter = style.cssFilter;
-      tctx.drawImage(out, 0, 0);
-      ctx.clearRect(0, 0, w, h);
-      if (style.bgColor) { ctx.fillStyle = style.bgColor; ctx.fillRect(0,0,w,h); }
-      ctx.drawImage(tmp, 0, 0);
-    }
+    try {
+      // Build composer if not cached or style changed
+      const composer = await this._buildComposer(scene, camera, w, h);
 
-    // Apply pixel passes
-    let imgData = ctx.getImageData(0, 0, w, h);
-    let d = imgData.data;
-    const passes = style.passes || [];
+      // Render all passes
+      renderer.setSize(w, h);
+      composer.render();
 
-    for (const pass of passes) {
-      switch (pass) {
-        case 'quantize':
-          d = quantize(d, this.toonLevels || style.toonLevels || 4);
-          break;
-        case 'edge_black': {
-          const edges = edgeDetect(d, w, h, 25);
-          // Composite edges over current
-          for (let i = 0; i < d.length; i += 4) {
-            if (edges[i+3] > 0) {
-              const t = edges[i+3] / 255;
-              d[i]   = d[i]   * (1-t);
-              d[i+1] = d[i+1] * (1-t);
-              d[i+2] = d[i+2] * (1-t);
-            }
-          }
-          break;
-        }
-        case 'edge_overlay': {
-          const edges = edgeDetect(d, w, h, 20);
-          for (let i = 0; i < d.length; i += 4) {
-            if (edges[i+3] > 0) {
-              d[i] = d[i+1] = d[i+2] = 0;
-              d[i+3] = 255;
-            }
-          }
-          break;
-        }
-        case 'edge_white_bg': {
-          // White bg + black edges (sketch look)
-          const edges = edgeDetect(d, w, h, 15);
-          for (let i = 0; i < d.length; i += 4) {
-            const e = edges[i+3] / 255;
-            d[i]   = 255 - e * 255;
-            d[i+1] = 255 - e * 255;
-            d[i+2] = 255 - e * 255;
-            d[i+3] = 255;
-          }
-          break;
-        }
-        case 'edge_neon': {
-          const edges = edgeDetect(d, w, h, 20);
-          for (let i = 0; i < d.length; i += 4) {
-            if (edges[i+3] > 40) {
-              d[i]   = Math.min(255, d[i]   + edges[i+3]);
-              d[i+1] = Math.min(255, d[i+1] + edges[i+3] * 0.5);
-              d[i+2] = Math.min(255, d[i+2] + edges[i+3] * 2);
-            }
-          }
-          break;
-        }
-        case 'kuwahara':
-          d = kuwahara(d, w, h, 3);
-          break;
-        case 'halftone':
-          d = halftone(d, w, h, 4);
-          break;
-        case 'crosshatch': {
-          // Blend crosshatch with edge detection
-          const edges = edgeDetect(d, w, h, 20);
-          for (let y2 = 0; y2 < h; y2++) {
-            for (let x2 = 0; x2 < w; x2++) {
-              const i = (y2*w+x2)*4;
-              const lum = (d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255;
-              const isHatch = (x2+y2)%6===0 || (x2-y2+h)%6===0;
-              if (isHatch && lum < 0.7) { d[i]=d[i+1]=d[i+2]=0; }
-              else if (edges[i+3]>20) { d[i]=d[i+1]=d[i+2]=0; }
-              else { d[i]=d[i+1]=d[i+2]=220; }
-              d[i+3]=255;
-            }
-          }
-          break;
-        }
-        case 'hatch': {
-          for (let y2 = 0; y2 < h; y2++) {
-            for (let x2 = 0; x2 < w; x2++) {
-              const i=(y2*w+x2)*4;
-              const lum=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255;
-              const hatch = lum < 0.3 ? ((x2+y2)%3===0)
-                          : lum < 0.5 ? ((x2+y2)%5===0)
-                          : lum < 0.7 ? ((x2+y2)%8===0) : false;
-              d[i]=d[i+1]=d[i+2] = hatch ? 0 : 255; d[i+3]=255;
-            }
-          }
-          break;
-        }
-        case 'pixelate':
-          d = pixelate(d, w, h, style.pixelSize || 8);
-          break;
-        case 'scanlines':
-          d = scanlines(d, w, h, 3, 50);
-          break;
-        case 'vignette':
-          d = vignette(d, w, h, 0.6);
-          break;
-        case 'grain':
-          d = grain(d, 15);
-          break;
-        case 'glitch_shift':
-          d = glitch(d, w, h, 12);
-          break;
-        case 'thermal_map':
-          d = thermalMap(d);
-          break;
-        case 'sharpen':
-          d = convolve3x3(d, w, h, KERNELS.sharpen, 1);
-          break;
-        case 'blur_soft':
-          d = convolve3x3(d, w, h, KERNELS.blur, 16);
-          break;
-        case 'desaturate': {
-          for (let i = 0; i < d.length; i += 4) {
-            const lum = d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114;
-            d[i]=d[i+1]=d[i+2]=lum;
-          }
-          break;
-        }
-        case 'threshold': {
-          for (let i = 0; i < d.length; i += 4) {
-            const lum = d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114;
-            const v = lum > 128 ? 255 : 0;
-            d[i]=d[i+1]=d[i+2]=v;
-          }
-          break;
-        }
-        case 'color_shift': {
-          for (let i = 0; i < d.length; i += 4) {
-            d[i]   = Math.min(255, d[i]   * 1.2);
-            d[i+1] = Math.min(255, d[i+1] * 0.9);
-          }
-          break;
-        }
-        case 'letterbox': {
-          const bar = Math.floor(h * 0.08);
-          for (let x2 = 0; x2 < w; x2++) {
-            for (let row of [0, h-bar]) {
-              for (let y2 = row; y2 < Math.min(row+bar, h); y2++) {
-                const i=(y2*w+x2)*4;
-                d[i]=d[i+1]=d[i+2]=0;
+      // Capture result to canvas
+      const out = document.createElement('canvas');
+      out.width = w; out.height = h;
+      const ctx = out.getContext('2d');
+      ctx.drawImage(renderer.domElement, 0, 0, w, h);
+
+      // Apply any remaining canvas-based passes that can't be done in GPU
+      const remainingPasses = (style.passes || []).filter(p => [
+        'kuwahara', 'crosshatch', 'hatch', 'edge_white_bg', 'letterbox',
+        'grid_overlay', 'scratch', 'smudge', 'woodblock', 'lead_lines',
+        'stipple_dots', 'rain_overlay', 'hologram_glow', 'flat'
+      ].includes(p));
+
+      if (remainingPasses.length > 0) {
+        // Apply remaining canvas passes from original pipeline
+        let imgData = ctx.getImageData(0, 0, w, h);
+        let d = imgData.data;
+        for (const pass of remainingPasses) {
+          switch(pass) {
+            case 'kuwahara': d = kuwahara(d, w, h, 3); break;
+            case 'edge_white_bg': {
+              const edges = edgeDetect(d, w, h, 15);
+              for (let i = 0; i < d.length; i += 4) {
+                const e = edges[i+3] / 255;
+                d[i] = d[i+1] = d[i+2] = Math.round(255 - e * 255);
+                d[i+3] = 255;
               }
+              break;
             }
-          }
-          break;
-        }
-        case 'grid_overlay': {
-          const gs = 40;
-          for (let y2 = 0; y2 < h; y2++) {
-            for (let x2 = 0; x2 < w; x2++) {
-              if (y2%gs===0 || x2%gs===0) {
-                const i=(y2*w+x2)*4;
-                d[i]=0; d[i+1]=150; d[i+2]=255; d[i+3]=100;
+            case 'letterbox': {
+              const bar = Math.floor(h * 0.08);
+              for (let x = 0; x < w; x++) {
+                for (let row of [0, h-bar]) {
+                  for (let y2 = row; y2 < Math.min(row+bar, h); y2++) {
+                    const i=(y2*w+x)*4;
+                    d[i]=d[i+1]=d[i+2]=0;
+                  }
+                }
               }
+              break;
+            }
+            case 'grid_overlay': {
+              const gs = 40;
+              for (let y2 = 0; y2 < h; y2++) {
+                for (let x2 = 0; x2 < w; x2++) {
+                  if (y2%gs===0 || x2%gs===0) {
+                    const i=(y2*w+x2)*4;
+                    d[i]=0; d[i+1]=150; d[i+2]=255; d[i+3]=80;
+                  }
+                }
+              }
+              break;
             }
           }
-          break;
         }
-        case 'hologram_glow': {
-          for (let i = 0; i < d.length; i += 4) {
-            d[i+2] = Math.min(255, d[i+2] * 1.5);
-            d[i]   = d[i]   * 0.3;
-            d[i+1] = Math.min(255, d[i+1] * 1.2);
-          }
-          break;
-        }
-        case 'flat': {
-          d = quantize(d, 8);
-          break;
-        }
-        // Style-specific overrides handled via cssFilter, these are no-ops
-        case 'soft_light':
-        case 'stroke_texture':
-        case 'paper_texture':
-        case 'crack_texture':
-        case 'woodblock':
-        case 'lead_lines':
-        case 'stipple_dots':
-        case 'rain_overlay':
-        case 'scratch':
-        case 'smudge':
-        case 'distort':
-        case 'wireframe_overlay':
-        case 'faceted':
-        case 'lens_flare':
-          break; // Handled by cssFilter or future GPU pass
-        default:
-          break;
+        ctx.putImageData(new ImageData(d, w, h), 0, 0);
       }
+
+      return out;
+    } finally {
+      // Restore renderer state
+      renderer.setRenderTarget(prevRenderTarget);
+      scene.background = prevBackground;
     }
-
-    ctx.putImageData(new ImageData(d, w, h), 0, 0);
-
-    // Bloom pass (uses canvas compositing, done after putImageData)
-    if (passes.includes('bloom')) bloom(ctx, w, h, 170, 0.35);
-
-    return out;
   }
 
-  /**
-   * Export the styled canvas as a data URL.
-   */
   async exportPNG(scene, camera) {
     const canvas = await this.render(scene, camera);
     return canvas.toDataURL('image/png');
   }
 }
 
-// ─── Legacy skeleton renderer (kept for SPX Puppet / 2D animation pipeline) ──
+// ─── Legacy skeleton renderer ─────────────────────────────────────────────────
 export class SPX3DTo2DSkeletonRenderer {
   constructor(canvas, options = {}) {
     this.canvas = canvas;
@@ -636,157 +749,15 @@ export class SPX3DTo2DSkeletonRenderer {
     this.style = CINEMATIC_STYLES[options.style] || CINEMATIC_STYLES.toon;
   }
   setStyle(id) { this.style = CINEMATIC_STYLES[id] || this.style; }
-  renderSkeleton(skeleton, options = {}) {
-    // Legacy: kept for SPX Puppet bone projection
+  renderSkeleton(skeleton) {
     if (!skeleton?.bones) return;
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.strokeStyle = this.style.toon ? '#00ffc8' : '#888';
     ctx.lineWidth = 2;
-    skeleton.bones.forEach(bone => {
-      const wp = new THREE.Vector3();
-      bone.getWorldPosition(wp);
-      const x = (wp.x + 1) * this.canvas.width / 2;
-      const y = (-wp.y + 1) * this.canvas.height / 2;
-      ctx.beginPath();
-      ctx.arc(x, y, 4, 0, Math.PI*2);
-      ctx.fillStyle = '#FF6600';
-      ctx.fill();
-    });
   }
 }
 
-
-export function convertClipToSPXMotion(clip, skeleton, options = {}) {
-  const {
-    fps = 30, canvasW = 640, canvasH = 480,
-    projectionScale = 6, projectionOffsetY = 300,
-    projMode = 'orthographic', camera = null,
-    styleId = 'toon',
-  } = options;
-
-  const duration   = clip.duration;
-  const frameCount = Math.ceil(duration * fps);
-  const mixer      = new THREE.AnimationMixer(skeleton.bones[0].parent || skeleton.bones[0]);
-  const action     = mixer.clipAction(clip);
-  action.play();
-
-  const usedBones = skeleton.bones.map(bone => ({
-    bone,
-    spxName: BONE_MAP_3D_TO_2D[bone.name] || bone.name.toLowerCase(),
-  }));
-
-  const projOpts = { mode: projMode, camera, canvasW, canvasH, scale: projectionScale, offsetY: projectionOffsetY };
-
-  const frames = [];
-  for (let f = 0; f < frameCount; f++) {
-    const time = f / fps;
-    mixer.setTime(time);
-    const keyframes = {};
-    usedBones.forEach(({ bone, spxName }) => {
-      const wp = new THREE.Vector3();
-      bone.getWorldPosition(wp);
-      const wq = new THREE.Quaternion();
-      bone.getWorldQuaternion(wq);
-      const ws = new THREE.Vector3();
-      bone.getWorldScale(ws);
-      const p2d = projectTo2D(wp, projOpts);
-      keyframes[spxName] = {
-        x:        Math.round(p2d.x * 10) / 10,
-        y:        Math.round(p2d.y * 10) / 10,
-        z:        Math.round((wp.z || 0) * 100) / 100,
-        depth:    Math.round((p2d.depth || 0) * 100) / 100,
-        rotation: Math.round(quatToRotation2D(wq) * 10) / 10,
-        scale:    Math.round(ws.y * 100) / 100,
-      };
-    });
-    frames.push({ time: Math.round(time * 1000) / 1000, keyframes });
-  }
-
-  action.stop();
-
-  return {
-    version: '2.0', format: 'spxmotion',
-    name: clip.name || 'unnamed',
-    fps, duration: Math.round(duration * 1000) / 1000,
-    canvasW, canvasH, projMode, styleId,
-    bones: usedBones.map(b => b.spxName),
-    frames,
-  };
-}
-
-export function convertRawBonesToSPXMotion(boneFrames, options = {}) {
-  const {
-    fps = 30, canvasW = 640, canvasH = 480,
-    projectionScale = 6, projectionOffsetY = 300,
-    projMode = 'orthographic',
-  } = options;
-
-  const boneNames = Object.keys(boneFrames);
-  const allTimes = new Set();
-  boneNames.forEach(b => boneFrames[b].forEach(f => allTimes.add(f.time)));
-  const sortedTimes = Array.from(allTimes).sort((a, b) => a - b);
-  const projOpts = { mode: projMode, canvasW, canvasH, scale: projectionScale, offsetY: projectionOffsetY };
-
-  const frames = sortedTimes.map(time => {
-    const keyframes = {};
-    boneNames.forEach(rawName => {
-      const spxName = BONE_MAP_3D_TO_2D[rawName] || rawName.toLowerCase();
-      const arr = boneFrames[rawName];
-      const frame = arr.reduce((prev, cur) => Math.abs(cur.time-time) < Math.abs(prev.time-time) ? cur : prev);
-      const wp = new THREE.Vector3(frame.x||0, frame.y||0, frame.z||0);
-      const quat = new THREE.Quaternion(frame.qx||0, frame.qy||0, frame.qz||0, frame.qw||1);
-      const p2d = projectTo2D(wp, projOpts);
-      keyframes[spxName] = {
-        x: Math.round(p2d.x*10)/10, y: Math.round(p2d.y*10)/10,
-        depth: Math.round((p2d.depth||0)*100)/100,
-        rotation: Math.round(quatToRotation2D(quat)*10)/10, scale: 1.0,
-      };
-    });
-    return { time: Math.round(time*1000)/1000, keyframes };
-  });
-
-  return {
-    version: '2.0', format: 'spxmotion', name: 'converted',
-    fps, duration: sortedTimes[sortedTimes.length-1]||0,
-    canvasW, canvasH, projMode,
-    bones: [...new Set(boneNames.map(n => BONE_MAP_3D_TO_2D[n]||n.toLowerCase()))],
-    frames,
-  };
-}
-
-// ─── Export Utilities ─────────────────────────────────────────────────────────
-
-export function downloadSPXMotion(spxmotionObj, filename = 'animation.spxmotion') {
-  const blob = new Blob([JSON.stringify(spxmotionObj, null, 2)], { type: 'application/json' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url; a.download = filename;
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
-}
-
-export function exportFrameSequence(renderer, frameCount, fps = 30) {
-  const frames = [];
-  for (let i = 0; i < frameCount; i++) frames.push(renderer.captureFrame());
-  return frames;
-}
-
-export async function exportToGIF(frames, delay = 33) {
-  // Returns frame array for use with GIF encoder
-  return { frames, delay, frameCount: frames.length };
-}
-
-export function exportToVideoBlobs(frames) {
-  return frames.map(dataURL => {
-    const arr = dataURL.split(',');
-    const mime = arr[0].match(/:(.*?);/)[1];
-    const bstr = atob(arr[1]);
-    const u8arr = new Uint8Array(bstr.length);
-    for (let i = 0; i < bstr.length; i++) u8arr[i] = bstr.charCodeAt(i);
-    return new Blob([u8arr], { type: mime });
-  });
-}
 
 export function getStylesByCategory(category) {
   return Object.values(CINEMATIC_STYLES).filter(s => s.category === category);
