@@ -3418,14 +3418,14 @@ export default function App() {
           {label:"Cloth",      fn:()=>setClothSimOpen(v=>!v)},
           {label:"Fluid",      fn:()=>setFluidPanelOpen(v=>!v)},
           {label:"Weather",    fn:()=>setWeatherPanelOpen(v=>!v)},
-          {label:"Destruction",fn:()=>openWorkspaceTool("destruction")},
-          {label:"Physics",    fn:()=>openWorkspaceTool("physics_sim")},
+          {label:"Destruction",fn:()=>setDestructionOpen(v=>!v)},
+          {label:"Physics",    fn:()=>setPhysicsOpen(v=>!v)},
         ]}/>
         <SpxTabGroup label="WORLD" color="#44aaff" tabs={[
           {label:"Environment",fn:()=>openWorkspaceTool("env_gen")},
           {label:"Terrain",    fn:()=>openWorkspaceTool("terrain")},
-          {label:"City Gen",   fn:()=>openWorkspaceTool("city_gen")},
-          {label:"Building",   fn:()=>openWorkspaceTool("building")},
+          {label:"City Gen",   fn:()=>setCityGenOpen(v=>!v)},
+          {label:"Building",   fn:()=>setCityGenOpen(v=>!v)},
           {label:"Foliage",    fn:()=>openWorkspaceTool("foliage_gen")},
           {label:"Crowd",      fn:()=>openWorkspaceTool("crowd_gen")},
         ]}/>
