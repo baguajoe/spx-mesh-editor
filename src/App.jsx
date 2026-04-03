@@ -14,6 +14,7 @@ import { Outliner } from "./components/Outliner";
 import React, { useRef, useEffect, useState, useCallback } from "react";
 
 import SPXPerformancePanel from "./components/SPXPerformancePanel.jsx";import * as THREE from "three";
+import { initFilmComposer, createProceduralHDRI, upgradeMaterialsToPhysical } from "./mesh/FilmRenderer.js";
 import ProfessionalShell from "./pro-ui/ProfessionalShell";
 import FeatureIndexPanel from "./pro-ui/FeatureIndexPanel";
 import WORKSPACE_FEATURES from "./pro-ui/workspaceMap";
@@ -1204,11 +1205,15 @@ export default function App() {
     const canvas = canvasRef.current;
     if (!canvas || rendererRef.current) return;
 
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    renderer.setPixelRatio(window.devicePixelRatio);
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(canvas.clientWidth, canvas.clientHeight);
     renderer.shadowMap.enabled = true;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
+    renderer.toneMapping          = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure  = 1.1;
+    renderer.outputColorSpace     = THREE.SRGBColorSpace;
+    renderer.physicallyCorrectLights = true;
     rendererRef.current = renderer;
 
     const scene = new THREE.Scene();
@@ -1219,8 +1224,10 @@ export default function App() {
   const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
   dirLight.position.set(5, 10, 7);
   dirLight.castShadow = true;
-  dirLight.shadow.mapSize.width = 2048;
-  dirLight.shadow.mapSize.height = 2048;
+  dirLight.shadow.mapSize.width = 4096;
+  dirLight.shadow.mapSize.height = 4096;
+  dirLight.shadow.bias = -0.0003;
+  dirLight.shadow.normalBias = 0.02;
   scene.add(dirLight);
 
   // Environment lighting for metalness
@@ -1229,6 +1236,13 @@ export default function App() {
   scene.add(hemiLight);
 
     scene.background = new THREE.Color(COLORS.bg);
+
+    // ── IBL environment lighting (film quality) ──
+    try {
+      const envMap = createProceduralHDRI(renderer);
+      scene.environment = envMap;
+      scene.environmentIntensity = 0.8;
+    } catch(e) { console.warn('IBL setup failed:', e); }
     scene.add(new THREE.GridHelper(10, 20, COLORS.border, COLORS.border));
 
     // subtle center marker like Blender origin / cursor
@@ -1283,6 +1297,17 @@ export default function App() {
     camera.position.set(3, 3, 5);
     camera.lookAt(0, 0, 0);
     cameraRef.current = camera;
+
+    // ── Film quality EffectComposer ──
+    try {
+      const composer = initFilmComposer(renderer, scene, camera);
+      rendererRef._composer = composer;
+    } catch(e) { console.warn('EffectComposer init failed:', e); }
+
+    // ── Upgrade all materials to MeshPhysical ──
+    setTimeout(() => {
+      try { upgradeMaterialsToPhysical(scene); } catch(e) {}
+    }, 500);
     quadCamerasRef.current = createQuadCameraSet(camera);
     resizeQuadCameraSet(quadCamerasRef.current, canvas.clientWidth, canvas.clientHeight);
 
@@ -1305,6 +1330,10 @@ export default function App() {
 
     const animate = () => {
       rafRef.current = requestAnimationFrame(animate);
+      const _composer = rendererRef.current?._composer;
+      if (_composer && typeof quadViewRef !== 'undefined' && !quadViewRef.current) {
+        _composer.render();
+      } else {
       renderViewportSet(
         renderer,
         scene,
@@ -1313,6 +1342,7 @@ export default function App() {
         canvas.clientHeight,
         typeof quadViewRef !== "undefined" ? quadViewRef.current : false
       );
+      } // end composer else
     };
     animate();
 

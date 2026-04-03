@@ -17,11 +17,17 @@ export function createPBRMaterial(options = {}) {
     envMapIntensity = 1.0,
   } = options;
 
-  const mat = new THREE.MeshStandardMaterial({
+  const mat = new THREE.MeshPhysicalMaterial({
     color, roughness, metalness,
     emissive, emissiveIntensity,
     transparent, opacity, alphaTest, side,
     envMapIntensity,
+    clearcoat:           options.clearcoat           ?? 0.0,
+    clearcoatRoughness:  options.clearcoatRoughness  ?? 0.3,
+    sheen:               options.sheen               ?? 0.0,
+    sheenColor:          options.sheenColor          ? new THREE.Color(options.sheenColor) : new THREE.Color(0xffffff),
+    anisotropy:          options.anisotropy          ?? 0.0,
+    iridescence:         options.iridescence         ?? 0.0,
   });
   mat.userData.aoIntensity  = aoIntensity;
   mat.userData.normalScale  = normalScale;
