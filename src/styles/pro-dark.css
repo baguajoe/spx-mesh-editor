@@ -1279,22 +1279,3 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px s
 .spx-right { overflow-y: auto; }
 .spx-left  { overflow-y: auto; }
 
-/* ── Timeline + sidebar bottom fix ──────────────────────────────────────── */
-.spx-shell {
-  grid-template-columns: var(--left-w) 1fr var(--right-w);
-}
-
-.spx-bottom {
-  grid-column: 1 / 3 !important;
-}
-
-.spx-right {
-  grid-row: 3 / 5 !important;
-  grid-column: 3 !important;
-  overflow-y: auto;
-}
-
-.spx-left {
-  grid-row: 3 / 4 !important;
-  overflow-y: auto;
-}
