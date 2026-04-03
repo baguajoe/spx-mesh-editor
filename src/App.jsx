@@ -3044,6 +3044,57 @@ export default function App() {
     // ── Materials ─────────────────────────────────────────────────────────────
     if (fn === "mat_pbr")             { if(typeof window.createPBRMaterial==="function"&&meshRef.current){meshRef.current.material=window.createPBRMaterial();setStatus("PBR applied");} return; }
     if (fn === "mat_sss")             { if(typeof window.createSSSMaterial==="function"&&meshRef.current){meshRef.current.material=window.createSSSMaterial(sssPreset);setStatus("SSS applied");} return; }
+    if (fn === "displace_perlin")   { if(meshRef.current){ applyDisplacementMap(meshRef.current,{noiseType:'perlin',noiseAmplitude:displacementScale,noiseScale:4}); setStatus("Perlin displacement applied"); } return; }
+    if (fn === "displace_voronoi")  { if(meshRef.current){ applyDisplacementMap(meshRef.current,{noiseType:'voronoi',noiseAmplitude:displacementScale,noiseScale:4}); setStatus("Voronoi displacement applied"); } return; }
+    if (fn === "displace_cellular") { if(meshRef.current){ applyDisplacementMap(meshRef.current,{noiseType:'cellular',noiseAmplitude:displacementScale,noiseScale:4}); setStatus("Cellular displacement applied"); } return; }
+    if (fn === "mat_clearcoat")     { if(meshRef.current){ applyClearcoatMaterial(meshRef.current,{clearcoat:clearcoatVal,clearcoatRoughness:clearcoatRoughVal}); setStatus("Clearcoat applied"); } return; }
+    if (fn === "mat_wet_clearcoat") { if(meshRef.current){ applyClearcoatMaterial(meshRef.current,{clearcoat:1.0,clearcoatRoughness:0.0,wetness:true}); setStatus("Wet clearcoat applied"); } return; }
+    if (fn === "mat_anisotropy")    { if(meshRef.current){ applyAnisotropyMaterial(meshRef.current,{anisotropy:anisotropyVal}); setStatus("Anisotropy material applied"); } return; }
+    if (fn === "mat_sss_skin")      { if(meshRef.current){ applySkinSSS(meshRef.current,{subsurface:0.4}); setStatus("SSS skin applied"); } return; }
+    if (fn === "mat_sss_wax")       { if(meshRef.current){ applySkinSSS(meshRef.current,{color:"#ffe4b5",subsurface:0.8,roughness:0.3}); setStatus("SSS wax applied"); } return; }
+    if (fn === "add_area_light")    { if(sceneRef.current){ const al=addAreaLight(sceneRef.current,{position:[0,3,2],intensity:3.0}); if(al) setStatus("Area light added"); } return; }
+    if (fn === "gen_skin_tex")      {
+      const canvas = generateProceduralSkinTexture({size:1024});
+      if(meshRef.current?.material && window.THREE) {
+        const tex = new window.THREE.CanvasTexture(canvas);
+        meshRef.current.material.map = tex;
+        meshRef.current.material.needsUpdate = true;
+        setStatus("Procedural skin texture applied (1024px)");
+      }
+      const a=document.createElement('a'); a.href=canvas.toDataURL('image/png');
+      a.download='spx_skin_texture.png'; a.click();
+      return;
+    }
+    if (fn === "gen_scale_tex")     {
+      const canvas = generateScaleTexture({size:1024,scaleSize:20});
+      if(meshRef.current?.material && window.THREE) {
+        const tex = new window.THREE.CanvasTexture(canvas);
+        meshRef.current.material.map = tex;
+        meshRef.current.material.needsUpdate = true;
+        setStatus("Procedural scale texture applied (1024px Voronoi)");
+      }
+      const normCanvas = canvasToNormalMap(canvas, 3.0);
+      if(meshRef.current?.material && window.THREE) {
+        const normTex = new window.THREE.CanvasTexture(normCanvas);
+        meshRef.current.material.normalMap = normTex;
+        meshRef.current.material.needsUpdate = true;
+      }
+      const a=document.createElement('a'); a.href=canvas.toDataURL('image/png');
+      a.download='spx_scale_texture.png'; a.click();
+      return;
+    }
+    if (fn === "gen_wrinkle_tex")   {
+      const canvas = generateProceduralSkinTexture({size:1024,poreScale:20,wrinkleScale:4,variation:0.25});
+      const normCanvas = canvasToNormalMap(canvas, 4.0);
+      if(meshRef.current?.material && window.THREE) {
+        const normTex = new window.THREE.CanvasTexture(normCanvas);
+        meshRef.current.material.normalMap = normTex;
+        meshRef.current.material.normalScale = new window.THREE.Vector2(2,2);
+        meshRef.current.material.needsUpdate = true;
+        setStatus("Wrinkle normal map applied");
+      }
+      return;
+    }
     if (fn === "mat_glass")           { if(typeof window.createTransmissionMaterial==="function"&&meshRef.current){meshRef.current.material=window.createTransmissionMaterial(transmissionPreset);setStatus("Glass applied");} return; }
     if (fn === "mat_smart")           { if(meshRef.current){applyPreset(meshRef.current,"chrome");setStatus("Smart material applied");} return; }
     if (fn === "mat_edge_wear")       { if(typeof window.applyEdgeWear==="function"&&meshRef.current){window.applyEdgeWear(meshRef.current);setStatus("Edge wear applied");} return; }
@@ -3279,6 +3330,12 @@ export default function App() {
   const [nodeEditorOpen, setNodeEditorOpen] = useState(false);
   const [clothSimOpen, setClothSimOpen] = useState(false);
   const [displacementOpen, setDisplacementOpen] = useState(false);
+  const [displacementScale, setDisplacementScale] = useState(0.1);
+  const [displacementType, setDisplacementType] = useState('perlin');
+  const [clearcoatVal, setClearcoatVal] = useState(1.0);
+  const [clearcoatRoughVal, setClearcoatRoughVal] = useState(0.1);
+  const [anisotropyVal, setAnisotropyVal] = useState(1.0);
+  const [areaLights, setAreaLights] = useState([]);
   const [mocapRetargetOpen, setMocapRetargetOpen] = useState(false);
   const [cinLightOpen, setCinLightOpen] = useState(false);
   const [filmVolOpen, setFilmVolOpen] = useState(false);

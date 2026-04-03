@@ -495,7 +495,7 @@ input, select { font-family: inherit; }
 .tl-btn--addkey:hover { background: var(--orange); color: white; }
 
 .tl-frame-display { display: flex; align-items: center; gap: 4px; margin-left: 4px; }
-.tl-frame-label { font-size: 9px; color: var(--t3); letter-spacing: 0.06em; }
+.tl-frame-label { font-size: 9px; color: var(--t1); letter-spacing: 0.06em; font-weight: 500; }
 .tl-frame-input {
   width: 52px; background: var(--d4); border: 1px solid var(--b2);
   border-radius: var(--r0); color: var(--t0); font-family: var(--mono);
@@ -1293,3 +1293,14 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px s
 .spx-left { min-width: 180px; }
 .spx-left .mesh-editor-panel,
 .spx-left > div { padding-left: 4px; }
+
+.tl-ruler-label { color: var(--t1) !important; font-size: 9px; font-weight: 500; }
+/* ── Timeline visibility improvements ───────────────────────────────────── */
+.tl-frame-label       { color: var(--t1) !important; font-weight: 500 !important; }
+.tl-range-input       { color: var(--t0) !important; }
+.tl-track-name        { color: var(--t1) !important; font-size: 10px !important; }
+.tl-keyframe          { opacity: 1 !important; }
+.tl-scrubber          { background: var(--ac) !important; }
+.tl-timecode          { color: var(--t0) !important; font-weight: 600 !important; font-size: 11px !important; }
+.spx-timeline-frame   { color: var(--t1) !important; }
+.spx-frame-num        { color: var(--t1) !important; font-weight: 500 !important; }
