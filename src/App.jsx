@@ -243,21 +243,28 @@ function SpxTabGroup({ label, color, tabs }) {
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef(null);
   React.useEffect(() => {
-    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const h = (e) => {
+      if (ref.current) {
+        const inside = ref.current.contains(e.target);
+        if (!inside) setOpen(false);
+      }
+    };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, []);
   return (
     <div ref={ref} style={{position:'relative',flexShrink:0}}>
-      <button className='spx-native-workspace-tab' onClick={() => setOpen(v => !v)}
+      <button className='spx-native-workspace-tab'
+        onClick={() => setOpen(prev => prev === false ? true : false)}
         style={{borderBottom:open?'2px solid '+color:'2px solid transparent'}}>
         <span className='spx-native-workspace-tab-label' style={{color:open?color:undefined}}>{label}</span>
-        <span style={{fontSize:7,marginLeft:3}}>{open?'▲':'▼'}</span>
+        <span style={{fontSize:7,marginLeft:3,color:open?color:'#8b949e'}}>{open?'▲':'▼'}</span>
       </button>
-      {open && (
+      {open === true && (
         <div style={{position:'absolute',top:'100%',left:0,zIndex:2000,background:'#0d1117',border:'1px solid #21262d',borderTop:'2px solid '+color,borderRadius:'0 0 6px 6px',minWidth:150,boxShadow:'0 8px 24px rgba(0,0,0,0.8)',padding:'4px 0'}}>
           {tabs.map(t => (
-            <div key={t.label} onClick={() => { t.fn(); setOpen(false); }}
+            <div key={t.label}
+              onClick={() => { t.fn(); setOpen(false); }}
               style={{padding:'6px 14px',cursor:'pointer',fontSize:10,color:'#8b949e',fontFamily:'JetBrains Mono,monospace',fontWeight:600,whiteSpace:'nowrap'}}
               onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.05)';e.currentTarget.style.color=color;}}
               onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='#8b949e';}}
@@ -3384,7 +3391,7 @@ export default function App() {
         🧍 {activeModelUrl ? activeModelUrl.split("/").pop().replace(".glb","") : "Model"}
       </button>
 
-      <div className="spx-native-workspace-tabs" style={{left:0}}>
+      <div className="spx-native-workspace-tabs" style={{left:0,justifyContent:"center"}}>
         <SpxTabGroup label="SURFACE" color="#00ffc8" tabs={[
           {label:"UV",         fn:()=>openWorkspaceTool("uv")},
           {label:"Materials",  fn:()=>openWorkspaceTool("materials_textures")},
