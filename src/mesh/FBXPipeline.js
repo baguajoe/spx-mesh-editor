@@ -236,3 +236,59 @@ export const SUPPORTED_EXPORT_FORMATS = [
   { ext:".abc",  label:"Alembic",    native:false,  desc:"VFX pipeline (via backend)" },
   { ext:".spx",  label:"SPX Scene",  native:true,   desc:"Native SPX format" },
 ];
+
+
+// ── Draco-compressed GLB export ──────────────────────────────────────────────
+export async function exportGLBWithDraco(scene, options = {}) {
+  const { GLTFExporter } = await import('three/examples/jsm/exporters/GLTFExporter.js');
+  const { DRACOExporter } = await import('three/examples/jsm/exporters/DRACOExporter.js');
+
+  return new Promise((resolve, reject) => {
+    const exporter = new GLTFExporter();
+    const dracoExporter = new DRACOExporter();
+
+    const exportOptions = {
+      binary: true,
+      dracoOptions: {
+        compressionLevel: options.compressionLevel || 7,
+        quantizePosition: options.quantizePosition || 14,
+        quantizeNormal: options.quantizeNormal || 10,
+        quantizeTexcoord: options.quantizeTexcoord || 12,
+        exportUvs: true,
+        exportNormals: true,
+        exportColor: options.exportColor || false,
+      },
+      ...options,
+    };
+
+    exporter.parse(
+      scene,
+      (result) => {
+        const blob = new Blob([result], { type: 'model/gltf-binary' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = options.filename || 'spx_export_draco.glb';
+        a.click();
+        URL.revokeObjectURL(url);
+        resolve(blob);
+      },
+      (error) => reject(error),
+      exportOptions
+    );
+  });
+}
+
+export function getDracoCompressionStats(geometry) {
+  const vertexCount = geometry.attributes?.position?.count || 0;
+  const indexCount = geometry.index?.count || 0;
+  const estimatedOriginal = (vertexCount * 12 + indexCount * 4) / 1024;
+  const estimatedDraco = estimatedOriginal * 0.15; // ~85% reduction typical
+  return {
+    vertexCount,
+    indexCount,
+    estimatedOriginalKB: Math.round(estimatedOriginal),
+    estimatedDracoKB: Math.round(estimatedDraco),
+    estimatedSavingsPct: 85,
+  };
+}

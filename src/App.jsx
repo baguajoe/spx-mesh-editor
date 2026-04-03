@@ -1,3 +1,4 @@
+import NodeCompositorPanel from './components/mesh/NodeCompositorPanel';
 import SPX3DTo2DPanel from './components/pipeline/SPX3DTo2DPanel';
 import { WORKSPACES, DEFAULT_WORKSPACE } from "./pro-ui/workspaceMap";
 import CityGeneratorPanel from './components/panels/CityGeneratorPanel';
@@ -82,7 +83,7 @@ import { createConstraint, applyLookAt, applyFloor, applyStretchTo, applyCopyLoc
 import { voxelRemesh, quadRemesh, symmetrizeMesh, getRemeshStats } from "./mesh/RemeshSystem.js";
 import { createRenderFarm, addRenderFarmJob, cancelRenderJob, runNextRenderJob, getRenderFarmStats, detectWebGPU, getWebGLInfo, applyIBLToScene, setupCascadedShadows, enableShadowsOnScene, createNPROutlinePass } from "./mesh/RenderFarm.js";
 import { createAdvancedShapeKey, addAdvancedShapeKey, removeShapeKey, evaluateShapeKeysAdvanced, mirrorShapeKey, blendShapeKeys, driverShapeKey, buildMorphTargetsFromKeys, getShapeKeyStats } from "./mesh/ShapeKeysAdvanced.js";
-import { exportOBJ, parseOBJ, importFBXFromBackend, exportFBXToBackend, exportAlembic, exportUSD } from "./mesh/FBXPipeline.js";
+import { exportOBJ, parseOBJ, importFBXFromBackend, exportFBXToBackend, exportAlembic, exportUSD , exportGLBWithDraco } from "./mesh/FBXPipeline.js";
 import { sendMeshToStreamPireX } from "./mesh/StreamPireXBridge.js";
 import { heatMapWeights, bindSkeletonAdvanced, normalizeAllWeights, paintBoneWeight, getBindingStats } from "./mesh/SkeletalBinding.js";
 import { initVertexColors, paintVertexColor, fillVertexColor, gradientFillVertexColor } from "./mesh/VertexColorPainter.js";
@@ -3448,6 +3449,10 @@ export default function App() {
 
 
 
+      <NodeCompositorPanel
+        open={compositorOpen}
+        onClose={() => setCompositorOpen(false)}
+      />
       <SPX3DTo2DPanel
         open={style3DTo2DOpen}
         onClose={() => setStyle3DTo2DOpen(false)}

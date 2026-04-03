@@ -15,6 +15,7 @@ const MENU_ITEMS = {
     { label: "Import FBX…",          fn: "importFBX",          key: "" },
     { label: "─", fn: null },
     { label: "Export GLB",           fn: "exportGLB",          key: "Ctrl+E" },
+    { label: "Export GLB (Draco)",    fn: "exportGLBDraco",     key: "" },
     { label: "Export OBJ",           fn: "exportOBJ",          key: "" },
     { label: "Export FBX",           fn: "exportFBX",          key: "" },
     { label: "Export Alembic",       fn: "exportAlembic",      key: "" },
