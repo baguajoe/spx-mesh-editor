@@ -1249,7 +1249,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px s
 
 /* Tab row — always on top */
 .spx-native-workspace-tabs { z-index: 1000 !important; }
-.workspace-tools-strip      { z-index: 999  !important; }
+.workspace-tools-strip      { z-index: 91  !important; }
 .spx-menubar                { z-index: 1001 !important; }
 
 /* Generator panels — proper panel sizing */
