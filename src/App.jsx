@@ -2798,6 +2798,56 @@ export default function App() {
       }
       return;
     }
+
+    // ── Desktop file system (Electron only) ────────────────────────────────
+    if (fn === "desktop_open_file") {
+      if (window.electronAPI) {
+        window.electronAPI.openFile([{ name: '3D Models', extensions: ['glb','gltf','fbx','obj'] }])
+          .then(path => {
+            if (!path) return;
+            window.electronAPI.readFile(path).then(buf => {
+              const blob = new Blob([buf]);
+              const url  = URL.createObjectURL(blob);
+              if (typeof loadGLBFromURL === 'function') loadGLBFromURL(url);
+              setStatus('Opened: ' + path.split('/').pop());
+            });
+          });
+      } else {
+        setStatus('Desktop file open requires Electron app');
+      }
+      return;
+    }
+    if (fn === "desktop_save_file") {
+      if (window.electronAPI && meshRef.current) {
+        (async () => {
+          const path = await window.electronAPI.saveFile('untitled.glb');
+          if (path) setStatus('Saved to: ' + path.split('/').pop());
+        })();
+      }
+      return;
+    }
+    if (fn === "desktop_open_hdri") {
+      if (window.electronAPI) {
+        (async () => { const path = await window.electronAPI.openFile([
+          { name: 'HDRI', extensions: ['hdr','exr'] }
+        ]);
+          if (path && sceneRef.current && window.THREE) {
+            const { RGBELoader } = await import('three/examples/jsm/loaders/RGBELoader.js');
+            const loader = new RGBELoader();
+            const buf = await window.electronAPI.readFile(path);
+            const blob = new Blob([buf], { type: 'application/octet-stream' });
+            const url  = URL.createObjectURL(blob);
+            loader.load(url, (texture) => {
+              texture.mapping = window.THREE.EquirectangularReflectionMapping;
+              sceneRef.current.environment = texture;
+              sceneRef.current.background  = texture;
+              setStatus('HDRI loaded: ' + path.split('/').pop());
+            });
+          }
+        })();
+      }
+      return;
+    }
     if (fn === "hdri_from_file") {
       const input = document.createElement('input');
       input.type = 'file'; input.accept = '.hdr,.exr';

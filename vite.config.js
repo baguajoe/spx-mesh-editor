@@ -1,34 +1,26 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  base: './',   // relative paths for Electron file:// loading
   build: {
-    target: "esnext",
-    chunkSizeWarningLimit: 2000,
-    rollupOptions: {
-      external: [
-        '@mediapipe/pose',
-        '@mediapipe/hands',
-        '@mediapipe/face_mesh',
-        '@mediapipe/camera_utils',
-        '@mediapipe/drawing_utils',
-      ],
-      output: {
-        manualChunks(id) {
-          if (id.includes("node_modules/three")) return "three-core";
-          if (id.includes("node_modules/react")) return "react-core";
-          if (id.includes("/src/mesh/")) return "mesh-core";
-          if (id.includes("/src/components/")) return "components";
-        },
-      },
-    },
+    outDir: 'dist',
+    assetsDir: 'assets',
+    sourcemap: false,
+    chunkSizeWarningLimit: 8000,
+
   },
-  optimizeDeps: {
-    include: ["three", "react", "react-dom"],
-  },
+  // Dev server for electron:dev mode
   server: {
     port: 5173,
-    hmr:  true,
+    strictPort: true,
   },
+  // Allow importing local files in desktop mode
+  optimizeDeps: {
+    exclude: ['electron'],
+  },
+  define: {
+    __DESKTOP__: JSON.stringify(process.env.ELECTRON === 'true'),
+  }
 });

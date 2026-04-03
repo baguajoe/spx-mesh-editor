@@ -9,8 +9,10 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "electron": "NODE_ENV=development electron .",
-    "electron:build": "vite build && electron .",
-    "electron:pack": "electron-builder"
+    "electron:build": "ELECTRON=true vite build && electron-builder",
+    "electron:pack": "ELECTRON=true vite build && electron-builder",
+    "electron:dev": "ELECTRON=true NODE_ENV=development concurrently \"vite\" \"electron .\"",
+    "electron:preview": "ELECTRON=true vite build && electron ."
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",
@@ -41,7 +43,8 @@
   "build": {
     "appId": "com.eyeforgstudios.spx-mesh-editor",
     "productName": "SPX Mesh Editor",
-    "copyright": "Copyright © Eye Forge Studios LLC",
+    "copyright": "Copyright \u00a9 Eye Forge Studios LLC",
+    "asar": true,
     "directories": {
       "output": "dist-electron"
     },
@@ -51,18 +54,54 @@
       "preload.js",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "public",
+        "to": "public"
+      }
+    ],
     "win": {
-      "target": "nsis",
-      "icon": "public/icon.ico"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "public/icon.ico",
+      "requestedExecutionLevel": "asInvoker"
     },
     "mac": {
-      "target": "dmg",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
       "icon": "public/icon.icns",
-      "category": "public.app-category.graphics-design"
+      "category": "public.app-category.graphics-design",
+      "hardenedRuntime": true
     },
     "linux": {
-      "target": "AppImage",
-      "icon": "public/icon.png"
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "public/icon.png",
+      "category": "Graphics"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
     }
   }
 }
