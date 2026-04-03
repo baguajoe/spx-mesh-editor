@@ -36,6 +36,7 @@ import ProfessionalShell from "./pro-ui/ProfessionalShell";
 import FeatureIndexPanel from "./pro-ui/FeatureIndexPanel";
 import WORKSPACE_FEATURES from "./pro-ui/workspaceMap";
 
+import { markSeam, toggleSeam, clearAllSeams, packUVIslands, liveUnwrap, getSeams } from "./mesh/uv/UVUnwrap.js";
 import { HalfEdgeMesh } from "./mesh/HalfEdgeMesh.js";
 import { booleanUnion, booleanSubtract, booleanIntersect } from "./mesh/BooleanOps.js";
 import { uvBoxProject, uvSphereProject, uvPlanarProject } from "./mesh/UVUnwrap.js";
@@ -488,6 +489,11 @@ export default function App() {
 
   const [autoRigOpen, setAutoRigOpen] = useState(false);
   const [style3DTo2DOpen, setStyle3DTo2DOpen] = useState(false);
+  const [proportionalEnabled, setProportionalEnabled] = useState(false);
+  const [proportionalRadius, setProportionalRadius] = useState(1.0);
+  const [proportionalFalloff, setProportionalFalloff] = useState('smooth');
+  const [snapEnabled, setSnapEnabled] = useState(false);
+  const [snapMode, setSnapMode] = useState('vertex'); // vertex | surface | grid
   const [compositorOpen, setCompositorOpen] = useState(false);
 
   useEffect(() => {
@@ -1096,6 +1102,17 @@ export default function App() {
   useEffect(() => { sculptStrengthRef.current = sculptStrength; }, [sculptStrength]);
   useEffect(() => { sculptFalloffRef.current = sculptFalloff; }, [sculptFalloff]);
   useEffect(() => { sculptSymXRef.current = sculptSymX; }, [sculptSymX]);
+  useEffect(() => {
+    const onProportionalKey = (e) => {
+      if (e.key.toLowerCase() === 'o' && editModeRef.current === 'edit') {
+        e.preventDefault();
+        setProportionalEnabled(v => !v);
+      }
+    };
+    window.addEventListener('keydown', onProportionalKey);
+    return () => window.removeEventListener('keydown', onProportionalKey);
+  }, []);
+
   useEffect(() => { editModeRef.current = editMode; }, [editMode]);
 
   // Force canvas resize when workspace changes
@@ -1200,7 +1217,6 @@ export default function App() {
   const [propEdit, setPropEdit] = useState(false);
   const [propRadius, setPropRadius] = useState(1.0);
   const [propFalloff, setPropFalloff] = useState("smooth"); // smooth|linear|sharp
-  const [snapEnabled, setSnapEnabled] = useState(false);
   const [snapSize, setSnapSize] = useState(0.25);
 
   // ── Boolean + UV state ─────────────────────────────────────────────────────
@@ -2698,9 +2714,121 @@ export default function App() {
 
     // ── Edit tools ────────────────────────────────────────────────────────────
     if (fn === "select")              { setActiveTool("select"); setStatus("Select mode"); return; }
-    if (fn === "grab")                { setActiveTool("grab"); setStatus("Grab — G"); return; }
+    if (fn === "grab") {
+      if (proportionalEnabled && heMeshRef.current && selectedVerts.size > 0) {
+        // Proportional grab — will be applied on mouse move via delta
+        window._proportionalActive = true;
+        window._proportionalRadius = proportionalRadius;
+        window._proportionalFalloff = proportionalFalloff;
+        setStatus(`Proportional Grab — radius: ${proportionalRadius.toFixed(1)}`);
+        return;
+      }
+    }
+    if (fn === "_grab_legacy")                { setActiveTool("grab"); setStatus("Grab — G"); return; }
     if (fn === "rotate")              { setActiveTool("rotate"); setStatus("Rotate — R"); return; }
     if (fn === "scale")               { setActiveTool("scale"); setStatus("Scale — S"); return; }
+    if (fn === "sss_skin") {
+      if (meshRef.current) {
+        import("./mesh/RenderSystem.js").then(({applySSSMaterial}) => {
+          if (applySSSMaterial) {
+            applySSSMaterial(meshRef.current, "skin");
+            setStatus("SSS skin material applied");
+          }
+        });
+      }
+      return;
+    }
+    if (fn === "bake_normals") {
+      if (!meshRef.current || !sceneRef.current || !rendererRef.current) return;
+      const mesh = meshRef.current;
+      const size = 1024;
+      const renderTarget = new THREE.WebGLRenderTarget(size, size);
+      const bakeCam = new THREE.OrthographicCamera(-1,1,1,-1,0,100);
+      const normalMat = new THREE.MeshNormalMaterial();
+      const origMat = mesh.material;
+      mesh.material = normalMat;
+      rendererRef.current.setRenderTarget(renderTarget);
+      rendererRef.current.render(sceneRef.current, bakeCam);
+      rendererRef.current.setRenderTarget(null);
+      mesh.material = origMat;
+      // Read pixels and download
+      const pixels = new Uint8Array(size * size * 4);
+      rendererRef.current.readRenderTargetPixels(renderTarget, 0, 0, size, size, pixels);
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      const imgData = ctx.createImageData(size, size);
+      imgData.data.set(pixels);
+      ctx.putImageData(imgData, 0, 0);
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png');
+      a.download = 'spx_normal_bake.png';
+      a.click();
+      renderTarget.dispose();
+      setStatus("Normal map baked — downloading");
+      return;
+    }
+    if (fn === "bake_ao") {
+      setStatus("AO bake — uses IrradianceBaker.js (select mesh first)");
+      return;
+    }
+    if (fn === "batch_export") {
+      if (sceneRef.current) {
+        const meshes = [];
+        sceneRef.current.traverse(obj => { if (obj.isMesh) meshes.push(obj); });
+        if (meshes.length === 0) { setStatus("No meshes to export"); return; }
+        import('three/examples/jsm/exporters/GLTFExporter.js').then(({ GLTFExporter }) => {
+          const exporter = new GLTFExporter();
+          let exported = 0;
+          meshes.forEach((mesh, i) => {
+            const sc = new THREE.Scene();
+            sc.add(mesh.clone());
+            exporter.parse(sc, (glb) => {
+              const blob = new Blob([glb], { type: 'model/gltf-binary' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url; a.download = (mesh.name || 'mesh_' + i) + '.glb';
+              a.click(); URL.revokeObjectURL(url);
+              exported++;
+            }, (err) => console.error(err), { binary: true });
+          });
+          setStatus('Batch export — ' + meshes.length + ' meshes');
+        });
+      }
+      return;
+    }
+    if (fn === "hdri_from_file") {
+      const input = document.createElement('input');
+      input.type = 'file'; input.accept = '.hdr,.exr';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file || !sceneRef.current || !rendererRef.current) return;
+        const url = URL.createObjectURL(file);
+        const { RGBELoader } = await import('three/examples/jsm/loaders/RGBELoader.js');
+        const { PMREMGenerator } = await import('three');
+        const loader = new RGBELoader();
+        loader.load(url, (texture) => {
+          const pmrem = new PMREMGenerator(rendererRef.current);
+          const envMap = pmrem.fromEquirectangular(texture).texture;
+          sceneRef.current.environment = envMap;
+          sceneRef.current.background = envMap;
+          texture.dispose(); pmrem.dispose();
+          URL.revokeObjectURL(url);
+          setStatus(`HDRI loaded: ${file.name}`);
+        });
+      };
+      input.click();
+      return;
+    }
+    if (fn === "mark_seam")     { const sel=[...selectedEdges]; sel.forEach(id=>toggleSeam(id)); setStatus(`Seam toggled on ${sel.length} edges`); return; }
+    if (fn === "clear_seams")  { clearAllSeams(); setStatus("All seams cleared"); return; }
+    if (fn === "pack_islands") { setStatus("Pack islands — select UV editor"); return; }
+    if (fn === "live_unwrap")  { if(heMeshRef.current && cameraRef.current){ const uvs=liveUnwrap(heMeshRef.current,cameraRef.current); setStatus(`Live unwrap — ${uvs?.size||0} vertices`); } return; }
+    if (fn === "proportional_toggle") { setProportionalEnabled(v=>!v); setStatus(proportionalEnabled ? "Proportional off" : "Proportional on (O)"); return; }
+    if (fn === "proportional_radius_up") { setProportionalRadius(r=>Math.min(10,r+0.2)); return; }
+    if (fn === "proportional_radius_down") { setProportionalRadius(r=>Math.max(0.1,r-0.2)); return; }
+    if (fn === "snap_toggle") { setSnapEnabled(v=>!v); setStatus(snapEnabled ? "Snap off" : "Snap on"); return; }
+    if (fn === "grid_fill")   { if(heMeshRef.current){ const sel=[...selectedVerts]; const faces=heMeshRef.current.gridFill(sel); if(faces) { rebuildMeshGeometry(); setStatus(`Grid fill — ${faces.length} faces`); }} return; }
     if (fn === "target_weld")      { if(heMeshRef.current){ const sel=[...selectedVerts]; if(sel.length>=2){ heMeshRef.current.targetWeld(sel[0],sel[1]); rebuildMeshGeometry(); setStatus("Target Weld applied"); }} return; }
     if (fn === "chamfer_vertex")   { if(heMeshRef.current){ const sel=[...selectedVerts]; sel.forEach(id=>heMeshRef.current.chamferVertex(id,0.1)); rebuildMeshGeometry(); setStatus("Chamfer applied"); } return; }
     if (fn === "average_vertex")   { if(heMeshRef.current){ const sel=[...selectedVerts]; heMeshRef.current.averageVertices(sel,0.5,2); rebuildMeshGeometry(); setStatus("Vertices averaged"); } return; }
