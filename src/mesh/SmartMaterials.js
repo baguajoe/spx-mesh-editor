@@ -450,3 +450,295 @@ export function canvasToNormalMap(canvas, strength = 2.0) {
   octx.putImageData(outData, 0, 0);
   return out;
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// REALISTIC HUMAN SKIN SYSTEM
+// Multi-layer SSS + procedural textures + skin tone library
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ── Skin tone library (based on Fitzpatrick scale + common ethnicities) ───────
+export const SKIN_TONES = {
+  // Fair
+  porcelain:    { base:"#f8ede3", sub:"#f4c5b0", scatter:"#ff9980", vein:"#9090c0", label:"Porcelain" },
+  fair:         { base:"#f5d5c0", sub:"#f0b899", scatter:"#ff8866", vein:"#8888bb", label:"Fair" },
+  light:        { base:"#edc9a8", sub:"#dea882", scatter:"#e87755", vein:"#7777aa", label:"Light" },
+  // Medium
+  medium:       { base:"#d4a574", sub:"#c08050", scatter:"#cc6633", vein:"#886688", label:"Medium" },
+  olive:        { base:"#c49a6c", sub:"#b07840", scatter:"#bb5522", vein:"#776677", label:"Olive" },
+  tan:          { base:"#b8864e", sub:"#9c6632", scatter:"#aa4411", vein:"#665566", label:"Tan" },
+  // Deep
+  brown:        { base:"#8b5e3c", sub:"#6b3e1c", scatter:"#883311", vein:"#553355", label:"Brown" },
+  deep_brown:   { base:"#6b3e26", sub:"#4e2410", scatter:"#660022", vein:"#442244", label:"Deep Brown" },
+  dark:         { base:"#4a2810", sub:"#341806", scatter:"#440011", vein:"#331133", label:"Dark" },
+  ebony:        { base:"#2c1608", sub:"#1e0c04", scatter:"#330011", vein:"#220022", label:"Ebony" },
+  // Special
+  albino:       { base:"#fef0ea", sub:"#fad4c8", scatter:"#ffbbaa", vein:"#ddaaaa", label:"Albino" },
+  vitiligo:     { base:"#f5e6da", sub:"#f0c8b0", scatter:"#ff9977", vein:"#9999cc", label:"Vitiligo" },
+  aged:         { base:"#d4a882", sub:"#b88860", scatter:"#cc6644", vein:"#887788", label:"Aged" },
+  newborn:      { base:"#ffddcc", sub:"#ffbbaa", scatter:"#ff9988", vein:"#aaaaee", label:"Newborn" },
+};
+
+// ── Core realistic skin material ───────────────────────────────────────────────
+// Uses MeshPhysicalMaterial with multi-layer SSS approximation via sheen + transmission
+export function applyRealisticSkin(mesh, options = {}) {
+  if (!mesh) return false;
+  const THREE = window.THREE;
+  if (!THREE) return false;
+
+  const toneKey = options.tone || 'medium';
+  const tone = SKIN_TONES[toneKey] || SKIN_TONES.medium;
+
+  const {
+    // Base properties
+    color = tone.base,
+    roughness = 0.72,
+    metalness = 0.0,
+    // SSS properties
+    subsurfaceStrength = 0.6,
+    subsurfaceColor = tone.scatter,
+    subsurfaceRadius = 0.8,
+    // Surface properties
+    poreStrength = 0.3,
+    oiliness = 0.15,        // clearcoat = oily/wet areas
+    hairFollicles = false,
+    // Body region
+    region = 'face',        // face | body | hand | lip | ear
+  } = options;
+
+  // Region-specific adjustments
+  const regionProps = {
+    face:  { roughness: 0.68, clearcoat: oiliness, sheenColor: tone.scatter, thickness: 0.6 },
+    body:  { roughness: 0.75, clearcoat: oiliness * 0.5, sheenColor: tone.scatter, thickness: 0.8 },
+    hand:  { roughness: 0.80, clearcoat: 0.05, sheenColor: tone.scatter, thickness: 1.0 },
+    lip:   { roughness: 0.40, clearcoat: 0.5, sheenColor: "#ff6655", thickness: 0.3 },
+    ear:   { roughness: 0.65, clearcoat: 0.1, sheenColor: tone.scatter, thickness: 0.3, transmission: 0.15 },
+    nose:  { roughness: 0.55, clearcoat: 0.3, sheenColor: tone.scatter, thickness: 0.4 },
+  };
+  const rp = regionProps[region] || regionProps.face;
+
+  mesh.material = new THREE.MeshPhysicalMaterial({
+    color: new THREE.Color(color),
+    roughness: rp.roughness,
+    metalness,
+    // SSS approximation via sheen
+    sheen: subsurfaceStrength,
+    sheenRoughness: 0.8,
+    sheenColor: new THREE.Color(rp.sheenColor || subsurfaceColor),
+    // Clearcoat for oily areas (nose, forehead T-zone)
+    clearcoat: rp.clearcoat || oiliness,
+    clearcoatRoughness: 0.3,
+    // Transmission for thin areas (ears, lips, nostrils)
+    transmission: rp.transmission || 0,
+    thickness: rp.thickness || 0.5,
+    ior: 1.4, // skin IOR
+    // Reflectivity
+    reflectivity: 0.04, // non-metallic fresnel
+    envMapIntensity: 0.8,
+  });
+
+  mesh.material.needsUpdate = true;
+  return true;
+}
+
+// ── Generate full skin texture stack ──────────────────────────────────────────
+// Returns { color, roughness, normal, ao } canvas maps
+export function generateFullSkinTextures(options = {}) {
+  const {
+    size = 1024,
+    tone = 'medium',
+    poreScale = 55,
+    wrinkleStrength = 0.5,
+    region = 'face',
+    age = 30,        // 0-100 — affects wrinkle density
+    oiliness = 0.15,
+  } = options;
+
+  const skinTone = SKIN_TONES[tone] || SKIN_TONES.medium;
+  const baseRGB = hexToRGB(skinTone.base);
+  const subRGB  = hexToRGB(skinTone.scatter);
+
+  const colorCanvas    = document.createElement('canvas');
+  const roughCanvas    = document.createElement('canvas');
+  const normalCanvas   = document.createElement('canvas');
+  const aoCanvas       = document.createElement('canvas');
+
+  [colorCanvas, roughCanvas, normalCanvas, aoCanvas].forEach(c => {
+    c.width = c.height = size;
+  });
+
+  const colorCtx  = colorCanvas.getContext('2d');
+  const roughCtx  = roughCanvas.getContext('2d');
+  const normalCtx = normalCanvas.getContext('2d');
+  const aoCtx     = aoCanvas.getContext('2d');
+
+  const colorData  = colorCtx.createImageData(size, size);
+  const roughData  = roughCtx.createImageData(size, size);
+  const normalData = normalCtx.createImageData(size, size);
+  const aoData     = aoCtx.createImageData(size, size);
+
+  const cd = colorData.data, rd = roughData.data;
+  const nd = normalData.data, ad = aoData.data;
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      const nx = x / size, ny = y / size;
+
+      // ── Pore layer (voronoi) ──
+      const poreX = nx * poreScale, poreY = ny * poreScale;
+      const poreVal = voronoiNoise(poreX, poreY, 0.5) * 0.5 + 0.5;
+      const poreDark = Math.pow(poreVal, 1.5); // pore centers darker
+
+      // ── Large variation (perlin) ──
+      const lv1 = perlinNoise(nx*3, ny*3, 0) * 0.5 + 0.5;
+      const lv2 = perlinNoise(nx*7, ny*7, 1) * 0.5 + 0.5;
+
+      // ── Wrinkle layer (fine perlin) ──
+      const ageScale = 4 + age * 0.08;
+      const wrinkle = Math.abs(perlinNoise(nx*ageScale, ny*ageScale, 2)) * wrinkleStrength;
+
+      // ── Pore bump for normal map ──
+      const poreL = voronoiNoise(poreX-0.01, poreY, 0.5) * 0.5 + 0.5;
+      const poreR = voronoiNoise(poreX+0.01, poreY, 0.5) * 0.5 + 0.5;
+      const poreU = voronoiNoise(poreX, poreY-0.01, 0.5) * 0.5 + 0.5;
+      const poreDn = voronoiNoise(poreX, poreY+0.01, 0.5) * 0.5 + 0.5;
+
+      // ── Color map ──
+      // Mix base skin color with subsurface scatter color in pore valleys
+      const poreInfluence = 1 - poreDark * 0.25;
+      const varInfluence  = 0.85 + lv1 * 0.15;
+      const wrinkShadow   = 1 - wrinkle * 0.15;
+
+      // Blood vessel suggestion (very subtle red variation)
+      const blood = perlinNoise(nx*2, ny*2, 3) * 0.5 + 0.5;
+      const bloodR = 1.0 + blood * 0.04;
+      const bloodG = 1.0 - blood * 0.02;
+
+      cd[i]   = Math.min(255, Math.round(baseRGB[0] * poreInfluence * varInfluence * wrinkShadow * bloodR));
+      cd[i+1] = Math.min(255, Math.round(baseRGB[1] * poreInfluence * varInfluence * wrinkShadow * bloodG));
+      cd[i+2] = Math.min(255, Math.round(baseRGB[2] * poreInfluence * varInfluence * wrinkShadow));
+      cd[i+3] = 255;
+
+      // ── Roughness map ──
+      // Pore centers = rougher, oily areas = smoother
+      const baseRough = 0.65 + (1 - poreDark) * 0.2 + wrinkle * 0.15;
+      const oilySpot = perlinNoise(nx*2, ny*2, 4) * 0.5 + 0.5;
+      const finalRough = Math.max(0, Math.min(1, baseRough - oiliness * oilySpot));
+      const roughVal = Math.round(finalRough * 255);
+      rd[i] = rd[i+1] = rd[i+2] = roughVal;
+      rd[i+3] = 255;
+
+      // ── Normal map ──
+      const strength = 3.0;
+      const nnx = (poreL - poreR) * strength;
+      const nny = (poreU - poreDn) * strength;
+      const nnz = Math.sqrt(Math.max(0, 1 - nnx*nnx - nny*nny));
+      nd[i]   = Math.round((nnx * 0.5 + 0.5) * 255);
+      nd[i+1] = Math.round((nny * 0.5 + 0.5) * 255);
+      nd[i+2] = Math.round(nnz * 255);
+      nd[i+3] = 255;
+
+      // ── AO map (cavity) ──
+      const ao = 0.7 + poreDark * 0.3 - wrinkle * 0.1;
+      const aoVal = Math.min(255, Math.round(ao * 255));
+      ad[i] = ad[i+1] = ad[i+2] = aoVal;
+      ad[i+3] = 255;
+    }
+  }
+
+  colorCtx.putImageData(colorData, 0, 0);
+  roughCtx.putImageData(roughData, 0, 0);
+  normalCtx.putImageData(normalData, 0, 0);
+  aoCtx.putImageData(aoData, 0, 0);
+
+  return { color: colorCanvas, roughness: roughCanvas, normal: normalCanvas, ao: aoCanvas };
+}
+
+// ── Apply full skin texture stack to mesh ─────────────────────────────────────
+export function applyFullSkinTextures(mesh, textures) {
+  if (!mesh?.material || !textures) return false;
+  const THREE = window.THREE;
+  if (!THREE) return false;
+  const { color, roughness, normal, ao } = textures;
+  if (color)    mesh.material.map          = new THREE.CanvasTexture(color);
+  if (roughness)mesh.material.roughnessMap = new THREE.CanvasTexture(roughness);
+  if (normal)   mesh.material.normalMap    = new THREE.CanvasTexture(normal);
+  if (ao)       mesh.material.aoMap        = new THREE.CanvasTexture(ao);
+  mesh.material.needsUpdate = true;
+  return true;
+}
+
+// ── Lip material ──────────────────────────────────────────────────────────────
+export function applyLipMaterial(mesh, options = {}) {
+  const THREE = window.THREE;
+  if (!THREE || !mesh) return false;
+  const { color="#cc4444", gloss=0.7, tone='medium' } = options;
+  const skinTone = SKIN_TONES[tone] || SKIN_TONES.medium;
+  // Mix lip color with skin tone
+  mesh.material = new THREE.MeshPhysicalMaterial({
+    color: new THREE.Color(color),
+    roughness: 1.0 - gloss * 0.7,
+    metalness: 0,
+    sheen: 0.6,
+    sheenColor: new THREE.Color("#ff8877"),
+    clearcoat: gloss,
+    clearcoatRoughness: 0.1,
+    transmission: 0.08,
+    thickness: 0.2,
+  });
+  mesh.material.needsUpdate = true;
+  return true;
+}
+
+// ── Eye material ──────────────────────────────────────────────────────────────
+export function applyEyeMaterial(mesh, options = {}) {
+  const THREE = window.THREE;
+  if (!THREE || !mesh) return false;
+  const { irisColor="#4a7c9e", pupilSize=0.35 } = options;
+  mesh.material = new THREE.MeshPhysicalMaterial({
+    color: new THREE.Color(irisColor),
+    roughness: 0.0,
+    metalness: 0.0,
+    transmission: 0.1,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.0,
+    ior: 1.34,
+    thickness: 0.5,
+  });
+  mesh.material.needsUpdate = true;
+  return true;
+}
+
+// ── Set up RectAreaLight for skin rendering ────────────────────────────────────
+export async function setupSkinLighting(scene, renderer) {
+  const THREE = window.THREE;
+  if (!THREE || !scene || !renderer) return null;
+  try {
+    const { RectAreaLightUniformsLib } = await import('three/examples/jsm/lights/RectAreaLightUniformsLib.js');
+    RectAreaLightUniformsLib.init();
+    // Key light (warm)
+    const keyLight = new THREE.RectAreaLight("#fff5e0", 4, 1.5, 2.0);
+    keyLight.position.set(1.5, 2, 2); keyLight.lookAt(0, 0, 0);
+    scene.add(keyLight);
+    // Fill light (cool)
+    const fillLight = new THREE.RectAreaLight("#e0f0ff", 2, 1.0, 1.5);
+    fillLight.position.set(-2, 1, 1); fillLight.lookAt(0, 0, 0);
+    scene.add(fillLight);
+    // Rim light (warm back)
+    const rimLight = new THREE.RectAreaLight("#ffeecc", 3, 0.5, 1.5);
+    rimLight.position.set(0, 1, -2); rimLight.lookAt(0, 0, 0);
+    scene.add(rimLight);
+    return { keyLight, fillLight, rimLight };
+  } catch(e) {
+    console.warn("RectAreaLight setup failed:", e);
+    return null;
+  }
+}
+
+// ── Helper: hex to RGB ────────────────────────────────────────────────────────
+function hexToRGB(hex) {
+  const r = parseInt(hex.slice(1,3), 16);
+  const g = parseInt(hex.slice(3,5), 16);
+  const b = parseInt(hex.slice(5,7), 16);
+  return [r, g, b];
+}

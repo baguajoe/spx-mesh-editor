@@ -3044,6 +3044,41 @@ export default function App() {
     // ── Materials ─────────────────────────────────────────────────────────────
     if (fn === "mat_pbr")             { if(typeof window.createPBRMaterial==="function"&&meshRef.current){meshRef.current.material=window.createPBRMaterial();setStatus("PBR applied");} return; }
     if (fn === "mat_sss")             { if(typeof window.createSSSMaterial==="function"&&meshRef.current){meshRef.current.material=window.createSSSMaterial(sssPreset);setStatus("SSS applied");} return; }
+    if (fn === "skin_apply")        { if(meshRef.current){ applyRealisticSkin(meshRef.current,{tone:skinTone,region:skinRegion,oiliness:skinOiliness}); setStatus(`Skin: ${skinTone} / ${skinRegion}`); } return; }
+    if (fn === "skin_gen_textures") {
+      if(meshRef.current && window.THREE) {
+        setStatus("Generating skin textures (1024px)...");
+        setTimeout(() => {
+          const textures = generateFullSkinTextures({size:1024,tone:skinTone,region:skinRegion,age:skinAge,oiliness:skinOiliness});
+          applyFullSkinTextures(meshRef.current, textures);
+          applyRealisticSkin(meshRef.current,{tone:skinTone,region:skinRegion,oiliness:skinOiliness});
+          // Download all maps
+          ['color','roughness','normal','ao'].forEach(k => {
+            const a=document.createElement('a');
+            a.href=textures[k].toDataURL('image/png');
+            a.download=`spx_skin_${k}_${skinTone}.png`;
+            a.click();
+          });
+          setStatus(`✓ Skin textures applied + downloaded (${skinTone}, age ${skinAge})`);
+        }, 100);
+      }
+      return;
+    }
+    if (fn === "skin_lip")          { if(meshRef.current){ applyLipMaterial(meshRef.current,{color:lipColor,tone:skinTone}); setStatus("Lip material applied"); } return; }
+    if (fn === "skin_eye")          { if(meshRef.current){ applyEyeMaterial(meshRef.current,{irisColor:eyeColor}); setStatus("Eye material applied"); } return; }
+    if (fn === "skin_lighting")     { if(sceneRef.current&&rendererRef.current){ setupSkinLighting(sceneRef.current,rendererRef.current).then(()=>setStatus("3-point skin lighting set up (key+fill+rim)")); } return; }
+    if (fn === "skin_tone_porcelain") { setSkinTone("porcelain"); if(meshRef.current){ applyRealisticSkin(meshRef.current,{tone:"porcelain",region:skinRegion}); } setStatus("Skin tone: porcelain"); return; }
+    if (fn === "skin_tone_fair") { setSkinTone("fair"); if(meshRef.current){ applyRealisticSkin(meshRef.current,{tone:"fair",region:skinRegion}); } setStatus("Skin tone: fair"); return; }
+    if (fn === "skin_tone_light") { setSkinTone("light"); if(meshRef.current){ applyRealisticSkin(meshRef.current,{tone:"light",region:skinRegion}); } setStatus("Skin tone: light"); return; }
+    if (fn === "skin_tone_medium") { setSkinTone("medium"); if(meshRef.current){ applyRealisticSkin(meshRef.current,{tone:"medium",region:skinRegion}); } setStatus("Skin tone: medium"); return; }
+    if (fn === "skin_tone_olive") { setSkinTone("olive"); if(meshRef.current){ applyRealisticSkin(meshRef.current,{tone:"olive",region:skinRegion}); } setStatus("Skin tone: olive"); return; }
+    if (fn === "skin_tone_tan") { setSkinTone("tan"); if(meshRef.current){ applyRealisticSkin(meshRef.current,{tone:"tan",region:skinRegion}); } setStatus("Skin tone: tan"); return; }
+    if (fn === "skin_tone_brown") { setSkinTone("brown"); if(meshRef.current){ applyRealisticSkin(meshRef.current,{tone:"brown",region:skinRegion}); } setStatus("Skin tone: brown"); return; }
+    if (fn === "skin_tone_deep_brown") { setSkinTone("deep_brown"); if(meshRef.current){ applyRealisticSkin(meshRef.current,{tone:"deep_brown",region:skinRegion}); } setStatus("Skin tone: deep_brown"); return; }
+    if (fn === "skin_tone_dark") { setSkinTone("dark"); if(meshRef.current){ applyRealisticSkin(meshRef.current,{tone:"dark",region:skinRegion}); } setStatus("Skin tone: dark"); return; }
+    if (fn === "skin_tone_ebony") { setSkinTone("ebony"); if(meshRef.current){ applyRealisticSkin(meshRef.current,{tone:"ebony",region:skinRegion}); } setStatus("Skin tone: ebony"); return; }
+    if (fn === "skin_tone_albino") { setSkinTone("albino"); if(meshRef.current){ applyRealisticSkin(meshRef.current,{tone:"albino",region:skinRegion}); } setStatus("Skin tone: albino"); return; }
+    if (fn === "skin_tone_aged") { setSkinTone("aged"); if(meshRef.current){ applyRealisticSkin(meshRef.current,{tone:"aged",region:skinRegion}); } setStatus("Skin tone: aged"); return; }
     if (fn === "displace_perlin")   { if(meshRef.current){ applyDisplacementMap(meshRef.current,{noiseType:'perlin',noiseAmplitude:displacementScale,noiseScale:4}); setStatus("Perlin displacement applied"); } return; }
     if (fn === "displace_voronoi")  { if(meshRef.current){ applyDisplacementMap(meshRef.current,{noiseType:'voronoi',noiseAmplitude:displacementScale,noiseScale:4}); setStatus("Voronoi displacement applied"); } return; }
     if (fn === "displace_cellular") { if(meshRef.current){ applyDisplacementMap(meshRef.current,{noiseType:'cellular',noiseAmplitude:displacementScale,noiseScale:4}); setStatus("Cellular displacement applied"); } return; }
@@ -3331,6 +3366,12 @@ export default function App() {
   const [clothSimOpen, setClothSimOpen] = useState(false);
   const [displacementOpen, setDisplacementOpen] = useState(false);
   const [displacementScale, setDisplacementScale] = useState(0.1);
+  const [skinTone, setSkinTone] = useState('medium');
+  const [skinRegion, setSkinRegion] = useState('face');
+  const [skinAge, setSkinAge] = useState(30);
+  const [skinOiliness, setSkinOiliness] = useState(0.15);
+  const [lipColor, setLipColor] = useState('#cc4444');
+  const [eyeColor, setEyeColor] = useState('#4a7c9e');
   const [displacementType, setDisplacementType] = useState('perlin');
   const [clearcoatVal, setClearcoatVal] = useState(1.0);
   const [clearcoatRoughVal, setClearcoatRoughVal] = useState(0.1);
