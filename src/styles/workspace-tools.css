@@ -1,96 +1,125 @@
+/* ═══════════════════════════════════════════════════════════════
+   SPX WORKSPACE TOOLS STRIP — Sub-toolbar
+   Sits below main tabs, shows context tools for active workspace
+   ═══════════════════════════════════════════════════════════════ */
 
-.workspace-tools-strip{
-  position:fixed;
-  top:82px;
-  left:214px;
-  right:8px;
-  z-index:11750;
-  pointer-events:none;
+.workspace-tools-strip {
+  position: fixed;
+  top: 60px;
+  left: 0;
+  right: 0;
+  z-index: 999;
+  pointer-events: none;
+  height: 32px;
 }
 
-.workspace-tools-strip-inner{
-  display:flex;
-  align-items:center;
-  min-height:28px;
-  padding:2px 6px;
-  background:rgba(8,12,18,0.92);
-  border-bottom:1px solid rgba(255,255,255,0.06);
-  pointer-events:auto;
-  overflow:hidden;
+.workspace-tools-strip-inner {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 8px;
+  background: #0a0f1a;
+  border-bottom: 1px solid #21262d;
+  pointer-events: auto;
+  overflow: hidden;
+  gap: 3px;
 }
 
-.workspace-tools-tabs{
-  display:flex;
-  align-items:center;
-  gap:4px;
-  flex-wrap:nowrap;
-  overflow-x:auto;
-  overflow-y:hidden;
-  scrollbar-width:thin;
-  min-width:0;
-  width:100%;
+.workspace-tools-tabs {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  width: 100%;
+  height: 100%;
 }
 
-.workspace-tools-tabs::-webkit-scrollbar{
-  height:5px;
+.workspace-tools-tabs::-webkit-scrollbar { display: none; }
+
+.workspace-tab-btn {
+  appearance: none;
+  border: 1px solid #21262d;
+  background: transparent;
+  color: #8b949e;
+  border-radius: 4px;
+  padding: 3px 10px;
+  min-width: fit-content;
+  cursor: pointer;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  line-height: 1;
+  height: 22px;
+  white-space: nowrap;
+  transition: all 0.1s;
 }
 
-.workspace-tab-btn{
-  appearance:none;
-  border:1px solid rgba(255,255,255,0.08);
-  background:#122033;
-  color:#e8edf5;
-  border-radius:5px;
-  padding:3px 7px;
-  min-width:68px;
-  cursor:pointer;
-  display:flex;
-  flex-direction:column;
-  align-items:flex-start;
-  gap:0;
-  flex:0 0 auto;
-  line-height:1.05;
+.workspace-tab-btn:hover {
+  border-color: #00ffc8;
+  color: #00ffc8;
+  background: rgba(0,255,200,0.06);
 }
 
-.workspace-tab-btn:hover{
-  border-color:#4a8cff;
-  background:#18304b;
+.workspace-tab-btn.is-active {
+  background: rgba(0,255,200,0.12);
+  border-color: #00ffc8;
+  color: #00ffc8;
 }
 
-.workspace-tab-btn.is-active{
-  background:#21548f;
-  border-color:#69a6ff;
-  color:#ffffff;
+.workspace-tab-label {
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
 }
 
-.workspace-tab-label{
-  font-size:10px;
-  line-height:1.05;
-  font-weight:600;
+.workspace-tab-hint { display: none; }
+
+/* Generator sub-tabs — horizontal row */
+.spx-gen-tabs {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 100%;
 }
 
-.workspace-tab-hint{
-  font-size:8px;
-  line-height:1.05;
-  color:#8eaed3;
+.spx-gen-tab {
+  appearance: none;
+  border: 1px solid #21262d;
+  background: transparent;
+  color: #8b949e;
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  transition: all 0.1s;
 }
 
-@media (max-width: 1400px){
-  .workspace-tools-strip{
-    left:206px;
-    right:6px;
-  }
+.spx-gen-tab:hover {
+  border-color: #FF6600;
+  color: #FF6600;
+}
 
-  .workspace-tab-btn{
-    min-width:60px;
-    padding:3px 6px;
-  }
+.spx-gen-tab.is-active {
+  background: rgba(255,102,0,0.12);
+  border-color: #FF6600;
+  color: #FF6600;
+}
 
-  .workspace-tab-label{
-    font-size:9px;
-  }
-
-  .workspace-tab-hint{
-    font-size:7px;
-  }
+@media (max-width: 1400px) {
+  .workspace-tab-btn { padding: 3px 7px; font-size: 8px; }
 }

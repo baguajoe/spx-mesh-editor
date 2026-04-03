@@ -1208,3 +1208,85 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px s
   border-radius:8px;
   padding:8px 10px;
 }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   VIEWPORT LAYOUT FIX — 3D Editor Proper Docking
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Main viewport pushed below all toolbars */
+.mesh-editor-canvas,
+.spx-viewport,
+.viewport-wrap,
+[class*="viewport"] {
+  margin-top: 0;
+}
+
+/* Left sidebar — docked, starts below toolbars */
+.spx-left,
+.left-panel,
+[class*="left-panel"] {
+  top: 92px !important;
+  height: calc(100vh - 92px - var(--bottom-h, 140px)) !important;
+  z-index: 100 !important;
+}
+
+/* Right sidebar — docked */
+.spx-right,
+.right-panel,
+[class*="right-panel"] {
+  top: 92px !important;
+  height: calc(100vh - 92px - var(--bottom-h, 140px)) !important;
+  z-index: 100 !important;
+}
+
+/* Floating panels — above content, below tabs */
+.material-panel-float,
+.render-workspace-panel-float,
+[class*="-float"],
+[class*="-panel-float"] {
+  z-index: 800 !important;
+}
+
+/* Dropdown menus — above panels */
+.menu-dropdown,
+[class*="dropdown"] {
+  z-index: 1100 !important;
+}
+
+/* Film panels — above everything except menus */
+[style*="position:"fixed""],
+[style*='position:"fixed"'] {
+  z-index: 850;
+}
+
+/* Tab row — always on top */
+.spx-native-workspace-tabs { z-index: 1000 !important; }
+.workspace-tools-strip      { z-index: 999  !important; }
+.spx-menubar                { z-index: 1001 !important; }
+
+/* Generator panels — proper panel sizing */
+.spx-panel-content,
+.panel-scroll {
+  overflow-y: auto;
+  height: 100%;
+  padding-bottom: 16px;
+}
+
+/* Status bar */
+.spx-statusbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 20px;
+  z-index: 1000;
+  background: #0d1117;
+  border-top: 1px solid #21262d;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  color: #8b949e;
+}

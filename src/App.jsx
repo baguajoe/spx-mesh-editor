@@ -3338,6 +3338,7 @@ export default function App() {
       </button>
 
       <div className="spx-native-workspace-tabs" style={{left: showPerformancePanel ? 330 : 220}}>
+        <div className="spx-tab-separator" title="Character &amp; Surface"/>
         <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("uv")}>
           <span className="spx-native-workspace-tab-label">UV</span>
           <span className="spx-native-workspace-tab-hint">Shift+U</span>
@@ -3358,6 +3359,7 @@ export default function App() {
           <span className="spx-native-workspace-tab-hint">Shift+H</span>
         </button>
 
+        <div className="spx-tab-separator" title="Rigging &amp; Animation"/>
         <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("rigging_suite")}>
           <span className="spx-native-workspace-tab-label">Rigging</span>
           <span className="spx-native-workspace-tab-hint">Shift+R</span>
@@ -3381,6 +3383,7 @@ export default function App() {
           <span className="spx-native-workspace-tab-hint">Shift+P</span>
         </button>
         {/* ── VFX Tabs ── */}
+        <div className="spx-tab-separator" title="VFX"/>
         <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("fluid")}>
           <span className="spx-native-workspace-tab-label">💧 Fluid</span>
           <span className="spx-native-workspace-tab-hint">Shift+F</span>

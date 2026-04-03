@@ -1,53 +1,90 @@
-.spx-native-workspace-tabs{
-  position:fixed;
-  top:52px;
-  left:220px;
-  right:10px;
-  z-index:13000;
-  display:flex !important;
-  flex-wrap:wrap !important;
-  flex-direction:row !important;
-  gap:3px !important;
-  align-items:flex-start !important;
-  padding:4px 8px !important;
-  overflow:hidden !important;
-  max-height:92px !important;
-  background:rgba(8,12,18,0.96);
-  border-bottom:1px solid rgba(255,255,255,0.08);
-  scrollbar-width:none;
-  right:10px !important;
+/* ═══════════════════════════════════════════════════════════════
+   SPX WORKSPACE TABS — Revamped 3D Editor Style
+   Single row, grouped, docked to top, no overlap
+   ═══════════════════════════════════════════════════════════════ */
+
+.spx-native-workspace-tabs {
+  position: fixed;
+  top: 24px;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  height: 36px !important;
+  padding: 0 8px !important;
+  gap: 2px !important;
+  background: #0d1117;
+  border-bottom: 1px solid #21262d;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  max-height: 36px !important;
 }
-.spx-native-workspace-tabs::-webkit-scrollbar { display:none; }
-.spx-native-workspace-tab{
-  appearance:none;
-  border:1px solid rgba(255,255,255,0.10);
-  background:#132031;
-  color:#e8edf5;
-  border-radius:6px;
-  padding:4px 6px;
-  min-width:80px !important;
-  max-width:130px !important;
-  height:34px !important;
-  cursor:pointer;
-  display:flex;
-  flex-direction:column;
-  align-items:flex-start;
-  gap:1px;
-  flex:0 0 auto !important;
-  white-space:nowrap;
-  margin:0 !important;
+
+.spx-native-workspace-tabs::-webkit-scrollbar { display: none; }
+
+/* Tab group separator */
+.spx-tab-separator {
+  width: 1px;
+  height: 20px;
+  background: #21262d;
+  margin: 0 4px;
+  flex-shrink: 0;
 }
-.spx-native-workspace-tab:hover{
-  border-color:#4a8cff;
-  background:#18304b;
+
+.spx-native-workspace-tab {
+  appearance: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: #8b949e;
+  border-radius: 0 !important;
+  padding: 0 10px !important;
+  height: 34px !important;
+  min-width: fit-content !important;
+  max-width: none !important;
+  cursor: pointer;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 5px !important;
+  flex: 0 0 auto !important;
+  white-space: nowrap;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px !important;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  position: relative;
 }
-.spx-native-workspace-tab-label{
-  font-size:10px;
-  line-height:1.1;
-  font-weight:600;
+
+.spx-native-workspace-tab:hover {
+  color: #e0e0e0;
+  background: rgba(255,255,255,0.04);
 }
-.spx-native-workspace-tab-hint{
-  font-size:8px;
-  line-height:1.1;
-  color:#8eaed3;
+
+.spx-native-workspace-tab.is-active,
+.spx-native-workspace-tab[data-active="true"] {
+  color: #00ffc8;
+  border-bottom-color: #00ffc8;
+  background: rgba(0,255,200,0.06);
+}
+
+/* Hide the hint on main tabs — cleaner */
+.spx-native-workspace-tab-hint {
+  display: none !important;
+}
+
+.spx-native-workspace-tab-label {
+  font-size: 10px !important;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* Tab icons inline */
+.spx-native-workspace-tab-label::before {
+  margin-right: 3px;
 }
