@@ -111,3 +111,10 @@
 .spx-native-workspace-tabs > div > div {
   z-index: 9999 !important;
 }
+
+.spx-native-workspace-tabs {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  overflow: visible !important;
+}

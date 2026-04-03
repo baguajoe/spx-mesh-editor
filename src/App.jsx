@@ -3419,23 +3419,23 @@ export default function App() {
           {label:"Fluid",      fn:()=>openWorkspaceTool("fluid")},
           {label:"Weather",    fn:()=>openWorkspaceTool("weather")},
           {label:"Destruction",fn:()=>openWorkspaceTool("destruction")},
-          {label:"Physics",    fn:()=>openWorkspaceTool("physics")},
+          {label:"Physics",    fn:()=>openWorkspaceTool("physics_sim")},
         ]}/>
         <SpxTabGroup label="WORLD" color="#44aaff" tabs={[
-          {label:"Environment",fn:()=>openWorkspaceTool("environment")},
+          {label:"Environment",fn:()=>openWorkspaceTool("env_gen")},
           {label:"Terrain",    fn:()=>openWorkspaceTool("terrain")},
           {label:"City Gen",   fn:()=>openWorkspaceTool("city_gen")},
           {label:"Building",   fn:()=>openWorkspaceTool("building")},
-          {label:"Foliage",    fn:()=>openWorkspaceTool("foliage")},
-          {label:"Crowd",      fn:()=>openWorkspaceTool("crowd")},
+          {label:"Foliage",    fn:()=>openWorkspaceTool("foliage_gen")},
+          {label:"Crowd",      fn:()=>openWorkspaceTool("crowd_gen")},
         ]}/>
         <SpxTabGroup label="GEN" color="#FF6600" tabs={[
           {label:"Face",       fn:()=>openWorkspaceTool("face_gen")},
-          {label:"Vehicle",    fn:()=>openWorkspaceTool("vehicle")},
-          {label:"Creature",   fn:()=>openWorkspaceTool("creature")},
+          {label:"Vehicle",    fn:()=>openWorkspaceTool("vehicle_gen")},
+          {label:"Creature",   fn:()=>openWorkspaceTool("creature_gen")},
           {label:"Prop",       fn:()=>openWorkspaceTool("prop_gen")},
-          {label:"Assets",     fn:()=>openWorkspaceTool("assets")},
-          {label:"Nodes",      fn:()=>openWorkspaceTool("nodes")},
+          {label:"Assets",     fn:()=>openWorkspaceTool("asset_lib")},
+          {label:"Nodes",      fn:()=>openWorkspaceTool("node_mod")},
           {label:"Pro Mesh",   fn:()=>openWorkspaceTool("pro_mesh")},
           {label:"VR Preview", fn:()=>openWorkspaceTool("vr_preview")},
         ]}/>
