@@ -2870,6 +2870,47 @@ export default function App() {
       }
       return;
     }
+    if (fn === "fluid_film_start") {
+      import("./mesh/FLIPFluidSolver.js").then(({ FLIPFluidSolver, stepFilmFluid }) => {
+        const solver = new FLIPFluidSolver({
+          cellSize: 0.08, maxParticles: 3000, foam: true,
+          bounds: { min: { x:-1.5,y:-1.5,z:-1.5 }, max: { x:1.5,y:1.5,z:1.5 } }
+        });
+        // Add initial particles in a box
+        for (let i=0; i<2000; i++) {
+          solver.particles.push({
+            alive: true, phase: 0,
+            position: { x:(Math.random()-0.5)*2, y:Math.random()*1.5-0.5, z:(Math.random()-0.5)*2 },
+            velocity: { x:0, y:0, z:0 },
+          });
+        }
+        window._filmFluidSolver = solver;
+        let frame = 0;
+        const sim = setInterval(() => {
+          stepFilmFluid(solver, sceneRef.current, fluidMeshRef, foamRef, {
+            resolution:28, radius:0.25, isolevel:0.45, rebuildEvery:4,
+          });
+          if (++frame > 400) clearInterval(sim);
+        }, 16);
+        window._filmFluidSim = sim;
+        setStatus("Film fluid simulation running (surface reconstruction + foam)");
+      });
+      return;
+    }
+    if (fn === "fluid_film_stop") {
+      if (window._filmFluidSim) { clearInterval(window._filmFluidSim); window._filmFluidSim=null; }
+      setStatus("Film fluid stopped");
+      return;
+    }
+    if (fn === "fluid_apply_water_mat") {
+      if (meshRef.current) {
+        import("./mesh/FLIPFluidSolver.js").then(({ createFilmWaterMaterial }) => {
+          meshRef.current.material = createFilmWaterMaterial({transmission:0.95,ior:1.333});
+          setStatus("Film water material applied");
+        });
+      }
+      return;
+    }
     if (fn === "fluid_sim_start") {
       import("./mesh/FLIPFluidSolver.js").then(({ FLIPFluidSolver }) => {
         const solver = new FLIPFluidSolver({ gridSize: 32, particleCount: 1000 });

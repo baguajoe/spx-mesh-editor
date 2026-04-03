@@ -396,4 +396,177 @@ export const FLIP_PRESETS = {
   slime:  { flipRatio: 0.3,  viscosity: 200,  density: 1100, foam: false                   },
 };
 
+// ══════════════════════════════════════════════════════════════════════════════
+// FILM-QUALITY FLUID — Surface Reconstruction + Foam + Water Shader
+// ══════════════════════════════════════════════════════════════════════════════
+
+import { fluidSurfaceMesh } from './MarchingCubes.js';
+
+// ── Build surface mesh from FLIP particles ────────────────────────────────────
+export function buildFluidSurface(solver, scene, options = {}) {
+  const THREE = window.THREE;
+  if (!THREE || !solver || !scene) return null;
+
+  const {
+    resolution   = 28,
+    radius       = solver.cellSize * 2.5,
+    isolevel     = 0.5,
+    smoothPasses = 2,
+  } = options;
+
+  // Get alive fluid particles
+  const particles = solver.particles
+    .filter(p => p.alive && p.phase === 0)
+    .map(p => p.position);
+
+  if (particles.length < 4) return null;
+
+  // Build marching cubes mesh
+  const geo = fluidSurfaceMesh(particles, { resolution, radius, isolevel });
+  if (!geo || !geo.attributes.position || geo.attributes.position.count === 0) return null;
+
+  // Smooth the surface (Laplacian passes)
+  for (let pass = 0; pass < smoothPasses; pass++) {
+    _laplacianSmooth(geo);
+  }
+  geo.computeVertexNormals();
+
+  return geo;
+}
+
+function _laplacianSmooth(geo) {
+  const pos = geo.attributes.position;
+  const idx = geo.index;
+  if (!pos || !idx) return;
+
+  // Build adjacency
+  const adj = new Map();
+  for (let i = 0; i < idx.count; i += 3) {
+    for (let j = 0; j < 3; j++) {
+      const a = idx.getX(i+j), b = idx.getX(i+(j+1)%3);
+      if (!adj.has(a)) adj.set(a, new Set());
+      if (!adj.has(b)) adj.set(b, new Set());
+      adj.get(a).add(b); adj.get(b).add(a);
+    }
+  }
+
+  const newPos = new Float32Array(pos.array.length);
+  for (let i = 0; i < pos.count; i++) {
+    const neighbors = adj.get(i);
+    if (!neighbors || neighbors.size === 0) {
+      newPos[i*3]=pos.getX(i); newPos[i*3+1]=pos.getY(i); newPos[i*3+2]=pos.getZ(i);
+      continue;
+    }
+    let sx=0,sy=0,sz=0;
+    for (const n of neighbors) { sx+=pos.getX(n); sy+=pos.getY(n); sz+=pos.getZ(n); }
+    const n = neighbors.size;
+    // Weighted average: 50% original, 50% neighbor average
+    newPos[i*3]   = pos.getX(i)*0.5 + (sx/n)*0.5;
+    newPos[i*3+1] = pos.getY(i)*0.5 + (sy/n)*0.5;
+    newPos[i*3+2] = pos.getZ(i)*0.5 + (sz/n)*0.5;
+  }
+  pos.array.set(newPos);
+  pos.needsUpdate = true;
+}
+
+// ── Film water shader material ─────────────────────────────────────────────────
+export function createFilmWaterMaterial(options = {}) {
+  const THREE = window.THREE;
+  if (!THREE) return null;
+  const {
+    color         = "#006994",
+    deepColor     = "#001a3a",
+    roughness     = 0.02,
+    transmission  = 0.95,
+    ior           = 1.333,
+    clearcoat     = 1.0,
+    envMapIntensity = 2.0,
+    opacity       = 0.85,
+    foam          = true,
+    foamColor     = "#e8f4f8",
+  } = options;
+
+  return new THREE.MeshPhysicalMaterial({
+    color:              new THREE.Color(color),
+    roughness,
+    metalness:          0.0,
+    transmission,
+    ior,
+    thickness:          1.5,
+    clearcoat,
+    clearcoatRoughness: 0.05,
+    transparent:        true,
+    opacity,
+    envMapIntensity,
+    side:               THREE.DoubleSide,
+    depthWrite:         false,
+  });
+}
+
+// ── Foam particle system ───────────────────────────────────────────────────────
+export function buildFoamParticles(solver, scene, options = {}) {
+  const THREE = window.THREE;
+  if (!THREE || !solver || !scene) return null;
+  const { color="#e8f4f8", size=0.04, maxFoam=2000 } = options;
+
+  const foamParticles = solver.particles
+    .filter(p => p.alive && p.phase === 1) // foam phase
+    .slice(0, maxFoam);
+
+  if (foamParticles.length === 0) return null;
+
+  const positions = new Float32Array(foamParticles.length * 3);
+  foamParticles.forEach((p, i) => {
+    positions[i*3]   = p.position.x;
+    positions[i*3+1] = p.position.y;
+    positions[i*3+2] = p.position.z;
+  });
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  const mat = new THREE.PointsMaterial({
+    color: new THREE.Color(color),
+    size,
+    transparent: true,
+    opacity: 0.8,
+    depthWrite: false,
+    sizeAttenuation: true,
+  });
+  return new THREE.Points(geo, mat);
+}
+
+// ── Full film fluid simulation step with surface rebuild ───────────────────────
+export function stepFilmFluid(solver, scene, fluidMeshRef, foamRef, options = {}) {
+  const THREE = window.THREE;
+  if (!THREE || !solver || !scene) return;
+
+  // Step the simulation
+  solver.step(options.dt || 1/60);
+
+  // Rebuild surface mesh every N frames for performance
+  const rebuildEvery = options.rebuildEvery || 3;
+  if (!stepFilmFluid._frame) stepFilmFluid._frame = 0;
+  stepFilmFluid._frame++;
+  if (stepFilmFluid._frame % rebuildEvery !== 0) return;
+
+  // Remove old surface mesh
+  if (fluidMeshRef.current) { scene.remove(fluidMeshRef.current); fluidMeshRef.current = null; }
+  if (foamRef.current) { scene.remove(foamRef.current); foamRef.current = null; }
+
+  // Build new surface
+  const geo = buildFluidSurface(solver, scene, options);
+  if (geo) {
+    if (!stepFilmFluid._mat) {
+      stepFilmFluid._mat = createFilmWaterMaterial(options);
+    }
+    const mesh = new THREE.Mesh(geo, stepFilmFluid._mat);
+    scene.add(mesh);
+    fluidMeshRef.current = mesh;
+  }
+
+  // Build foam
+  const foam = buildFoamParticles(solver, scene, options);
+  if (foam) { scene.add(foam); foamRef.current = foam; }
+}
+
 export default FLIPFluidSolver;
