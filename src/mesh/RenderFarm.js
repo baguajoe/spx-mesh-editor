@@ -45,9 +45,21 @@ export function createPMREMFromHDR(renderer, hdrTexture) {
 
 export function createPMREMFromScene(renderer, scene, camera) {
   const pmrem  = new THREE.PMREMGenerator(renderer);
-  const target = pmrem.fromScene(new THREE.RoomEnvironment(), 0.04);
+  // RoomEnvironment removed (not in three.module.js build)
+  // Use a neutral grey scene as PMREM source instead
+  const neutralScene = new THREE.Scene();
+  neutralScene.background = new THREE.Color(0x444444);
+  const target = pmrem.fromScene(neutralScene, 0.04);
   pmrem.dispose();
   return target.texture;
+}
+
+export function configurePBRRenderer(renderer) {
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 }
 
 export function applyIBLToScene(scene, envMap, { intensity=1.0, background=false } = {}) {

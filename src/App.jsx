@@ -467,6 +467,7 @@ export default function App() {
     else if (toolId === "prop_gen") setPropGenOpen?.(true);
     else if (toolId === "mocap") setMocapWorkspaceOpen?.(true);
     else if (toolId === "3d_to_2d") setStyle3DTo2DOpen(true);
+    else if (toolId === "node_compositor") setCompositorOpen(v => !v);
   };
 
 
@@ -486,6 +487,7 @@ export default function App() {
 
   const [autoRigOpen, setAutoRigOpen] = useState(false);
   const [style3DTo2DOpen, setStyle3DTo2DOpen] = useState(false);
+  const [compositorOpen, setCompositorOpen] = useState(false);
 
   useEffect(() => {
     const onAutoRigKey = (e) => {
