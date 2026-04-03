@@ -3433,6 +3433,7 @@ export default function App() {
           {label:"Vehicle",    fn:()=>openWorkspaceTool("vehicle_gen")},
           {label:"Creature",   fn:()=>openWorkspaceTool("creature_gen")},
           {label:"Pro Mesh",   fn:()=>openWorkspaceTool("pro_mesh")},
+          {label:"3D→2D Style", fn:()=>openWorkspaceTool("3d_to_2d")},
         ]}/>
         <button type="button" className="spx-native-workspace-tab" onClick={()=>setShowPerformancePanel(v=>!v)} style={{marginLeft:"auto",flexShrink:0}}>
           <span className="spx-native-workspace-tab-label">Performance</span>
@@ -3525,6 +3526,10 @@ export default function App() {
       )}
 
       {/* Lighting & Camera Panel */}
+      {filmCameraOpen && (<div style={{position:"fixed",left:16,top:60,zIndex:1200}}><FilmCameraPanel cameraRef={cameraRef} rendererRef={rendererRef} sceneRef={sceneRef} open={filmCameraOpen} onClose={()=>setFilmCameraOpen(false)}/></div>)}
+      {filmVolOpen && (<div style={{position:"fixed",left:280,top:60,zIndex:1200}}><FilmVolumetricsPanel sceneRef={sceneRef} open={filmVolOpen} onClose={()=>setFilmVolOpen(false)}/></div>)}
+      {filmPTOpen && (<div style={{position:"fixed",left:540,top:60,zIndex:1200}}><FilmPathTracerPanel rendererRef={rendererRef} sceneRef={sceneRef} cameraRef={cameraRef} open={filmPTOpen} onClose={()=>setFilmPTOpen(false)}/></div>)}
+      {cinLightOpen && (<div style={{position:"fixed",right:16,top:60,zIndex:1200}}><CinematicLightingPanel sceneRef={sceneRef} open={cinLightOpen} onClose={()=>setCinLightOpen(false)}/></div>)}
       {lightingCameraPanelOpen && (
         <div style={{position:"fixed",top:0,right:0,width:380,height:"100vh",zIndex:60,overflow:"hidden",display:"flex",flexDirection:"column"}}>
           <LightingCameraPanel
