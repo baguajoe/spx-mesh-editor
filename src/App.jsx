@@ -3253,7 +3253,7 @@ export default function App() {
             onAddPrimitive={addPrimitive}
           />
           <div style={{ flex:1, overflow:"auto", borderTop:"1px solid #202020" }}>
-            {showNPanel || activeWorkspace !== "Modeling" ? (
+            {showNPanel ? (
               <FeatureIndexPanel
                 activeWorkspace={activeWorkspace}
                 onApplyFunction={handleApplyFunction}
