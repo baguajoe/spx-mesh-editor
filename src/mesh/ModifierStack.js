@@ -83,7 +83,7 @@ function applyMirror(geo, params) {
 function applySolidify(geo, params) {
   const thickness = params.thickness ?? 0.1;
   const pos = geo.attributes.position;
-  const norm = geo.attributes.normal ?? geo.computeVertexNormals() && geo.attributes.normal;
+  geo.computeVertexNormals(); const norm = geo.attributes.normal;
   const inner = geo.clone();
   const ipos = inner.attributes.position;
   const inorm = inner.attributes.normal;

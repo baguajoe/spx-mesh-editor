@@ -2820,6 +2820,107 @@ export default function App() {
       input.click();
       return;
     }
+    if (fn === "graph_editor") {
+      import("./mesh/DriverSystem.js").then(({ createDriver }) => {
+        setStatus("Graph editor — use Animation workspace → F-Curve panel");
+      });
+      return;
+    }
+    if (fn === "particle_emit") {
+      if (sceneRef.current && meshRef.current) {
+        const pos = meshRef.current.position;
+        if (typeof window.burstEmit === "function") {
+          window.burstEmit(null, pos, 200);
+          setStatus("Particle burst emitted");
+        } else {
+          setStatus("Particle system not initialized — add a mesh first");
+        }
+      }
+      return;
+    }
+    if (fn === "particle_fire")  { if(typeof window.createEmitter==="function"&&window.VFX_PRESETS){ window.createEmitter(window.VFX_PRESETS.fire); setStatus("Fire emitter"); } return; }
+    if (fn === "particle_smoke") { if(typeof window.createEmitter==="function"&&window.VFX_PRESETS){ window.createEmitter(window.VFX_PRESETS.smoke); setStatus("Smoke emitter"); } return; }
+    if (fn === "particle_sparks"){ if(typeof window.createEmitter==="function"&&window.VFX_PRESETS){ window.createEmitter(window.VFX_PRESETS.sparks); setStatus("Sparks emitter"); } return; }
+    if (fn === "modifier_add") {
+      import("./mesh/ModifierStack.js").then(({ addModifier, applyModifierStack }) => {
+        if (!meshRef.current) return;
+        if (!window._modStack) window._modStack = [];
+        const mod = addModifier(window._modStack, "subdivide", { levels: 1 });
+        const newGeo = applyModifierStack(meshRef.current.geometry, window._modStack);
+        if (newGeo && meshRef.current.isMesh) {
+          meshRef.current.geometry.dispose();
+          meshRef.current.geometry = newGeo;
+          heMeshRef.current = null; // force rebuild on next edit
+          setStatus("Subdivide modifier applied");
+        }
+      });
+      return;
+    }
+    if (fn === "modifier_apply_all") {
+      if (window._modStack?.length) {
+        import("./mesh/ModifierStack.js").then(({ applyModifierStack }) => {
+          const newGeo = applyModifierStack(meshRef.current?.geometry, window._modStack);
+          if (newGeo && meshRef.current?.isMesh) {
+            meshRef.current.geometry.dispose();
+            meshRef.current.geometry = newGeo;
+            window._modStack = [];
+            setStatus("All modifiers applied");
+          }
+        });
+      }
+      return;
+    }
+    if (fn === "fluid_sim_start") {
+      import("./mesh/FLIPFluidSolver.js").then(({ FLIPFluidSolver }) => {
+        const solver = new FLIPFluidSolver({ gridSize: 32, particleCount: 1000 });
+        let frame = 0;
+        const sim = setInterval(() => {
+          solver.step(1/60);
+          if (++frame > 200) clearInterval(sim);
+        }, 16);
+        window._fluidSim = sim;
+        window._fluidSolver = solver;
+        setStatus("FLIP fluid simulation running");
+      });
+      return;
+    }
+    if (fn === "fluid_sim_stop") {
+      if (window._fluidSim) { clearInterval(window._fluidSim); window._fluidSim = null; }
+      setStatus("Fluid simulation stopped");
+      return;
+    }
+    if (fn === "cloth_sim_start") {
+      if (meshRef.current) {
+        import("./mesh/ClothSystem.js").then(({ createCloth, stepCloth, applyClothToMesh, pinTopRow }) => {
+          const cloth = createCloth(meshRef.current, { segments: 10, stiffness: 0.8 });
+          pinTopRow(cloth, meshRef.current);
+          let frame = 0;
+          const sim = setInterval(() => {
+            stepCloth(cloth, 1/60);
+            applyClothToMesh(cloth);
+            if (meshRef.current?.geometry) meshRef.current.geometry.attributes.position.needsUpdate = true;
+            if (++frame > 300) clearInterval(sim);
+          }, 16);
+          window._clothSim = sim;
+          setStatus("Cloth simulation running — 300 frames");
+        });
+      }
+      return;
+    }
+    if (fn === "cloth_sim_stop") {
+      if (window._clothSim) { clearInterval(window._clothSim); window._clothSim = null; }
+      setStatus("Cloth simulation stopped");
+      return;
+    }
+    if (fn === "smart_uv") {
+      if (heMeshRef.current) {
+        import("./mesh/uv/UVUnwrap.js").then(({ smartUnwrap, getSeams }) => {
+          const uvs = smartUnwrap(heMeshRef.current, getSeams ? getSeams() : []);
+          setStatus("Smart UV unwrap — " + uvs.size + " vertices mapped");
+        });
+      }
+      return;
+    }
     if (fn === "mark_seam")     { const sel=[...selectedEdges]; sel.forEach(id=>toggleSeam(id)); setStatus(`Seam toggled on ${sel.length} edges`); return; }
     if (fn === "clear_seams")  { clearAllSeams(); setStatus("All seams cleared"); return; }
     if (fn === "pack_islands") { setStatus("Pack islands — select UV editor"); return; }
