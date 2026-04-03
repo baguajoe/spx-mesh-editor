@@ -1,3 +1,4 @@
+import SPX3DTo2DPanel from './components/pipeline/SPX3DTo2DPanel';
 import { WORKSPACES, DEFAULT_WORKSPACE } from "./pro-ui/workspaceMap";
 import CityGeneratorPanel from './components/panels/CityGeneratorPanel';
 import VRPreviewPanel from './components/panels/VRPreviewPanel';
