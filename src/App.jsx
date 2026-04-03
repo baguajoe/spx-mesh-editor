@@ -3363,7 +3363,10 @@ export default function App() {
         <div className="spx-tab-separator" title="Rigging &amp; Animation"/>
         <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("rigging_suite")}>
           <span className="spx-native-workspace-tab-label">Rigging</span>
-          <span className="spx-native-workspace-tab-hint">Shift+R</span>
+          <span className="spx-native-workspace-tab-hint">Shift+R</span></button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => setLightingCameraPanelOpen(v=>!v)}>
+          <span className="spx-native-workspace-tab-label">💡 Lighting</span>
+          <span className="spx-native-workspace-tab-hint">Shift+L</span>
         </button>
 
         <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("mocap")}>
