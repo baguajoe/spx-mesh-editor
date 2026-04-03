@@ -19,6 +19,9 @@ import FilmPostPanel from "./components/panels/FilmPostPanel.jsx";
 import FilmAssetLibrary from "./components/panels/FilmAssetLibrary.jsx";
 import FilmMaterialPanel from "./components/panels/FilmMaterialPanel.jsx";
 import FilmSculptPanel from "./components/panels/FilmSculptPanel.jsx";
+import FilmCameraPanel from "./components/panels/FilmCameraPanel.jsx";
+import FilmVolumetricsPanel from "./components/panels/FilmVolumetricsPanel.jsx";
+import FilmPathTracerPanel from "./components/panels/FilmPathTracerPanel.jsx";
 import RotoscopePanel from "./components/panels/RotoscopePanel.jsx";
 import FilmSubdivPanel from "./components/panels/FilmSubdivPanel.jsx";
 import FilmRenderPipeline from "./components/panels/FilmRenderPipeline.jsx";
@@ -2892,6 +2895,9 @@ export default function App() {
   const [filmLibraryOpen, setFilmLibraryOpen] = useState(false);
   const [filmMaterialOpen, setFilmMaterialOpen] = useState(false);
   const [filmSculptOpen, setFilmSculptOpen] = useState(false);
+  const [filmCameraOpen, setFilmCameraOpen] = useState(false);
+  const [filmVolOpen, setFilmVolOpen] = useState(false);
+  const [filmPTOpen, setFilmPTOpen] = useState(false);
   const [rotoOpen, setRotoOpen] = useState(false);
   const [filmSubdivOpen, setFilmSubdivOpen] = useState(false);
   const [filmRenderOpen, setFilmRenderOpen] = useState(false);
@@ -3364,6 +3370,18 @@ export default function App() {
         <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("rigging_suite")}>
           <span className="spx-native-workspace-tab-label">Rigging</span>
           <span className="spx-native-workspace-tab-hint">Shift+R</span></button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => setFilmCameraOpen(v=>!v)}>
+          <span className="spx-native-workspace-tab-label">🎬 Camera</span>
+          <span className="spx-native-workspace-tab-hint">Shift+C</span>
+        </button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => setFilmVolOpen(v=>!v)}>
+          <span className="spx-native-workspace-tab-label">🌫 Volume</span>
+          <span className="spx-native-workspace-tab-hint">Shift+V</span>
+        </button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => setFilmPTOpen(v=>!v)}>
+          <span className="spx-native-workspace-tab-label">✨ Path Trace</span>
+          <span className="spx-native-workspace-tab-hint">Shift+T</span>
+        </button>
         <button type="button" className="spx-native-workspace-tab" onClick={() => setLightingCameraPanelOpen(v=>!v)}>
           <span className="spx-native-workspace-tab-label">💡 Lighting</span>
           <span className="spx-native-workspace-tab-hint">Shift+L</span>
