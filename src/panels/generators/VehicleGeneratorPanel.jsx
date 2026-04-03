@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { buildCurvedVehicle, VEHICLE_CURVE_PRESETS } from '../../mesh/VehicleCurves.js';
 import * as THREE from 'three';
 
 function Slider({label,value,min=0,max=1,step=0.01,onChange,unit=''}) {
@@ -36,7 +37,7 @@ function Badges({items,active,onSelect}) {
   </div>;
 }
 
-const PRESETS = {
+const PRESETS = { ...VEHICLE_CURVE_PRESETS, ...{
   'Sports Car':  {bodyLength:0.45,bodyHeight:0.22,bodyWidth:0.52,wheelSize:0.42,spoiler:true, groundClearance:0.08,primaryColor:'#cc2200',wheelCount:4},
   'SUV':         {bodyLength:0.80,bodyHeight:0.72,bodyWidth:0.72,wheelSize:0.62,spoiler:false,groundClearance:0.42,primaryColor:'#1a3a5a',wheelCount:4},
   'Pickup Truck':{bodyLength:0.95,bodyHeight:0.58,bodyWidth:0.68,wheelSize:0.65,spoiler:false,groundClearance:0.45,primaryColor:'#3a3a2a',wheelCount:4},
@@ -45,9 +46,9 @@ const PRESETS = {
   'Semi Truck':  {bodyLength:1.20,bodyHeight:0.90,bodyWidth:0.75,wheelSize:0.70,spoiler:false,groundClearance:0.50,primaryColor:'#aa2211',wheelCount:18},
   'Supercar':    {bodyLength:0.50,bodyHeight:0.18,bodyWidth:0.56,wheelSize:0.46,spoiler:true, groundClearance:0.06,primaryColor:'#f0c000',wheelCount:4},
   'Off-Road':    {bodyLength:0.78,bodyHeight:0.78,bodyWidth:0.75,wheelSize:0.78,spoiler:false,groundClearance:0.62,primaryColor:'#3a4a2a',wheelCount:4},
-};
+}};
 
-function buildVehicle(scene, p, meshesRef) {
+function buildCurvedVehicle(scene, p, meshesRef) {
   meshesRef.current.forEach(m=>{scene.remove(m);m.geometry?.dispose();m.material?.dispose();});
   meshesRef.current=[];
   const ms=[];
@@ -119,7 +120,7 @@ export default function VehicleGeneratorPanel({sceneRef,setStatus,onGenerate}) {
     setWheelSize(p.wheelSize);setSpoiler(p.spoiler);setGroundClearance(p.groundClearance);
     setPrimaryColor(p.primaryColor);setWheelCount(p.wheelCount);
     // Rebuild immediately with preset values
-    if(sceneRef?.current) setTimeout(()=>buildVehicle(sceneRef.current,{
+    if(sceneRef?.current) setTimeout(()=>buildCurvedVehicle(sceneRef.current,{
       bodyLength:p.bodyLength,bodyHeight:p.bodyHeight,bodyWidth:p.bodyWidth,
       wheelSize:p.wheelSize,wheelCount:p.wheelCount,spoiler:p.spoiler,
       groundClearance:p.groundClearance,primaryColor:p.primaryColor,roughness:0.20,metalness:0.85
@@ -128,7 +129,7 @@ export default function VehicleGeneratorPanel({sceneRef,setStatus,onGenerate}) {
 
   function generate(){
     if(!scene){setStatus?.('No scene');return;}
-    const n=buildVehicle(scene,getParams(),meshesRef);
+    const n=buildCurvedVehicle(scene,getParams(),meshesRef);
     setStatus?.(`✓ ${activePreset} — ${n} parts`);
     onGenerate?.(getParams());
   }
@@ -139,7 +140,7 @@ export default function VehicleGeneratorPanel({sceneRef,setStatus,onGenerate}) {
 
   // Rebuild live when sliders change
   useEffect(()=>{
-    if(sceneRef?.current) buildVehicle(sceneRef.current, getParams(), meshesRef);
+    if(sceneRef?.current) buildCurvedVehicle(sceneRef.current, getParams(), meshesRef);
   },[bodyLength,bodyHeight,bodyWidth,wheelSize,wheelCount,spoiler,groundClearance,primaryColor]);
 
   const P={fontFamily:'JetBrains Mono,monospace',color:'#e0e0e0',fontSize:12,userSelect:'none',width:'100%'};

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { buildLSystemTree, LSYSTEM_PRESETS } from '../../mesh/LSystemTree.js';
 import * as THREE from 'three';
 
 function Slider({label,value,min=0,max=1,step=0.01,onChange,unit=''}) {
@@ -72,6 +73,50 @@ function buildFoliage(scene, p, meshesRef) {
   }
   meshesRef.current=ms;
   return ms.filter(m=>m.isMesh).length;
+}
+
+function LSystemTab({ sceneRef }) {
+  const meshesRef = useRef([]);
+  const [preset, setPreset] = useState('Oak');
+  const [grammarType, setGrammarType] = useState('oak');
+  const [trunkRadius, setTrunkRadius] = useState(0.22);
+  const [trunkColor, setTrunkColor] = useState('#5a3a1a');
+  const [leafColor, setLeafColor] = useState('#2a7a2a');
+  const [leafSize, setLeafSize] = useState(0.45);
+  const [iterations, setIterations] = useState(4);
+  const [count, setCount] = useState(1);
+  const [scatter, setScatter] = useState(0);
+
+  const build = () => {
+    const scene = sceneRef?.current; if(!scene) return;
+    buildLSystemTree(scene, { grammarType, trunkRadius, trunkColor, leafColor, leafSize, iterations, count, scatter }, meshesRef);
+  };
+
+  useEffect(()=>{ build(); }, []);
+
+  const loadPreset = (name) => {
+    const p = LSYSTEM_PRESETS[name]; if(!p) return;
+    setPreset(name); setGrammarType(p.grammarType); setTrunkRadius(p.trunkRadius);
+    setTrunkColor(p.trunkColor); setLeafColor(p.leafColor); setLeafSize(p.leafSize);
+    setIterations(p.iterations); setCount(p.count||1); setScatter(p.scatter||0);
+    const scene = sceneRef?.current; if(!scene) return;
+    setTimeout(()=>buildLSystemTree(scene, p, meshesRef), 50);
+  };
+
+  return <div style={{padding:'0 4px'}}>
+    <div style={{fontSize:9,color:'#8b949e',marginBottom:4,letterSpacing:1}}>L-SYSTEM GRAMMAR TREES</div>
+    <div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:8}}>
+      {Object.keys(LSYSTEM_PRESETS).map(k=><button key={k} onClick={()=>loadPreset(k)} style={{padding:'3px 8px',fontSize:9,borderRadius:4,cursor:'pointer',background:preset===k?'#00ffc8':'#0d1117',color:preset===k?'#06060f':'#8b949e',border:`1px solid ${preset===k?'#00ffc8':'#21262d'}`,fontWeight:700}}>{k}</button>)}
+    </div>
+    <Slider label="TRUNK RADIUS" value={trunkRadius} min={0.05} max={0.5} step={0.01} onChange={setTrunkRadius}/>
+    <Slider label="LEAF SIZE"    value={leafSize}    min={0}    max={1}   step={0.01} onChange={setLeafSize}/>
+    <Slider label="ITERATIONS"   value={iterations}  min={2}    max={6}   step={1}    onChange={setIterations}/>
+    <Slider label="COUNT"        value={count}       min={1}    max={20}  step={1}    onChange={setCount}/>
+    <Slider label="SCATTER"      value={scatter}     min={0}    max={1}   step={0.01} onChange={setScatter}/>
+    <ColorRow label="TRUNK" value={trunkColor} onChange={setTrunkColor}/>
+    <ColorRow label="LEAF"  value={leafColor}  onChange={setLeafColor}/>
+    <button onClick={build} style={{width:'100%',padding:'7px',marginTop:6,background:'rgba(0,255,200,0.1)',border:'1px solid #00ffc8',borderRadius:4,color:'#00ffc8',fontFamily:'JetBrains Mono,monospace',fontSize:10,fontWeight:700,cursor:'pointer',letterSpacing:1}}>↺ REBUILD TREE</button>
+  </div>;
 }
 
 export default function FoliageGeneratorPanel({sceneRef,setStatus,onGenerate}) {
