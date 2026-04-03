@@ -340,6 +340,8 @@ function thermalMap(data) {
 // ─── Main Renderer ────────────────────────────────────────────────────────────
 
 // ─── GPU Renderer using Three.js EffectComposer ──────────────────────────────
+
+// ─── GPU Renderer using Three.js EffectComposer ──────────────────────────────
 export class SPX3DTo2DRenderer {
   /**
    * @param {THREE.WebGLRenderer} threeRenderer
