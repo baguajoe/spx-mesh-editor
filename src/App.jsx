@@ -3326,7 +3326,10 @@ export default function App() {
       <TexturePaintPanel
         open={paintPanelOpen}
         onClose={() => setPaintPanelOpen(false)}
-        meshRef      <div className="spx-native-workspace-tabs" style={{left:0}}>
+        meshRef={meshRef}
+      />
+
+      <div className="spx-native-workspace-tabs" style={{left:0}}>
         <SpxTabGroup label="SURFACE" color="#00ffc8" tabs={[
           {label:'UV',          fn:()=>openWorkspaceTool('uv')},
           {label:'Materials',   fn:()=>openWorkspaceTool('materials_textures')},
