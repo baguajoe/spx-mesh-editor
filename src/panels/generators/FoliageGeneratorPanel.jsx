@@ -49,7 +49,7 @@ function buildFoliage(scene, p, meshesRef) {
     const a=new THREE.AmbientLight(0xffffff,0.6);a.name='fol_amb';scene.add(a);ms.push(a);
     const d=new THREE.DirectionalLight(0xffeedd,1.2);d.name='fol_dir';d.position.set(8,15,8);d.castShadow=true;scene.add(d);ms.push(d);
   }
-  const ground=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.MeshStandardMaterial({color:0x1a2a18,roughness:0.95}));
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.MeshPhysicalMaterial({color:0x1a2a18,roughness:0.95}));
   ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);ms.push(ground);
   const rng=(a,b)=>a+Math.random()*(b-a);
   const count=Math.max(1,p.count);
@@ -57,10 +57,10 @@ function buildFoliage(scene, p, meshesRef) {
   for(let i=0;i<count;i++){
     const ox=count>1?rng(-spread,spread):0;
     const oz=count>1?rng(-spread,spread):0;
-    const trunkMat=new THREE.MeshStandardMaterial({color:new THREE.Color(p.trunkColor),roughness:0.95});
+    const trunkMat=new THREE.MeshPhysicalMaterial({color:new THREE.Color(p.trunkColor),roughness:0.95});
     const trunk=new THREE.Mesh(new THREE.CylinderGeometry(p.trunkR*0.6,p.trunkR,p.trunkH,8),trunkMat);
     trunk.position.set(ox,p.trunkH/2,oz);trunk.castShadow=true;scene.add(trunk);ms.push(trunk);
-    const leafMat=new THREE.MeshStandardMaterial({color:new THREE.Color(p.leafColor),roughness:0.8});
+    const leafMat=new THREE.MeshPhysicalMaterial({color:new THREE.Color(p.leafColor),roughness:0.8});
     for(let l=0;l<p.branchLevels;l++){
       const t=(l+1)/p.branchLevels;
       const ly=p.trunkH*(0.45+t*0.5);

@@ -40,11 +40,11 @@ function buildProp(scene, type, p, meshesRef) {
     const a=new THREE.AmbientLight(0xffffff,0.6);a.name='prop_amb';scene.add(a);ms.push(a);
     const d=new THREE.DirectionalLight(0xffeedd,1.2);d.name='prop_dir';d.position.set(8,15,8);d.castShadow=true;scene.add(d);ms.push(d);
   }
-  const ground=new THREE.Mesh(new THREE.PlaneGeometry(20,20),new THREE.MeshStandardMaterial({color:0x111811,roughness:0.95}));
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(20,20),new THREE.MeshPhysicalMaterial({color:0x111811,roughness:0.95}));
   ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);ms.push(ground);
 
   const col=new THREE.Color(p.color);
-  const mat=(c=col,r=p.roughness,me=p.metalness)=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:me});
+  const mat=(c=col,r=p.roughness,me=p.metalness)=>new THREE.MeshPhysicalMaterial({color:c,roughness:r,metalness:me});
   const rng=(a,b)=>a+Math.random()*(b-a);
   const n=Math.max(1,p.count), sp=p.scatter*6;
 

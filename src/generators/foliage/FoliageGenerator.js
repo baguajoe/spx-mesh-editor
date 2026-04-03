@@ -164,14 +164,14 @@ export function createTree(params = {}) {
 
   // Trunk
   const trunkGeo = generateTrunk({ ...rest, seed });
-  const trunkMat = new THREE.MeshStandardMaterial({ color: trunkColor, roughness: 0.9, metalness: 0 });
+  const trunkMat = new THREE.MeshPhysicalMaterial({ color: trunkColor, roughness: 0.9, metalness: 0 });
   const trunk = new THREE.Mesh(trunkGeo, trunkMat);
   trunk.castShadow = trunk.receiveShadow = true;
   group.add(trunk);
 
   // Branches
   const branchGeos = generateBranches({ ...rest, seed: seed+1 });
-  const branchMat = new THREE.MeshStandardMaterial({ color: trunkColor, roughness: 0.9 });
+  const branchMat = new THREE.MeshPhysicalMaterial({ color: trunkColor, roughness: 0.9 });
   branchGeos.forEach(geo => {
     const m = new THREE.Mesh(geo, branchMat);
     m.castShadow = true;
@@ -181,7 +181,7 @@ export function createTree(params = {}) {
   // Leaves
   if ((params.canopyDensity ?? 0.85) > 0) {
     const leafGeo = generateLeafCluster({ ...rest, seed: seed+2, color: leafColor });
-    const leafMat = new THREE.MeshStandardMaterial({ color: leafColor, roughness: 0.8, side: THREE.DoubleSide });
+    const leafMat = new THREE.MeshPhysicalMaterial({ color: leafColor, roughness: 0.8, side: THREE.DoubleSide });
     const leaves = new THREE.Mesh(leafGeo, leafMat);
     leaves.position.y = (rest.trunkHeight ?? 2) * 0.7;
     leaves.castShadow = leaves.receiveShadow = true;
@@ -196,7 +196,7 @@ export function createTree(params = {}) {
 export function createBush(params = {}) {
   const { leafColor=0x2d6a2d, size=0.8, density=0.7, seed=42 } = params;
   const geo = generateLeafCluster({ radius: size, density, leafSize: 0.12, leafCount: 80, seed, color: leafColor });
-  const mat = new THREE.MeshStandardMaterial({ color: leafColor, roughness: 0.8, side: THREE.DoubleSide });
+  const mat = new THREE.MeshPhysicalMaterial({ color: leafColor, roughness: 0.8, side: THREE.DoubleSide });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.name = 'Bush';
   return mesh;
@@ -223,7 +223,7 @@ export function createGrass(params = {}) {
     geo.setIndex(indices);
     geo.computeVertexNormals();
 
-    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.8, side: THREE.DoubleSide });
+    const mat = new THREE.MeshPhysicalMaterial({ color, roughness: 0.8, side: THREE.DoubleSide });
     const blade = new THREE.Mesh(geo, mat);
     blade.position.set(x, 0, z);
     blade.rotation.y = rng()*Math.PI*2;

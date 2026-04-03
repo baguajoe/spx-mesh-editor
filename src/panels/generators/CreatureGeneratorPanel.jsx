@@ -63,21 +63,21 @@ function buildOrganicTorso(sc, skinCol, accCol, bL, bG, baseY) {
     [bG*0.6,  bL*0.35],
   ];
   const torsoGeo = createLatheProfile(torsoProfile, 20);
-  const torsoMat = new THREE.MeshStandardMaterial({color:skinCol, roughness:0.75, metalness:0.05});
+  const torsoMat = new THREE.MeshPhysicalMaterial({color:skinCol, roughness:0.75, metalness:0.05});
   const torso = new THREE.Mesh(torsoGeo, torsoMat);
   torso.position.y = baseY; torso.castShadow = true;
   meshes.push(torso);
 
   // Chest muscle definition - two pectoral masses
   for(const sx of [-1,1]) {
-    const pec = new THREE.Mesh(smoothSphere(bG*0.55, 16), new THREE.MeshStandardMaterial({color:skinCol,roughness:0.7,metalness:0.05}));
+    const pec = new THREE.Mesh(smoothSphere(bG*0.55, 16), new THREE.MeshPhysicalMaterial({color:skinCol,roughness:0.7,metalness:0.05}));
     pec.position.set(sx*bG*0.55, baseY+bL*0.1, bG*0.7);
     pec.scale.set(1,0.7,0.6); pec.castShadow=true;
     meshes.push(pec);
   }
   // Abs definition
   for(let row=0;row<3;row++) for(const sx of [-1,1]) {
-    const ab = new THREE.Mesh(smoothSphere(bG*0.25,12), new THREE.MeshStandardMaterial({color:new THREE.Color(skinCol).multiplyScalar(0.8),roughness:0.8}));
+    const ab = new THREE.Mesh(smoothSphere(bG*0.25,12), new THREE.MeshPhysicalMaterial({color:new THREE.Color(skinCol).multiplyScalar(0.8),roughness:0.8}));
     ab.position.set(sx*bG*0.35, baseY-bL*0.05-row*bG*0.28, bG*0.85);
     ab.scale.set(0.9, 0.6, 0.4); ab.castShadow=true;
     meshes.push(ab);
@@ -87,7 +87,7 @@ function buildOrganicTorso(sc, skinCol, accCol, bL, bG, baseY) {
 
 function buildOrganicHead(scene, sc, skinCol, accCol, hS, hy, preset) {
   const meshes = [];
-  const mat = (c,r=0.65,me=0.05) => new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:me});
+  const mat = (c,r=0.65,me=0.05) => new THREE.MeshPhysicalMaterial({color:c,roughness:r,metalness:me});
 
   // Cranium - elongated for menacing look
   const crania = new THREE.Mesh(smoothSphere(hS, 28), mat(skinCol));
@@ -140,7 +140,7 @@ function buildOrganicHead(scene, sc, skinCol, accCol, hS, hy, preset) {
     socket.position.set(ex, ey, ez-0.02); socket.scale.set(1,0.85,0.5); meshes.push(socket);
     // Iris with emissive glow
     const irisCol = preset==='Alien'?0x00ffaa:preset==='Mech'?0x00aaff:0xff4400;
-    const iris = new THREE.Mesh(smoothSphere(hS*0.22,12), new THREE.MeshStandardMaterial({color:irisCol,emissive:new THREE.Color(irisCol),emissiveIntensity:0.6,roughness:0.1}));
+    const iris = new THREE.Mesh(smoothSphere(hS*0.22,12), new THREE.MeshPhysicalMaterial({color:irisCol,emissive:new THREE.Color(irisCol),emissiveIntensity:0.6,roughness:0.1}));
     iris.position.set(ex, ey, ez+0.02); meshes.push(iris);
     // Slit pupil
     const pupil = new THREE.Mesh(smoothSphere(hS*0.1,10), mat(new THREE.Color(0x000000),0.0));
@@ -166,7 +166,7 @@ function buildOrganicHead(scene, sc, skinCol, accCol, hS, hy, preset) {
 
 function buildOrganicLimb(skinCol, upper, lower, thickness, digitigrade=true) {
   const meshes = [];
-  const mat = new THREE.MeshStandardMaterial({color:skinCol, roughness:0.72, metalness:0.04});
+  const mat = new THREE.MeshPhysicalMaterial({color:skinCol, roughness:0.72, metalness:0.04});
 
   // Upper segment - tapered with muscle bulk
   const upperGeo = smoothCyl(thickness*1.1, thickness*0.85, upper, 16);
@@ -199,7 +199,7 @@ function buildCreature(scene, p, meshesRef) {
   }
 
   // Ground with reflection-like dark surface
-  const ground=new THREE.Mesh(new THREE.PlaneGeometry(50,50), new THREE.MeshStandardMaterial({color:0x080c10,roughness:0.8,metalness:0.2}));
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(50,50), new THREE.MeshPhysicalMaterial({color:0x080c10,roughness:0.8,metalness:0.2}));
   ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground); ms.push(ground);
   scene.add(new THREE.GridHelper(30,15,0x1a2a3a,0x111a22));
 
@@ -218,7 +218,7 @@ function buildCreature(scene, p, meshesRef) {
   const accCol=new THREE.Color(p.accentColor);
   const isMech = p.skinColor === '#1a2a3a';
 
-  const mat=(c=skinCol,r=0.7,me=0.05)=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:me});
+  const mat=(c=skinCol,r=0.7,me=0.05)=>new THREE.MeshPhysicalMaterial({color:c,roughness:r,metalness:me});
 
   // ── TORSO ─────────────────────────────────────────────────────────────────
   const torsoMeshes = buildOrganicTorso(sc, skinCol, accCol, bL, bG, baseY);
@@ -408,7 +408,7 @@ function buildCreature(scene, p, meshesRef) {
       wGeo.setAttribute('position',new THREE.Float32BufferAttribute(verts,3));
       wGeo.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));
       wGeo.computeVertexNormals();
-      const wMat=new THREE.MeshStandardMaterial({color:accCol,side:THREE.DoubleSide,transparent:true,opacity:0.82,roughness:0.55,metalness:0.05});
+      const wMat=new THREE.MeshPhysicalMaterial({color:accCol,side:THREE.DoubleSide,transparent:true,opacity:0.82,roughness:0.55,metalness:0.05});
       const wing=new THREE.Mesh(wGeo,wMat);
       wing.position.set(sx*bG, baseY+bL*0.2, -bG*0.5); wing.castShadow=true; scene.add(wing); ms.push(wing);
 
@@ -454,7 +454,7 @@ function buildCreature(scene, p, meshesRef) {
   if(isMech) {
     // Panel lines and mechanical details
     for(let i=0;i<6;i++) {
-      const panel=new THREE.Mesh(new THREE.BoxGeometry(bG*0.15,bL*0.08,bG*0.05), new THREE.MeshStandardMaterial({color:0x00aaff,emissive:0x0066aa,emissiveIntensity:0.8,roughness:0.1,metalness:0.9}));
+      const panel=new THREE.Mesh(new THREE.BoxGeometry(bG*0.15,bL*0.08,bG*0.05), new THREE.MeshPhysicalMaterial({color:0x00aaff,emissive:0x0066aa,emissiveIntensity:0.8,roughness:0.1,metalness:0.9}));
       panel.position.set((i%2===0?1:-1)*bG*(0.8+Math.random()*0.3), baseY+bL*(0.2-i*0.08), bG*0.9);
       scene.add(panel); ms.push(panel);
     }

@@ -19,7 +19,7 @@ export class CreatureGenerator {
   _mkRng(s) { let n = s; return () => { n = (n * 9301 + 49297) % 233280; return n / 233280; }; }
   _rn(lo, hi) { return lo + this._rng() * (hi - lo); }
   _mat(hex, rough = 0.7, metal = 0) {
-    return new THREE.MeshStandardMaterial({ color: new THREE.Color(hex), roughness: rough, metalness: metal });
+    return new THREE.MeshPhysicalMaterial({ color: new THREE.Color(hex), roughness: rough, metalness: metal });
   }
 
   buildBody(p) {
@@ -138,7 +138,7 @@ export class CreatureGenerator {
     if (wingType !== 'None') {
       [-1, 1].forEach(side => {
         const wGeo = this.buildWing(params);
-        const wing = new THREE.Mesh(wGeo, new THREE.MeshStandardMaterial({
+        const wing = new THREE.Mesh(wGeo, new THREE.MeshPhysicalMaterial({
           color: new THREE.Color(primaryColor), transparent: true, opacity: 0.65, side: THREE.DoubleSide,
         }));
         wing.position.set(side * 0.45, 0.15, 0);

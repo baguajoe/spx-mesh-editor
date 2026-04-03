@@ -19,7 +19,7 @@ export class VehicleGenerator {
   _mkRng(s) { let n = s; return () => { n = (n * 9301 + 49297) % 233280; return n / 233280; }; }
   _rn(lo, hi) { return lo + this._rng() * (hi - lo); }
   _mat(hex, rough = 0.3, metal = 0.8) {
-    return new THREE.MeshStandardMaterial({ color: new THREE.Color(hex), roughness: rough, metalness: metal });
+    return new THREE.MeshPhysicalMaterial({ color: new THREE.Color(hex), roughness: rough, metalness: metal });
   }
 
   buildWheel(radius, thickness, rimColor) {
@@ -53,7 +53,7 @@ export class VehicleGenerator {
     const H = 1.25 + bodyH  * 0.35;
     const group  = new THREE.Group();
     const bodyMat  = this._mat(primaryColor, roughness, metalness);
-    const glassMat = new THREE.MeshStandardMaterial({
+    const glassMat = new THREE.MeshPhysicalMaterial({
       color: 0x223344, transparent: true, opacity: 0.35 + windowTint * 0.4, metalness: 0.05, roughness: 0.05,
     });
 
@@ -100,14 +100,14 @@ export class VehicleGenerator {
 
     // Headlights
     if (addLights) {
-      const lightMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffaa, emissiveIntensity: 0.9 });
+      const lightMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, emissive: 0xffffaa, emissiveIntensity: 0.9 });
       [-W * 0.3, W * 0.3].forEach(z => {
         const l = new THREE.Mesh(new THREE.SphereGeometry(0.065, 8, 6), lightMat);
         l.position.set(-L / 2, H * 0.52 * 0.75 + 0.22, z);
         group.add(l);
       });
       // Taillights
-      const tailMat = new THREE.MeshStandardMaterial({ color: 0xff2200, emissive: 0xff1100, emissiveIntensity: 0.7 });
+      const tailMat = new THREE.MeshPhysicalMaterial({ color: 0xff2200, emissive: 0xff1100, emissiveIntensity: 0.7 });
       [-W * 0.28, W * 0.28].forEach(z => {
         const t = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.06, 0.08), tailMat);
         t.position.set(L / 2, H * 0.52 * 0.7 + 0.22, z);

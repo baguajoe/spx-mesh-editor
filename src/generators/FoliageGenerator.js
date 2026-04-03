@@ -39,7 +39,7 @@ export class FoliageGenerator {
     }
     pos.needsUpdate = true;
     geo.computeVertexNormals();
-    return new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: new THREE.Color(barkColor), roughness: 0.9 }));
+    return new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ color: new THREE.Color(barkColor), roughness: 0.9 }));
   }
 
   buildLeafCard(size, color1 = '#3a7a20', color2 = '#5a9a30') {
@@ -50,7 +50,7 @@ export class FoliageGenerator {
       pos.setZ(i, Math.sin((y / size + 0.5) * Math.PI) * size * 0.1);
     }
     pos.needsUpdate = true;
-    return new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    return new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({
       color: new THREE.Color(this._rng() > 0.5 ? color1 : color2),
       side: THREE.DoubleSide, roughness: 0.9, alphaTest: 0.4,
     }));
@@ -97,7 +97,7 @@ export class FoliageGenerator {
     trunk.position.y = height / 2;
     group.add(trunk);
     const branches = Math.round(3 + branchCount * 9);
-    const branchMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(barkColor), roughness: 0.9 });
+    const branchMat = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(barkColor), roughness: 0.9 });
     for (let i = 0; i < branches; i++) {
       const bh  = height * (0.35 + i / branches * 0.55);
       const ang = (i / branches) * TWO_PI + this._rn(-0.4, 0.4);
@@ -118,7 +118,7 @@ export class FoliageGenerator {
   buildGrassTuft(params = {}) {
     const count = 10 + Math.round((params.leafDensity ?? 0.7) * 22);
     const group = new THREE.Group();
-    const mat   = new THREE.MeshStandardMaterial({ color: new THREE.Color(params.leafColor ?? '#4a8a20'), side: THREE.DoubleSide });
+    const mat   = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(params.leafColor ?? '#4a8a20'), side: THREE.DoubleSide });
     for (let i = 0; i < count; i++) {
       const h   = 0.18 + this._rn(0, 0.28);
       const geo = new THREE.PlaneGeometry(0.035, h, 1, 5);
@@ -142,12 +142,12 @@ export class FoliageGenerator {
     const stemColor = '#e8d8c0';
     const stem  = new THREE.Mesh(
       new THREE.CylinderGeometry(0.04, 0.06, 0.20, 10),
-      new THREE.MeshStandardMaterial({ color: new THREE.Color(stemColor), roughness: 0.8 })
+      new THREE.MeshPhysicalMaterial({ color: new THREE.Color(stemColor), roughness: 0.8 })
     );
     stem.position.y = 0.10;
     const cap   = new THREE.Mesh(
       new THREE.SphereGeometry(0.18, 12, 8, 0, TWO_PI, 0, Math.PI * 0.6),
-      new THREE.MeshStandardMaterial({ color: new THREE.Color(capColor), roughness: 0.7 })
+      new THREE.MeshPhysicalMaterial({ color: new THREE.Color(capColor), roughness: 0.7 })
     );
     cap.position.y = 0.22;
     group.add(stem, cap);

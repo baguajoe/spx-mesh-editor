@@ -55,10 +55,10 @@ function buildVehicle(scene, p, meshesRef) {
     const a=new THREE.AmbientLight(0xffffff,0.6);a.name='veh_amb';scene.add(a);ms.push(a);
     const d=new THREE.DirectionalLight(0xffeedd,1.2);d.name='veh_dir';d.position.set(8,15,8);d.castShadow=true;scene.add(d);ms.push(d);
   }
-  const ground=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.MeshStandardMaterial({color:0x111811,roughness:0.95}));
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.MeshPhysicalMaterial({color:0x111811,roughness:0.95}));
   ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);ms.push(ground);
   const col=new THREE.Color(p.primaryColor);
-  const mat=(c,r=0.3,me=0.7)=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:me});
+  const mat=(c,r=0.3,me=0.7)=>new THREE.MeshPhysicalMaterial({color:c,roughness:r,metalness:me});
   const add=(geo,x,y,z,m=mat(col))=>{const mesh=new THREE.Mesh(geo,m);mesh.position.set(x,y,z);mesh.castShadow=true;scene.add(mesh);ms.push(mesh);return mesh;};
   const bL=3+p.bodyLength*4, bH=0.6+p.bodyHeight*1.5, bW=1.2+p.bodyWidth*1.2;
   const wR=0.25+p.wheelSize*0.35, gC=p.groundClearance*1.2+wR;

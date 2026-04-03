@@ -78,15 +78,15 @@ export class FaceGenerator {
     const r    = 0.10 + eyeSize * 0.03;
     // Eyeball
     const ball = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12),
-      new THREE.MeshStandardMaterial({ color: 0xf5f0e8, roughness: 0.1 }));
+      new THREE.MeshPhysicalMaterial({ color: 0xf5f0e8, roughness: 0.1 }));
     ball.position.set(xOff, yOff, zOff);
     // Iris
     const iris = new THREE.Mesh(new THREE.CircleGeometry(r * 0.55, 20),
-      new THREE.MeshStandardMaterial({ color: new THREE.Color(irisColor) }));
+      new THREE.MeshPhysicalMaterial({ color: new THREE.Color(irisColor) }));
     iris.position.set(xOff, yOff, zOff + r * 0.98);
     // Pupil
     const pupil = new THREE.Mesh(new THREE.CircleGeometry(r * 0.28, 16),
-      new THREE.MeshStandardMaterial({ color: 0x080808 }));
+      new THREE.MeshPhysicalMaterial({ color: 0x080808 }));
     pupil.position.set(xOff, yOff, zOff + r * 0.99);
     g.add(ball, iris, pupil);
     return g;
@@ -95,7 +95,7 @@ export class FaceGenerator {
   buildLips(params = {}) {
     const { lipThick = 0.5, lipWidth = 0.5, mouthAngle = 0, lipColor = '#c06070' } = params;
     const w  = 0.16 + lipWidth * 0.06;
-    const mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(lipColor), roughness: 0.5 });
+    const mat = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(lipColor), roughness: 0.5 });
     const upper = new THREE.Mesh(new THREE.TorusGeometry(w, 0.03 + lipThick * 0.02, 6, 16, Math.PI), mat);
     upper.position.set(0, -0.22, 0.80);
     upper.rotation.x = -0.3 + mouthAngle * 0.5;
@@ -120,7 +120,7 @@ export class FaceGenerator {
     const { upper, lower } = this.buildLips(params);
     const morphs = this.buildMorphTargets(skull);
     const group  = new THREE.Group();
-    const skinMat = new THREE.MeshStandardMaterial({
+    const skinMat = new THREE.MeshPhysicalMaterial({
       color: new THREE.Color(params.skinTone ?? '#c8906a'), roughness: 0.6, metalness: 0,
     });
     group.add(new THREE.Mesh(skull, skinMat));

@@ -48,7 +48,7 @@ function buildFace(scene, p, meshesRef) {
     const d=new THREE.DirectionalLight(0xffeedd,1.2);d.name='face_dir';d.position.set(5,8,8);d.castShadow=true;scene.add(d);ms.push(d);
   }
   const skin=new THREE.Color(p.skinColor);
-  const mat=(c=skin,r=0.6,me=0.1)=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:me});
+  const mat=(c=skin,r=0.6,me=0.1)=>new THREE.MeshPhysicalMaterial({color:c,roughness:r,metalness:me});
   const add=(geo,x,y,z,m=mat())=>{const mesh=new THREE.Mesh(geo,m);mesh.position.set(x,y,z);mesh.castShadow=true;scene.add(mesh);ms.push(mesh);return mesh;};
   const s=2.5;
   const hW=p.headW*s, hH=p.headH*s;

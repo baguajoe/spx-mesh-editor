@@ -11,9 +11,9 @@ export function generateWheel(params = {}) {
   const { radius=0.35, width=0.22, spokes=5, rimDetail=16 } = params;
   const group = new THREE.Group();
 
-  const tireMat  = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
-  const rimMat   = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.3, metalness: 0.8 });
-  const hubMat   = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.4, metalness: 0.7 });
+  const tireMat  = new THREE.MeshPhysicalMaterial({ color: 0x111111, roughness: 0.9 });
+  const rimMat   = new THREE.MeshPhysicalMaterial({ color: 0xcccccc, roughness: 0.3, metalness: 0.8 });
+  const hubMat   = new THREE.MeshPhysicalMaterial({ color: 0x888888, roughness: 0.4, metalness: 0.7 });
 
   // Tire
   const tire = new THREE.Mesh(new THREE.TorusGeometry(radius*0.85, radius*0.18, 12, rimDetail), tireMat);
@@ -54,11 +54,11 @@ export function generateCarBody(params = {}) {
   } = params;
 
   const group = new THREE.Group();
-  const bodyMat  = new THREE.MeshStandardMaterial({ color: colors.primary,   roughness: params.roughness??0.15, metalness: params.metalness??0.85 });
-  const trimMat  = new THREE.MeshStandardMaterial({ color: colors.secondary,  roughness: 0.5, metalness: 0.6 });
-  const glassMat = new THREE.MeshStandardMaterial({ color: colors.glass,      roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.6 });
-  const lightMat = new THREE.MeshStandardMaterial({ color: 0xffffcc,          emissive: 0xffffcc, emissiveIntensity: 0.5 });
-  const brakeMat = new THREE.MeshStandardMaterial({ color: 0xff2200,          emissive: 0xff2200, emissiveIntensity: 0.3 });
+  const bodyMat  = new THREE.MeshPhysicalMaterial({ color: colors.primary,   roughness: params.roughness??0.15, metalness: params.metalness??0.85 });
+  const trimMat  = new THREE.MeshPhysicalMaterial({ color: colors.secondary,  roughness: 0.5, metalness: 0.6 });
+  const glassMat = new THREE.MeshPhysicalMaterial({ color: colors.glass,      roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.6 });
+  const lightMat = new THREE.MeshPhysicalMaterial({ color: 0xffffcc,          emissive: 0xffffcc, emissiveIntensity: 0.5 });
+  const brakeMat = new THREE.MeshPhysicalMaterial({ color: 0xff2200,          emissive: 0xff2200, emissiveIntensity: 0.3 });
 
   const hl = bodyLength/2, hw = bodyWidth/2, hh = bodyHeight/2;
 

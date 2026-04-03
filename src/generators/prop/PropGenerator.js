@@ -19,7 +19,7 @@ export function generateBoxProp(params = {}) {
 export function generateChair(params = {}) {
   const { seatHeight=0.45, seatWidth=0.45, seatDepth=0.45, backHeight=0.5, legRadius=0.025, style='modern' } = params;
   const group = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: params.color ?? 0xa0785a, roughness: 0.8 });
+  const mat = new THREE.MeshPhysicalMaterial({ color: params.color ?? 0xa0785a, roughness: 0.8 });
 
   // Seat
   const seat = new THREE.Mesh(new THREE.BoxGeometry(seatWidth, 0.05, seatDepth), mat);
@@ -47,7 +47,7 @@ export function generateChair(params = {}) {
 export function generateTable(params = {}) {
   const { width=1.2, depth=0.8, height=0.75, thickness=0.05, legRadius=0.04, style='modern' } = params;
   const group = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: params.color ?? 0x8b6914, roughness: 0.7 });
+  const mat = new THREE.MeshPhysicalMaterial({ color: params.color ?? 0x8b6914, roughness: 0.7 });
 
   // Top
   const top = new THREE.Mesh(new THREE.BoxGeometry(width, thickness, depth), mat);
@@ -69,8 +69,8 @@ export function generateTable(params = {}) {
 export function generateBarrel(params = {}) {
   const { radius=0.3, height=0.5, hoopCount=3, segments=16 } = params;
   const group = new THREE.Group();
-  const woodMat = new THREE.MeshStandardMaterial({ color: params.color ?? 0x8b6914, roughness: 0.9 });
-  const metalMat = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.3, metalness: 0.8 });
+  const woodMat = new THREE.MeshPhysicalMaterial({ color: params.color ?? 0x8b6914, roughness: 0.9 });
+  const metalMat = new THREE.MeshPhysicalMaterial({ color: 0x444444, roughness: 0.3, metalness: 0.8 });
 
   // Barrel body (bulged cylinder)
   const positions=[], normals=[], uvs=[], indices=[];
@@ -121,9 +121,9 @@ export function generateBarrel(params = {}) {
 export function generateSword(params = {}) {
   const { bladeLength=1.2, bladeWidth=0.06, guardWidth=0.22, handleLength=0.22, style='medieval' } = params;
   const group = new THREE.Group();
-  const bladeMat = new THREE.MeshStandardMaterial({ color: 0xccccdd, roughness: 0.2, metalness: 0.9 });
-  const handleMat = new THREE.MeshStandardMaterial({ color: 0x8b4513, roughness: 0.8 });
-  const goldMat = new THREE.MeshStandardMaterial({ color: 0xffd700, roughness: 0.3, metalness: 0.8 });
+  const bladeMat = new THREE.MeshPhysicalMaterial({ color: 0xccccdd, roughness: 0.2, metalness: 0.9 });
+  const handleMat = new THREE.MeshPhysicalMaterial({ color: 0x8b4513, roughness: 0.8 });
+  const goldMat = new THREE.MeshPhysicalMaterial({ color: 0xffd700, roughness: 0.3, metalness: 0.8 });
 
   // Blade
   const bladeShape = new THREE.Shape();
@@ -162,8 +162,8 @@ export function generateSword(params = {}) {
 export function generateCrate(params = {}) {
   const { size=0.6, planks=true, metalCorners=true } = params;
   const group = new THREE.Group();
-  const woodMat = new THREE.MeshStandardMaterial({ color: params.color??0x8b6914, roughness:0.9 });
-  const metalMat = new THREE.MeshStandardMaterial({ color:0x555555, roughness:0.4, metalness:0.7 });
+  const woodMat = new THREE.MeshPhysicalMaterial({ color: params.color??0x8b6914, roughness:0.9 });
+  const metalMat = new THREE.MeshPhysicalMaterial({ color:0x555555, roughness:0.4, metalness:0.7 });
 
   const box = new THREE.Mesh(new THREE.BoxGeometry(size,size,size), woodMat);
   group.add(box);
@@ -195,7 +195,7 @@ export function createProp(params = {}) {
   if (fn) {
     const result = fn(params);
     if (result.isGroup) { result.name = propType; return result; }
-    const mat = new THREE.MeshStandardMaterial({ color: params.color??0x888888, roughness: params.roughness??0.5, metalness: params.metalness??0 });
+    const mat = new THREE.MeshPhysicalMaterial({ color: params.color??0x888888, roughness: params.roughness??0.5, metalness: params.metalness??0 });
     const mesh = new THREE.Mesh(result, mat);
     mesh.name = propType;
     return mesh;
@@ -203,7 +203,7 @@ export function createProp(params = {}) {
 
   // Fallback — generic box prop
   const geo = generateBoxProp(params);
-  const mat = new THREE.MeshStandardMaterial({ color: params.color??0x888888, roughness: params.roughness??0.5 });
+  const mat = new THREE.MeshPhysicalMaterial({ color: params.color??0x888888, roughness: params.roughness??0.5 });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.name = propType;
   return mesh;

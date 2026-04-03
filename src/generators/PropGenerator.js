@@ -19,7 +19,7 @@ export class PropGenerator {
   _mkRng(s) { let n = s; return () => { n = (n * 9301 + 49297) % 233280; return n / 233280; }; }
   _rn(lo, hi) { return lo + this._rng() * (hi - lo); }
   _mat(hex, rough = 0.6, metal = 0) {
-    return new THREE.MeshStandardMaterial({ color: new THREE.Color(hex ?? '#8a6030'), roughness: rough, metalness: metal });
+    return new THREE.MeshPhysicalMaterial({ color: new THREE.Color(hex ?? '#8a6030'), roughness: rough, metalness: metal });
   }
 
   buildChair(p) {
@@ -89,7 +89,7 @@ export class PropGenerator {
     const accent = this._mat(p.secondColor ?? '#c8a830', 0.3, 0.8);
     g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.048, 1.05, 0.007), blade), { position: new THREE.Vector3(0, 0.2, 0) }));
     // Fuller
-    g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.85, 0.002), new THREE.MeshStandardMaterial({ color: 0xb8b8c8 })), { position: new THREE.Vector3(0, 0.2, 0.005) }));
+    g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.85, 0.002), new THREE.MeshPhysicalMaterial({ color: 0xb8b8c8 })), { position: new THREE.Vector3(0, 0.2, 0.005) }));
     // Crossguard
     g.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.04, 0.04), accent), { position: new THREE.Vector3(0, -0.42, 0) }));
     // Grip
@@ -111,7 +111,7 @@ export class PropGenerator {
     g.add(Object.assign(new THREE.Mesh(new THREE.ConeGeometry(0.20, 0.22, 12, 1, true), shade), { position: new THREE.Vector3(0, 0.67, 0) }));
     // Bulb
     g.add(Object.assign(new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6),
-      new THREE.MeshStandardMaterial({ color: 0xfffff0, emissive: 0xffffaa, emissiveIntensity: 0.8 })),
+      new THREE.MeshPhysicalMaterial({ color: 0xfffff0, emissive: 0xffffaa, emissiveIntensity: 0.8 })),
       { position: new THREE.Vector3(0, 0.58, 0) }));
     return g;
   }

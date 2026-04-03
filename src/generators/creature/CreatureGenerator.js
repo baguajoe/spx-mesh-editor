@@ -26,17 +26,17 @@ export function generateLeg(params = {}) {
   const group = new THREE.Group();
 
   // Upper leg
-  const upper = new THREE.Mesh(new THREE.CylinderGeometry(radius*1.2, radius, length*0.5, segments), new THREE.MeshStandardMaterial());
+  const upper = new THREE.Mesh(new THREE.CylinderGeometry(radius*1.2, radius, length*0.5, segments), new THREE.MeshPhysicalMaterial());
   upper.position.y = -length*0.25;
   group.add(upper);
 
   // Lower leg
-  const lower = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius*0.7, length*0.5, segments), new THREE.MeshStandardMaterial());
+  const lower = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius*0.7, length*0.5, segments), new THREE.MeshPhysicalMaterial());
   lower.position.y = -length*0.75;
   group.add(lower);
 
   // Foot
-  const foot = new THREE.Mesh(new THREE.BoxGeometry(radius*3, radius*0.5, radius*4), new THREE.MeshStandardMaterial());
+  const foot = new THREE.Mesh(new THREE.BoxGeometry(radius*3, radius*0.5, radius*4), new THREE.MeshPhysicalMaterial());
   foot.position.set(radius, -length, radius);
   group.add(foot);
 
@@ -100,7 +100,7 @@ export function generateSpines(params = {}) {
   const { count=5, length=0.2, baseRadius=0.02, spacing=0.15 } = params;
   const group = new THREE.Group();
   for (let i=0;i<count;i++) {
-    const spine = new THREE.Mesh(new THREE.ConeGeometry(baseRadius*(1-i/count*0.5), length, 4), new THREE.MeshStandardMaterial());
+    const spine = new THREE.Mesh(new THREE.ConeGeometry(baseRadius*(1-i/count*0.5), length, 4), new THREE.MeshPhysicalMaterial());
     spine.position.set(0, 0, -i*spacing);
     spine.rotation.x = 0.3;
     group.add(spine);
@@ -124,9 +124,9 @@ export function createCreature(params = {}) {
   const group = new THREE.Group();
   group.name = creatureType;
 
-  const primaryMat  = new THREE.MeshStandardMaterial({ color: colors.primary,   roughness: 0.7 });
-  const secondaryMat = new THREE.MeshStandardMaterial({ color: colors.secondary, roughness: 0.8 });
-  const eyeMat      = new THREE.MeshStandardMaterial({ color: colors.eye,       emissive: colors.eye, emissiveIntensity: 0.3, roughness: 0.1 });
+  const primaryMat  = new THREE.MeshPhysicalMaterial({ color: colors.primary,   roughness: 0.7 });
+  const secondaryMat = new THREE.MeshPhysicalMaterial({ color: colors.secondary, roughness: 0.8 });
+  const eyeMat      = new THREE.MeshPhysicalMaterial({ color: colors.eye,       emissive: colors.eye, emissiveIntensity: 0.3, roughness: 0.1 });
 
   // Body
   const bodyGeo = generateBody({ bodyLength: bodyLength*size, bodyWidth: bodyWidth*size, bodyHeight: bodyHeight*size });

@@ -266,7 +266,7 @@ export function createFaceMesh(params = {}) {
   merged.setIndex(allIdx);
   merged.computeVertexNormals();
 
-  const mat = new THREE.MeshStandardMaterial({ color: 0xf4a261, roughness: 0.7, metalness: 0 });
+  const mat = new THREE.MeshPhysicalMaterial({ color: 0xf4a261, roughness: 0.7, metalness: 0 });
   const mesh = new THREE.Mesh(merged, mat);
   mesh.name = 'Face';
   mesh.castShadow = mesh.receiveShadow = true;
