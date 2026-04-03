@@ -118,6 +118,12 @@ export default function VehicleGeneratorPanel({sceneRef,setStatus,onGenerate}) {
     setBodyLength(p.bodyLength);setBodyHeight(p.bodyHeight);setBodyWidth(p.bodyWidth);
     setWheelSize(p.wheelSize);setSpoiler(p.spoiler);setGroundClearance(p.groundClearance);
     setPrimaryColor(p.primaryColor);setWheelCount(p.wheelCount);
+    // Rebuild immediately with preset values
+    if(sceneRef?.current) setTimeout(()=>buildVehicle(sceneRef.current,{
+      bodyLength:p.bodyLength,bodyHeight:p.bodyHeight,bodyWidth:p.bodyWidth,
+      wheelSize:p.wheelSize,wheelCount:p.wheelCount,spoiler:p.spoiler,
+      groundClearance:p.groundClearance,primaryColor:p.primaryColor,roughness:0.20,metalness:0.85
+    },meshesRef),10);
   }
 
   function generate(){
@@ -130,6 +136,11 @@ export default function VehicleGeneratorPanel({sceneRef,setStatus,onGenerate}) {
   function clear(){meshesRef.current.forEach(m=>{scene?.remove(m);m.geometry?.dispose();m.material?.dispose();});meshesRef.current=[];setStatus?.('Cleared');}
 
   useEffect(()=>{applyPreset('Sports Car');},[]);
+
+  // Rebuild live when sliders change
+  useEffect(()=>{
+    if(sceneRef?.current) buildVehicle(sceneRef.current, getParams(), meshesRef);
+  },[bodyLength,bodyHeight,bodyWidth,wheelSize,wheelCount,spoiler,groundClearance,primaryColor]);
 
   const P={fontFamily:'JetBrains Mono,monospace',color:'#e0e0e0',fontSize:12,userSelect:'none',width:'100%'};
   return (
