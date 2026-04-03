@@ -192,6 +192,12 @@ input, select { font-family: inherit; }
 
 
 
+.spx-center::before {
+  content: 'VIEWPORT';
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+  font-family: var(--mono); font-size: 9px; color: var(--t4);
+  letter-spacing: 0.14em; pointer-events: none; z-index: 20;
+}
 .spx-right {
   background: var(--d2); border-left: 1px solid var(--b1);
   overflow-y: auto; overflow-x: hidden; min-height: 0;
