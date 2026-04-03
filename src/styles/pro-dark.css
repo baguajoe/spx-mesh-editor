@@ -1255,10 +1255,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px s
 }
 
 /* Film panels — above everything except menus */
-[style*="position:"fixed""],
-[style*='position:"fixed"'] {
-  z-index: 850;
-}
+
 
 /* Tab row — always on top */
 .spx-native-workspace-tabs { z-index: 1000 !important; }
