@@ -1265,6 +1265,7 @@ export default function App() {
     centerMarker.rotation.x = -Math.PI / 2;
     centerMarker.position.set(0, 0.001, 0);
     centerMarker.renderOrder = 999;
+    centerMarker.userData.isHelper = true;
     scene.add(centerMarker);
 
     // center axis guide lines (Blender style reference)
