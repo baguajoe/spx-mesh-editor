@@ -3370,6 +3370,24 @@ export default function App() {
     if (fn === "cam_shake")           { if(typeof window.applyCameraShake==="function"&&cameraRef.current){window.applyCameraShake(cameraRef.current);setStatus("Camera shake applied");} return; }
 
     // ── Path tracer ───────────────────────────────────────────────────────────
+
+    if (fn === "spectral_glass")      { if(meshRef.current){ const r=applySpectralGlass(meshRef.current,{material:'glass',aberration:0.003}); setStatus(r?'Spectral glass — IOR '+r.ior.toFixed(3)+' Abbe '+r.abbeV.toFixed(1):'Failed'); } return; }
+    if (fn === "spectral_diamond")    { if(meshRef.current){ const r=applySpectralGlass(meshRef.current,{material:'diamond',aberration:0.008}); setStatus(r?'Diamond — IOR '+r.ior.toFixed(3)+' Abbe '+r.abbeV.toFixed(1):'Failed'); } return; }
+    if (fn === "spectral_sapphire")   { if(meshRef.current){ const r=applySpectralGlass(meshRef.current,{material:'sapphire',aberration:0.005}); setStatus(r?'Sapphire applied':'Failed'); } return; }
+    if (fn === "spectral_water")      { if(meshRef.current){ const r=applySpectralGlass(meshRef.current,{material:'water',aberration:0.001,thickness:2.0}); setStatus(r?'Water glass applied':'Failed'); } return; }
+    if (fn === "spectral_crystal")    { if(meshRef.current){ const r=applySpectralGlass(meshRef.current,{material:'crystal',aberration:0.004}); setStatus(r?'Crystal applied':'Failed'); } return; }
+    if (fn === "spectral_ruby")       { if(meshRef.current){ const r=applySpectralGlass(meshRef.current,{material:'ruby',aberration:0.006,tint:'#ff2244'}); setStatus(r?'Ruby applied':'Failed'); } return; }
+    if (fn === "spectral_emerald")    { if(meshRef.current){ const r=applySpectralGlass(meshRef.current,{material:'emerald',aberration:0.005,tint:'#22cc44'}); setStatus(r?'Emerald applied':'Failed'); } return; }
+    if (fn === "spectral_quartz")     { if(meshRef.current){ const r=applySpectralGlass(meshRef.current,{material:'quartz',aberration:0.003}); setStatus(r?'Quartz applied':'Failed'); } return; }
+    if (fn === "iridescence_soap")    { if(meshRef.current){ applyIridescence(meshRef.current,{minThickness:100,maxThickness:600,n2:1.33,n3:1.5}); setStatus('Soap bubble iridescence applied'); } return; }
+    if (fn === "iridescence_beetle")  { if(meshRef.current){ applyIridescence(meshRef.current,{minThickness:200,maxThickness:500,n2:1.56,n3:1.7}); setStatus('Beetle wing iridescence applied'); } return; }
+    if (fn === "iridescence_oil")     { if(meshRef.current){ applyIridescence(meshRef.current,{minThickness:50,maxThickness:300,n2:1.45,n3:1.5}); setStatus('Oil slick iridescence applied'); } return; }
+    if (fn === "iridescence_pearl")   { if(meshRef.current){ applyIridescence(meshRef.current,{minThickness:150,maxThickness:400,n2:1.53,n3:1.65}); setStatus('Pearl iridescence applied'); } return; }
+    if (fn === "chromatic_aberration"){ if(rendererRef.current&&sceneRef.current&&cameraRef.current){ applySpectralChromaticAberration(rendererRef.current,sceneRef.current,cameraRef.current,{strength:0.005}); setStatus('Chromatic aberration applied'); } return; }
+    if (fn === "chromatic_strong")    { if(rendererRef.current&&sceneRef.current&&cameraRef.current){ applySpectralChromaticAberration(rendererRef.current,sceneRef.current,cameraRef.current,{strength:0.015}); setStatus('Strong chromatic aberration'); } return; }
+    if (fn === "adaptive_tess")       { if(meshRef.current&&cameraRef.current){ applyAdaptiveTessellation(meshRef.current,cameraRef.current,{targetEdgePixels:4,maxSubdivisions:3}); setStatus('Adaptive tessellation applied — '+meshRef.current.geometry.attributes.position?.count+' verts'); } return; }
+    if (fn === "adaptive_tess_fine")  { if(meshRef.current&&cameraRef.current){ applyAdaptiveTessellation(meshRef.current,cameraRef.current,{targetEdgePixels:2,maxSubdivisions:4}); setStatus('Fine adaptive tessellation — '+meshRef.current.geometry.attributes.position?.count+' verts'); } return; }
+    if (fn === "adaptive_tess_ultra") { if(meshRef.current&&cameraRef.current){ applyAdaptiveTessellation(meshRef.current,cameraRef.current,{targetEdgePixels:1,maxSubdivisions:5}); setStatus('Ultra tessellation — '+meshRef.current.geometry.attributes.position?.count+' verts'); } return; }
     if (fn === "pt_start")            { setFilmPTOpen(true); setStatus("Path tracer starting..."); return; }
     if (fn === "pt_stop")             { setFilmPTOpen(false); setStatus("Path tracer stopped"); return; }
     if (fn === "pt_export")           { takeSnapshot(); return; }
