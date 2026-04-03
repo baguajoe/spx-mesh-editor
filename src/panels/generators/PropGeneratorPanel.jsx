@@ -1,310 +1,166 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useEffect, useRef } from 'react';
+import * as THREE from 'three';
 
-function Slider({ label, value, min=0, max=1, step=0.01, onChange, unit="" }) {
-  return (
-    <div style={{ marginBottom:6 }}>
-      <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, color:"#8b949e", marginBottom:2 }}>
-        <span>{label}</span>
-        <span style={{ color:"#00ffc8", fontWeight:700 }}>
-          {typeof value==="number" ? (step<0.1 ? value.toFixed(2) : Math.round(value)) : value}{unit}
-        </span>
-      </div>
-      <input type="range" min={min} max={max} step={step} value={value}
-        onChange={e => onChange(parseFloat(e.target.value))}
-        style={{ width:"100%", accentColor:"#00ffc8", cursor:"pointer", height:16 }} />
+function Slider({label,value,min=0,max=1,step=0.01,onChange,unit=''}) {
+  return <div style={{marginBottom:5}}>
+    <div style={{display:'flex',justifyContent:'space-between',fontSize:10,color:'#888'}}>
+      <span>{label}</span><span style={{color:'#00ffc8',fontWeight:600}}>{step<0.1?value.toFixed(2):Math.round(value)}{unit}</span>
     </div>
-  );
+    <input type="range" min={min} max={max} step={step} value={value} onChange={e=>onChange(parseFloat(e.target.value))} style={{width:'100%',accentColor:'#00ffc8',cursor:'pointer'}}/>
+  </div>;
 }
-function Select({ label, value, options, onChange }) {
-  return (
-    <div style={{ marginBottom:6 }}>
-      {label && <div style={{ fontSize:10, color:"#8b949e", marginBottom:2 }}>{label}</div>}
-      <select value={value} onChange={e => onChange(e.target.value)} style={{
-        width:"100%", background:"#161b22", color:"#e6edf3",
-        border:"1px solid #30363d", borderRadius:4, padding:"4px 8px", fontSize:11, cursor:"pointer"
-      }}>
-        {options.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
+function ColorRow({label,value,onChange}) {
+  return <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:5}}>
+    <span style={{fontSize:10,color:'#888',flex:1}}>{label}</span>
+    <input type="color" value={value} onChange={e=>onChange(e.target.value)} style={{width:32,height:22,border:'none',cursor:'pointer',borderRadius:3}}/>
+  </div>;
+}
+function Section({title,children,defaultOpen=true}) {
+  const [open,setOpen]=useState(defaultOpen);
+  return <div style={{marginBottom:6,border:'1px solid #21262d',borderRadius:5,overflow:'hidden'}}>
+    <div onClick={()=>setOpen(o=>!o)} style={{padding:'5px 8px',cursor:'pointer',background:'#0d1117',display:'flex',justifyContent:'space-between',fontSize:11,fontWeight:600,color:'#00ffc8',userSelect:'none'}}>
+      <span>{title}</span><span style={{fontSize:9,opacity:0.7}}>{open?'▲':'▼'}</span>
     </div>
-  );
+    {open&&<div style={{padding:'6px 8px',background:'#06060f'}}>{children}</div>}
+  </div>;
 }
-function Check({ label, value, onChange }) {
-  return (
-    <label style={{ display:"flex", alignItems:"center", gap:7, fontSize:11, color:"#c9d1d9", cursor:"pointer", marginBottom:5 }}>
-      <input type="checkbox" checked={value} onChange={e => onChange(e.target.checked)}
-        style={{ accentColor:"#00ffc8", width:13, height:13 }} />
-      {label}
-    </label>
-  );
+function Badges({items,active,onSelect}) {
+  return <div style={{display:'flex',flexWrap:'wrap',gap:3,marginBottom:6}}>
+    {items.map(item=><button key={item} onClick={()=>onSelect(item)} style={{padding:'2px 7px',fontSize:9,borderRadius:4,cursor:'pointer',background:active===item?'#00ffc8':'#1a1f2c',color:active===item?'#06060f':'#ccc',border:`1px solid ${active===item?'#00ffc8':'#21262d'}`}}>{item}</button>)}
+  </div>;
 }
-function ColorRow({ label, value, onChange }) {
-  return (
-    <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
-      <span style={{ fontSize:10, color:"#8b949e", flex:1 }}>{label}</span>
-      <input type="color" value={value} onChange={e => onChange(e.target.value)}
-        style={{ width:32, height:22, border:"none", cursor:"pointer", borderRadius:3 }} />
-      <span style={{ fontSize:9, color:"#555", fontFamily:"monospace" }}>{value}</span>
-    </div>
-  );
+
+const PROP_TYPES = ['Barrel','Crate','Trash Can','Street Light','Fire Hydrant','Mailbox','Bench','Dumpster','Lamppost','Rock','Fence'];
+
+function buildProp(scene, type, p, meshesRef) {
+  meshesRef.current.forEach(m=>{scene.remove(m);m.geometry?.dispose();m.material?.dispose();});
+  meshesRef.current=[];
+  const ms=[];
+  if(!scene.getObjectByName('prop_amb')){
+    const a=new THREE.AmbientLight(0xffffff,0.6);a.name='prop_amb';scene.add(a);ms.push(a);
+    const d=new THREE.DirectionalLight(0xffeedd,1.2);d.name='prop_dir';d.position.set(8,15,8);d.castShadow=true;scene.add(d);ms.push(d);
+  }
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(20,20),new THREE.MeshStandardMaterial({color:0x111811,roughness:0.95}));
+  ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);ms.push(ground);
+
+  const col=new THREE.Color(p.color);
+  const mat=(c=col,r=p.roughness,me=p.metalness)=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:me});
+  const rng=(a,b)=>a+Math.random()*(b-a);
+  const n=Math.max(1,p.count), sp=p.scatter*6;
+
+  for(let i=0;i<n;i++){
+    const ox=n>1?rng(-sp,sp):0, oz=n>1?rng(-sp,sp):0;
+    const add=(geo,x,y,z,m=mat())=>{const mesh=new THREE.Mesh(geo,m);mesh.position.set(ox+x,y,oz+z);mesh.castShadow=true;mesh.receiveShadow=true;scene.add(mesh);ms.push(mesh);return mesh;};
+    const w=p.width, h=p.height, d=p.depth;
+
+    if(type==='Barrel'){
+      add(new THREE.CylinderGeometry(w*0.5,w*0.45,h,16),0,h/2,0);
+      add(new THREE.TorusGeometry(w*0.5,0.04,6,16),0,h*0.25,0,mat(0x888888,0.3,0.7));
+      add(new THREE.TorusGeometry(w*0.5,0.04,6,16),0,h*0.75,0,mat(0x888888,0.3,0.7));
+    } else if(type==='Crate'){
+      add(new THREE.BoxGeometry(w,h,d),0,h/2,0);
+      for(const sx of[-1,1]){
+        add(new THREE.BoxGeometry(0.05,h*1.01,d*1.01),sx*w*0.35,h/2,0,mat(new THREE.Color('#5a3a1a'),0.9));
+        add(new THREE.BoxGeometry(w*1.01,h*1.01,0.05),0,h/2,sx*d*0.35,mat(new THREE.Color('#5a3a1a'),0.9));
+      }
+    } else if(type==='Trash Can'){
+      add(new THREE.CylinderGeometry(w*0.42,w*0.38,h*0.92,14),0,h*0.46,0);
+      add(new THREE.CylinderGeometry(w*0.46,w*0.44,h*0.08,14),0,h*0.96,0,mat(0x444444,0.5,0.5));
+    } else if(type==='Street Light'){
+      add(new THREE.CylinderGeometry(0.06,0.1,h*0.9,8),0,h*0.45,0,mat(0x888899,0.4,0.6));
+      add(new THREE.CylinderGeometry(0.04,0.04,w*0.6,8),0,h*0.92,w*0.15,mat(0x888899,0.4,0.6));
+      add(new THREE.SphereGeometry(0.12,8,6),0,h*0.94,w*0.28,mat(0xffffcc,0.1,0.0));
+    } else if(type==='Fire Hydrant'){
+      add(new THREE.CylinderGeometry(w*0.38,w*0.42,h*0.7,10),0,h*0.35,0);
+      add(new THREE.CylinderGeometry(w*0.32,w*0.35,h*0.22,10),0,h*0.78,0);
+      add(new THREE.SphereGeometry(w*0.22,8,6),0,h*0.92,0);
+      for(const sx of[-1,1]) add(new THREE.CylinderGeometry(0.06,0.06,w*0.35,8),sx*w*0.48,h*0.42,0,mat(0xcccc00,0.4,0.5));
+    } else if(type==='Mailbox'){
+      add(new THREE.CylinderGeometry(0.05,0.05,h*0.7,6),0,h*0.35,0,mat(0x444444,0.6));
+      add(new THREE.BoxGeometry(w,h*0.5,d),0,h*0.8,0);
+      add(new THREE.CylinderGeometry(w*0.5,w*0.5,d,12,1,false,0,Math.PI),0,h*0.8,0,mat(col));
+      add(new THREE.BoxGeometry(w*0.5,0.05,0.06),0,h*0.72,d*0.51,mat(0x111111,0.9));
+    } else if(type==='Bench'){
+      for(let bi=-1;bi<=1;bi++) add(new THREE.BoxGeometry(w,0.06,0.14),0,h,bi*0.12,mat(col,0.85));
+      for(const sx of[-1,1]){
+        add(new THREE.BoxGeometry(0.06,h,0.04),sx*w*0.42,h/2,-0.18);
+        add(new THREE.BoxGeometry(0.06,h,0.04),sx*w*0.42,h/2,0.18);
+        add(new THREE.BoxGeometry(0.06,0.04,0.4),sx*w*0.42,h*0.3,0);
+      }
+      for(let bi=0;bi<2;bi++) add(new THREE.BoxGeometry(w,0.05,0.08),0,h+0.12+bi*0.14,-0.28);
+    } else if(type==='Dumpster'){
+      add(new THREE.BoxGeometry(w,h*0.85,d),0,h*0.42,0,mat(col,0.6,0.3));
+      add(new THREE.BoxGeometry(w*0.48,0.06,d*1.01),w*0.25,h*0.87,0,mat(0x333333,0.5));
+      add(new THREE.BoxGeometry(w*0.48,0.06,d*1.01),-w*0.25,h*0.87,0,mat(0x333333,0.5));
+    } else if(type==='Lamppost'){
+      add(new THREE.CylinderGeometry(0.08,0.12,h,8),0,h/2,0,mat(0x556677,0.4,0.6));
+      add(new THREE.BoxGeometry(w*0.5,0.08,0.08),0,h,w*0.12,mat(0x556677,0.4,0.6));
+      add(new THREE.CylinderGeometry(0.15,0.12,0.2,8),0,h+0.1,w*0.24,mat(0xffffaa,0.1));
+    } else if(type==='Rock'){
+      add(new THREE.DodecahedronGeometry(w*0.6,0),0,h*0.3,0,mat(col,0.95));
+      add(new THREE.DodecahedronGeometry(w*0.35,0),w*0.2,h*0.15,w*0.15,mat(new THREE.Color(p.color).multiplyScalar(0.8),0.95));
+    } else if(type==='Fence'){
+      for(let fi=0;fi<5;fi++){
+        add(new THREE.BoxGeometry(0.08,h,0.08),fi*w*0.5-w,h/2,0);
+      }
+      add(new THREE.BoxGeometry(w*2.4,0.06,0.06),0,h*0.65,0);
+      add(new THREE.BoxGeometry(w*2.4,0.06,0.06),0,h*0.35,0);
+    }
+  }
+  meshesRef.current=ms;
+  return ms.filter(m=>m.isMesh).length;
 }
-function Badges({ items, active, onSelect }) {
-  return (
-    <div style={{ display:"flex", flexWrap:"wrap", gap:3, marginBottom:8 }}>
-      {items.map(item => (
-        <button key={item} onClick={() => onSelect(item)} style={{
-          padding:"3px 9px", fontSize:9, borderRadius:4, cursor:"pointer", fontWeight:600,
-          background: active===item ? "#00ffc8" : "#21262d",
-          color:      active===item ? "#0d1117" : "#8b949e",
-          border:     `1px solid ${active===item ? "#00ffc8" : "#30363d"}`,
-        }}>{item}</button>
-      ))}
-    </div>
-  );
-}
-function Section({ title, children, defaultOpen=true }) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div style={{ marginBottom:8, border:"1px solid #21262d", borderRadius:6, overflow:"hidden" }}>
-      <div onClick={() => setOpen(o => !o)} style={{
-        background:"#161b22", padding:"6px 10px", cursor:"pointer",
-        display:"flex", justifyContent:"space-between", alignItems:"center",
-        fontSize:11, fontWeight:700, color:"#00ffc8", userSelect:"none",
-      }}>
-        <span>{title}</span>
-        <span style={{ fontSize:9, opacity:0.7 }}>{open ? "▲" : "▼"}</span>
-      </div>
-      {open && <div style={{ padding:"8px 10px", background:"#0d1117" }}>{children}</div>}
-    </div>
-  );
-}
-function NumInput({ label, value, min, max, step=1, onChange, unit="" }) {
-  return (
-    <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:6 }}>
-      <span style={{ fontSize:10, color:"#8b949e", flex:1 }}>{label}</span>
-      <input type="number" value={value} min={min} max={max} step={step}
-        onChange={e => onChange(parseFloat(e.target.value))}
-        style={{ width:64, background:"#161b22", color:"#e6edf3", border:"1px solid #30363d",
-          padding:"3px 5px", borderRadius:3, fontSize:11, textAlign:"right" }} />
-      {unit && <span style={{ fontSize:9, color:"#555" }}>{unit}</span>}
-    </div>
-  );
-}
-const GenBtn = ({ label, onClick }) => (
-  <button onClick={onClick} style={{
-    width:"100%", background:"#00ffc8", color:"#0d1117", border:"none",
-    borderRadius:6, padding:"9px 0", cursor:"pointer", fontWeight:700,
-    fontSize:13, marginTop:8, letterSpacing:0.5, fontFamily:"JetBrains Mono,monospace",
-  }}>{label}</button>
-);
-const RandBtn = ({ onClick }) => (
-  <button onClick={onClick} style={{
-    background:"#21262d", color:"#8b949e", border:"1px solid #30363d",
-    borderRadius:4, padding:"7px 12px", cursor:"pointer", fontSize:12, marginTop:8, marginRight:6,
-  }}>🎲</button>
-);
-const P = { fontFamily:"JetBrains Mono,monospace", color:"#e6edf3", fontSize:12, userSelect:"none", width:"100%" };
 
-const PROP_CATEGORIES = {
-  "Furniture":   ["Chair","Table","Desk","Sofa","Bed","Bookshelf","Cabinet","Wardrobe","Stool","Bench"],
-  "Containers":  ["Barrel","Crate","Box","Chest","Bag","Bucket","Vase","Jar","Bottle","Can"],
-  "Weapons":     ["Sword","Axe","Spear","Shield","Bow","Dagger","Mace","Staff","Crossbow","Hammer"],
-  "Tools":       ["Hammer","Wrench","Saw","Shovel","Pickaxe","Lantern","Key","Lock","Rope","Chain"],
-  "Electronics": ["Computer","TV","Radio","Phone","Camera","Speaker","Lamp","Clock","Keyboard","Monitor"],
-  "Architecture":["Door","Window","Column","Arch","Stairs","Railing","Fence","Wall","Pillar","Beam"],
-  "Nature":      ["Rock","Log","Stump","Boulder","Crystal","Mushroom","Root","Branch","Stone","Pebble"],
-  "Fantasy":     ["Magic Orb","Potion","Scroll","Tome","Rune Stone","Amulet","Crown","Scepter","Candle","Altar"],
-};
+export default function PropGeneratorPanel({sceneRef,setStatus,onGenerate}) {
+  const scene=sceneRef?.current;
+  const meshesRef=useRef([]);
+  const [activeProp,setActiveProp]=useState('Barrel');
+  const [width,setWidth]=useState(0.6);
+  const [height,setHeight]=useState(1.0);
+  const [depth,setDepth]=useState(0.6);
+  const [color,setColor]=useState('#8a5a2a');
+  const [count,setCount]=useState(1);
+  const [scatter,setScatter]=useState(0.0);
+  const [roughness,setRoughness]=useState(0.6);
+  const [metalness,setMetalness]=useState(0.1);
 
-const PROP_PRESETS = {
-  "Wooden Chair":   { category:"Furniture", propType:"Chair",   primaryColor:"#8a5520", secondColor:"#6a3a10", material:"Wood",   roughness:0.80, metalness:0.00, scaleX:1.0, scaleY:1.0, scaleZ:1.0, worn:0.20, damaged:0.00 },
-  "Metal Barrel":   { category:"Containers",propType:"Barrel",  primaryColor:"#556055", secondColor:"#888888", material:"Metal",  roughness:0.50, metalness:0.80, scaleX:1.0, scaleY:1.0, scaleZ:1.0, worn:0.40, damaged:0.10 },
-  "Iron Sword":     { category:"Weapons",   propType:"Sword",   primaryColor:"#c0c8d0", secondColor:"#8a6030", material:"Metal",  roughness:0.20, metalness:0.90, scaleX:1.0, scaleY:1.0, scaleZ:1.0, worn:0.15, damaged:0.00 },
-  "Stone Boulder":  { category:"Nature",    propType:"Boulder", primaryColor:"#888880", secondColor:"#606058", material:"Stone",  roughness:0.95, metalness:0.00, scaleX:1.2, scaleY:0.9, scaleZ:1.1, worn:0.60, damaged:0.20 },
-  "Magic Crystal":  { category:"Fantasy",   propType:"Crystal", primaryColor:"#6080ff", secondColor:"#4060cc", material:"Glass",  roughness:0.05, metalness:0.30, scaleX:1.0, scaleY:1.4, scaleZ:1.0, worn:0.00, damaged:0.00 },
-  "Wooden Crate":   { category:"Containers",propType:"Crate",   primaryColor:"#a07040", secondColor:"#705020", material:"Wood",   roughness:0.85, metalness:0.00, scaleX:1.0, scaleY:1.0, scaleZ:1.0, worn:0.35, damaged:0.15 },
-  "Desk Lamp":      { category:"Electronics",propType:"Lamp",   primaryColor:"#c8a830", secondColor:"#222222", material:"Metal",  roughness:0.30, metalness:0.85, scaleX:1.0, scaleY:1.0, scaleZ:1.0, worn:0.05, damaged:0.00 },
-  "Ancient Altar":  { category:"Fantasy",   propType:"Altar",   primaryColor:"#504840", secondColor:"#c8a830", material:"Stone",  roughness:0.90, metalness:0.10, scaleX:1.0, scaleY:1.0, scaleZ:1.0, worn:0.70, damaged:0.30 },
-};
+  function getParams(){return{width,height,depth,color,count,scatter,roughness,metalness};}
 
-const MATERIALS     = ["Wood","Metal","Stone","Fabric","Plastic","Glass","Ceramic","Leather","Bone","Crystal","Rust","Gold","Silver"];
-const SURFACE_TYPES = ["Smooth","Rough","Carved","Worn","Polished","Painted","Rusted","Mossy","Cracked","Burnt"];
+  function generate(){
+    if(!scene){setStatus?.('No scene');return;}
+    const n=buildProp(scene,activeProp,getParams(),meshesRef);
+    setStatus?.(`✓ ${count}x ${activeProp} — ${n} parts`);
+    onGenerate?.(getParams());
+  }
 
-export default function PropGeneratorPanel({ onGenerate }) {
-  const [category,       setCategory]       = useState("Furniture");
-  const [propType,       setPropType]       = useState("Chair");
-  const [activePreset,   setActivePreset]   = useState("Wooden Chair");
-  const [seed,           setSeed]           = useState(1);
-  // Scale
-  const [scaleX,         setScaleX]         = useState(1.0);
-  const [scaleY,         setScaleY]         = useState(1.0);
-  const [scaleZ,         setScaleZ]         = useState(1.0);
-  const [uniformScale,   setUniformScale]   = useState(false);
-  // Material
-  const [material,       setMaterial]       = useState("Wood");
-  const [primaryColor,   setPrimaryColor]   = useState("#8a5520");
-  const [secondColor,    setSecondColor]    = useState("#6a3a10");
-  const [accentColor,    setAccentColor]    = useState("#c8a830");
-  const [roughness,      setRoughness]      = useState(0.80);
-  const [metalness,      setMetalness]      = useState(0.00);
-  const [surfaceType,    setSurfaceType]    = useState("Rough");
-  // Wear
-  const [worn,           setWorn]           = useState(0.20);
-  const [damaged,        setDamaged]        = useState(0.00);
-  const [dirty,          setDirty]          = useState(0.00);
-  const [mossy,          setMossy]          = useState(0.00);
-  const [burnt,          setBurnt]          = useState(0.00);
-  // Details
-  const [addDecals,      setAddDecals]      = useState(false);
-  const [decalType,      setDecalType]      = useState("Graffiti");
-  const [addPhysics,     setAddPhysics]     = useState(false);
-  const [breakable,      setBreakable]      = useState(false);
-  const [glowing,        setGlowing]        = useState(false);
-  const [glowColor,      setGlowColor]      = useState("#00ffc8");
-  const [glowIntensity,  setGlowIntensity]  = useState(0.50);
-  const [animated,       setAnimated]       = useState(false);
-  const [animType,       setAnimType]       = useState("Idle Float");
-  // Variation
-  const [variation,      setVariation]      = useState(0.00);
-  const [randomRotation, setRandomRotation] = useState(false);
-  const [batchCount,     setBatchCount]     = useState(1);
-  // Output
-  const [polyBudget,     setPolyBudget]     = useState("Mid");
-  const [addLOD,         setAddLOD]         = useState(true);
-  const [addCollider,    setAddCollider]    = useState(true);
+  function clear(){meshesRef.current.forEach(m=>{scene?.remove(m);m.geometry?.dispose();m.material?.dispose();});meshesRef.current=[];setStatus?.('Cleared');}
 
-  const applyPreset = useCallback((name) => {
-    const p = PROP_PRESETS[name];
-    if (!p) return;
-    setActivePreset(name);
-    setCategory(p.category);     setPropType(p.propType);
-    setPrimaryColor(p.primaryColor); setSecondColor(p.secondColor);
-    setMaterial(p.material);     setRoughness(p.roughness);
-    setMetalness(p.metalness);   setScaleX(p.scaleX);
-    setScaleY(p.scaleY);         setScaleZ(p.scaleZ);
-    setWorn(p.worn);             setDamaged(p.damaged);
-  }, []);
+  useEffect(()=>{if(scene) buildProp(scene,activeProp,getParams(),meshesRef);},[activeProp]);
 
-  // Apply default preset on mount
-  useEffect(() => { applyPreset("Wooden Chair"); }, []);
-
-  const randomize = useCallback(() => {
-    const cats = Object.keys(PROP_CATEGORIES);
-    const cat  = cats[Math.floor(Math.random() * cats.length)];
-    const types = PROP_CATEGORIES[cat];
-    setCategory(cat);
-    setPropType(types[Math.floor(Math.random() * types.length)]);
-    setMaterial(MATERIALS[Math.floor(Math.random() * MATERIALS.length)]);
-    setPrimaryColor(`#${Math.floor(Math.random()*0xffffff).toString(16).padStart(6,"0")}`);
-    const rn = (a,b) => parseFloat((a + Math.random()*(b-a)).toFixed(2));
-    setRoughness(rn(0.1,1.0)); setMetalness(rn(0,0.9));
-    setWorn(rn(0,0.7)); setDamaged(rn(0,0.5));
-    setScaleX(rn(0.7,1.5)); setScaleY(rn(0.7,1.5)); setScaleZ(rn(0.7,1.5));
-    setVariation(rn(0,0.3)); setSeed(Math.floor(Math.random()*9999));
-  }, []);
-
-  const handleGenerate = useCallback(() => {
-    onGenerate?.({
-      identity:  { category, propType, seed },
-      scale:     { scaleX, scaleY, scaleZ, uniformScale },
-      material:  { material, primaryColor, secondColor, accentColor, roughness, metalness, surfaceType },
-      wear:      { worn, damaged, dirty, mossy, burnt },
-      details:   { addDecals, decalType, addPhysics, breakable, glowing, glowColor, glowIntensity, animated, animType },
-      variation: { variation, randomRotation, batchCount },
-      output:    { polyBudget, addLOD, addCollider },
-    });
-  }, [category, propType, seed, scaleX, scaleY, scaleZ, uniformScale, material, primaryColor,
-      secondColor, accentColor, roughness, metalness, surfaceType, worn, damaged, dirty, mossy, burnt,
-      addDecals, decalType, addPhysics, breakable, glowing, glowColor, glowIntensity, animated, animType,
-      variation, randomRotation, batchCount, polyBudget, addLOD, addCollider, onGenerate]);
-
+  const P={fontFamily:'JetBrains Mono,monospace',color:'#e0e0e0',fontSize:12,userSelect:'none',width:'100%'};
   return (
     <div style={P}>
-      {/* Presets */}
-      <Section title="📦 Presets">
-        <div style={{ display:"flex", flexWrap:"wrap", gap:4 }}>
-          {Object.keys(PROP_PRESETS).map(name => (
-            <button key={name} onClick={() => applyPreset(name)} style={{
-              padding:"4px 9px", fontSize:9, borderRadius:4, cursor:"pointer", fontWeight:600,
-              background: activePreset===name ? "#00ffc8" : "#21262d",
-              color:      activePreset===name ? "#0d1117" : "#8b949e",
-              border:     `1px solid ${activePreset===name ? "#00ffc8" : "#30363d"}`,
-            }}>{name}</button>
-          ))}
-        </div>
+      <Section title="📦 Prop Type">
+        <Badges items={PROP_TYPES} active={activeProp} onSelect={setActiveProp}/>
       </Section>
-
-      {/* Category & Type */}
-      <Section title="🗂 Category & Type">
-        <Select label="Category" value={category} options={Object.keys(PROP_CATEGORIES)}
-          onChange={v => { setCategory(v); setPropType(PROP_CATEGORIES[v][0]); }} />
-        <Badges items={PROP_CATEGORIES[category] ?? []} active={propType} onSelect={setPropType} />
-        <Slider label="Random Seed" value={seed} min={0} max={9999} step={1} onChange={setSeed} />
+      <Section title="📐 Dimensions">
+        <Slider label="Width"  value={width}  min={0.1} max={4} step={0.05} onChange={setWidth}/>
+        <Slider label="Height" value={height} min={0.1} max={6} step={0.05} onChange={setHeight}/>
+        <Slider label="Depth"  value={depth}  min={0.1} max={4} step={0.05} onChange={setDepth}/>
       </Section>
-
-      {/* Scale */}
-      <Section title="📏 Scale">
-        <Check label="Uniform Scale" value={uniformScale} onChange={setUniformScale} />
-        <Slider label="Scale X" value={scaleX} min={0.1} max={5} step={0.05}
-          onChange={v => { setScaleX(v); if(uniformScale){setScaleY(v);setScaleZ(v);} }} />
-        <Slider label="Scale Y" value={scaleY} min={0.1} max={5} step={0.05}
-          onChange={v => { setScaleY(v); if(uniformScale){setScaleX(v);setScaleZ(v);} }} />
-        <Slider label="Scale Z" value={scaleZ} min={0.1} max={5} step={0.05}
-          onChange={v => { setScaleZ(v); if(uniformScale){setScaleX(v);setScaleY(v);} }} />
+      <Section title="🎨 Material">
+        <ColorRow label="Color"    value={color}    onChange={setColor}/>
+        <Slider label="Roughness"  value={roughness} onChange={setRoughness}/>
+        <Slider label="Metalness"  value={metalness} onChange={setMetalness}/>
       </Section>
-
-      {/* Material */}
-      <Section title="🎨 Material & Color">
-        <Badges items={MATERIALS} active={material} onSelect={setMaterial} />
-        <Badges items={SURFACE_TYPES} active={surfaceType} onSelect={setSurfaceType} />
-        <ColorRow label="Primary Color" value={primaryColor} onChange={setPrimaryColor} />
-        <ColorRow label="Secondary"     value={secondColor}  onChange={setSecondColor}  />
-        <ColorRow label="Accent"        value={accentColor}  onChange={setAccentColor}  />
-        <Slider label="Roughness"       value={roughness}    onChange={setRoughness}    />
-        <Slider label="Metalness"       value={metalness}    onChange={setMetalness}    />
+      <Section title="🔢 Scatter" defaultOpen={false}>
+        <Slider label="Count"   value={count}   min={1} max={20} step={1} onChange={setCount}/>
+        <Slider label="Scatter" value={scatter} onChange={setScatter}/>
       </Section>
-
-      {/* Wear & Damage */}
-      <Section title="💥 Wear & Damage">
-        <Slider label="Worn"    value={worn}    onChange={setWorn}    />
-        <Slider label="Damaged" value={damaged} onChange={setDamaged} />
-        <Slider label="Dirty"   value={dirty}   onChange={setDirty}   />
-        <Slider label="Mossy"   value={mossy}   onChange={setMossy}   />
-        <Slider label="Burnt"   value={burnt}   onChange={setBurnt}   />
-      </Section>
-
-      {/* Details */}
-      <Section title="✨ Details" defaultOpen={false}>
-        <Check  label="Add Decals"    value={addDecals}   onChange={setAddDecals}   />
-        {addDecals && <Select label="Decal Type" value={decalType} options={["Graffiti","Labels","Runes","Insignia","Scratches","Bullet Holes"]} onChange={setDecalType} />}
-        <Check  label="Physics"       value={addPhysics}  onChange={setAddPhysics}  />
-        <Check  label="Breakable"     value={breakable}   onChange={setBreakable}   />
-        <Check  label="Glowing"       value={glowing}     onChange={setGlowing}     />
-        {glowing && <>
-          <ColorRow label="Glow Color"    value={glowColor}     onChange={setGlowColor}     />
-          <Slider   label="Glow Intensity" value={glowIntensity} onChange={setGlowIntensity} />
-        </>}
-        <Check  label="Animated"      value={animated}    onChange={setAnimated}    />
-        {animated && <Select label="Anim Type" value={animType} options={["Idle Float","Spin","Bob","Pulse","Open/Close","Flicker"]} onChange={setAnimType} />}
-      </Section>
-
-      {/* Variation */}
-      <Section title="🔀 Variation" defaultOpen={false}>
-        <Slider   label="Variation Amount" value={variation} onChange={setVariation} />
-        <Check    label="Random Rotation"  value={randomRotation} onChange={setRandomRotation} />
-        <NumInput label="Batch Count"      value={batchCount} min={1} max={100} onChange={setBatchCount} />
-      </Section>
-
-      {/* Output */}
-      <Section title="⚙ Output" defaultOpen={false}>
-        <Select label="Poly Budget"  value={polyBudget} options={["Low","Mid","High","Ultra"]} onChange={setPolyBudget} />
-        <Check  label="Auto LOD"     value={addLOD}     onChange={setAddLOD}     />
-        <Check  label="Add Collider" value={addCollider} onChange={setAddCollider} />
-      </Section>
-
-      <div style={{ display:"flex", gap:6 }}>
-        <RandBtn onClick={randomize} />
-        <GenBtn label="⚡ Generate Prop" onClick={handleGenerate} />
+      <div style={{display:'flex',gap:6,marginTop:8}}>
+        <button onClick={generate} style={{flex:1,background:'#00ffc8',color:'#06060f',border:'none',borderRadius:4,padding:'7px 0',cursor:'pointer',fontWeight:700,fontSize:12}}>⚡ Generate Prop</button>
       </div>
+      <button onClick={clear} style={{width:'100%',marginTop:6,background:'#1a1f2c',color:'#ff4444',border:'1px solid #ff4444',borderRadius:4,padding:'5px 0',cursor:'pointer',fontSize:11}}>🗑 Clear</button>
     </div>
   );
 }
