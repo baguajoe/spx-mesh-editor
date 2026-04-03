@@ -15,6 +15,7 @@ import React, { useRef, useEffect, useState, useCallback } from "react";
 
 import SPXPerformancePanel from "./components/SPXPerformancePanel.jsx";import * as THREE from "three";
 import { initFilmComposer, createProceduralHDRI, upgradeMaterialsToPhysical } from "./mesh/FilmRenderer.js";
+import FilmPostPanel from "./components/panels/FilmPostPanel.jsx";
 import ProfessionalShell from "./pro-ui/ProfessionalShell";
 import FeatureIndexPanel from "./pro-ui/FeatureIndexPanel";
 import WORKSPACE_FEATURES from "./pro-ui/workspaceMap";
@@ -2880,6 +2881,7 @@ export default function App() {
   const [dispScale, setDispScale] = useState(0.1);
   const [renderPreset, setRenderPreset] = useState("medium");
   const [toneMappingMode, setToneMappingMode] = useState("aces");
+  const [filmPostOpen, setFilmPostOpen] = useState(false);
   const [toneExposure, setToneExposure] = useState(1.0);
   const [videoFps, setVideoFps] = useState(24);
   const [videoStartFrame, setVideoStartFrame] = useState(0);

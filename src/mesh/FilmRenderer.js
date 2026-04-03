@@ -124,5 +124,15 @@ export function initFilmComposer(renderer, scene, camera) {
     composer.addPass(new OutputPass());
   } catch(e) {}
 
+  // Expose named pass refs for live control panels
+  composer._passes = {
+    render: composer.passes[0] || null,
+    ssao:   composer.passes[1] || null,
+    bloom:  composer.passes[2] || null,
+    smaa:   composer.passes[3] || null,
+    output: composer.passes[4] || null,
+  };
+
   return composer;
 }
+
