@@ -795,10 +795,7 @@ export function getStylesByCategory(category) {
 export function getStyleCount() { return Object.keys(CINEMATIC_STYLES).length; }
 
 export default {
-  CINEMATIC_STYLES, STYLE_CATEGORIES, BONE_MAP_3D_TO_2D,
-  projectTo2D, quatToRotation2D,
-  RenderPass, SPX3DTo2DRenderer,
-  convertClipToSPXMotion, convertRawBonesToSPXMotion,
-  downloadSPXMotion, exportFrameSequence, exportToGIF, exportToVideoBlobs,
+  CINEMATIC_STYLES, BONE_MAP_3D_TO_2D,
+  SPX3DTo2DRenderer, SPX3DTo2DSkeletonRenderer,
   getStylesByCategory, getStyleCount,
 };
