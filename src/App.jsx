@@ -3450,6 +3450,7 @@ export default function App() {
   const [skinOiliness, setSkinOiliness] = useState(0.15);
   const [lipColor, setLipColor] = useState('#cc4444');
   const [eyeColor, setEyeColor] = useState('#4a7c9e');
+  const [customSkin, setCustomSkin] = useState({...DEFAULT_CUSTOM_SKIN});
   const [displacementType, setDisplacementType] = useState('perlin');
   const [clearcoatVal, setClearcoatVal] = useState(1.0);
   const [clearcoatRoughVal, setClearcoatRoughVal] = useState(0.1);
