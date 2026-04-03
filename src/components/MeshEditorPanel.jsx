@@ -250,16 +250,6 @@ export const MeshEditorPanel = ({ stats, onApplyFunction, onAddPrimitive }) => {
   return (
     <div className="mep-root">
 
-      {/* header */}
-      <div className="mep-header">
-        <span className="mep-title">SPX MESH</span>
-        <span className="mep-stats">
-          {(stats?.vertices||0).toLocaleString()}v &nbsp;
-          {(stats?.edges||0).toLocaleString()}e &nbsp;
-          {(stats?.faces||0).toLocaleString()}f
-        </span>
-      </div>
-
       {/* mode switcher */}
       <div className="mep-mode-bar">
         {[["object","OBJECT"],["edit","EDIT"],["sculpt","SCULPT"]].map(([m,lbl]) => (
