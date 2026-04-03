@@ -2064,6 +2064,56 @@ export default function App() {
     [selectedEdges]
   );
 
+  // ── Build face overlay ─────────────────────────────────────────────────────
+  const buildFaceOverlay = useCallback(
+    (selFaces = selectedFaces) => {
+      const scene = sceneRef.current;
+      const mesh = meshRef.current;
+      if (!scene || !mesh) return;
+
+      // Remove existing face overlay
+      if (faceOverlayRef.current) { scene.remove(faceOverlayRef.current); faceOverlayRef.current = null; }
+      if (selFaces.size === 0) return;
+
+      const geo = mesh.geometry;
+      const pos = geo.attributes.position;
+      const idx = geo.index;
+      if (!pos) return;
+
+      const overlayPositions = [];
+      const overlayColors = [];
+
+      if (idx) {
+        for (let i = 0; i < idx.count; i += 3) {
+          const faceIdx = Math.floor(i / 3);
+          const selected = selFaces.has(faceIdx);
+          if (!selected) continue;
+          for (let k = 0; k < 3; k++) {
+            const vi = idx.getX(i + k);
+            overlayPositions.push(pos.getX(vi), pos.getY(vi), pos.getZ(vi));
+            overlayColors.push(1.0, 0.4, 0.0); // orange highlight
+          }
+        }
+      }
+
+      if (overlayPositions.length === 0) return;
+
+      const overlayGeo = new THREE.BufferGeometry();
+      overlayGeo.setAttribute("position", new THREE.Float32BufferAttribute(overlayPositions, 3));
+      overlayGeo.setAttribute("color", new THREE.Float32BufferAttribute(overlayColors, 3));
+      const overlayMat = new THREE.MeshBasicMaterial({
+        vertexColors: true, transparent: true, opacity: 0.4,
+        depthTest: false, side: THREE.DoubleSide,
+      });
+      const overlayMesh = new THREE.Mesh(overlayGeo, overlayMat);
+      overlayMesh.position.copy(mesh.position);
+      overlayMesh.renderOrder = 1;
+      scene.add(overlayMesh);
+      faceOverlayRef.current = overlayMesh;
+    },
+    [selectedFaces]
+  );
+
   // ── Build loop cut preview line ────────────────────────────────────────────
   const buildLoopCutPreview = useCallback((t) => {
     const scene = sceneRef.current;
@@ -2133,8 +2183,9 @@ export default function App() {
     if (editMode === "edit") {
       if (selectMode === "vert") buildVertexOverlay();
       if (selectMode === "edge") buildEdgeOverlay();
+      if (selectMode === "face") buildFaceOverlay();
     }
-  }, [editMode, selectMode, buildVertexOverlay, buildEdgeOverlay]);
+  }, [editMode, selectMode, buildVertexOverlay, buildEdgeOverlay, buildFaceOverlay]);
 
   // ── Raycasting for selection ───────────────────────────────────────────────
   const raycast = useCallback((e) => {
@@ -2286,10 +2337,11 @@ export default function App() {
             return next;
           });
           setStatus(`Face ${faceIdx} selected`);
+          buildFaceOverlay(next);
         }
       }
     },
-    [raycast, buildVertexOverlay, buildEdgeOverlay]
+    [raycast, buildVertexOverlay, buildEdgeOverlay, buildFaceOverlay]
   );
 
   // ── Knife tool ─────────────────────────────────────────────────────────────
@@ -2633,18 +2685,47 @@ export default function App() {
     if (fn === "grab")                { setActiveTool("grab"); setStatus("Grab — G"); return; }
     if (fn === "rotate")              { setActiveTool("rotate"); setStatus("Rotate — R"); return; }
     if (fn === "scale")               { setActiveTool("scale"); setStatus("Scale — S"); return; }
-    if (fn === "target_weld")      { if(heMeshRef.current){ const sel=[...window._selectedVerts||[]]; if(sel.length>=2){ heMeshRef.current.targetWeld(sel[0],sel[1]); rebuildMeshGeometry(); setStatus("Target Weld applied"); }} return; }
-    if (fn === "chamfer_vertex")   { if(heMeshRef.current){ const sel=[...window._selectedVerts||[]]; sel.forEach(id=>heMeshRef.current.chamferVertex(id,0.1)); rebuildMeshGeometry(); setStatus("Chamfer applied"); } return; }
-    if (fn === "average_vertex")   { if(heMeshRef.current){ const sel=[...window._selectedVerts||[]]; heMeshRef.current.averageVertices(sel,0.5,2); rebuildMeshGeometry(); setStatus("Vertices averaged"); } return; }
-    if (fn === "circularize")      { if(heMeshRef.current){ const sel=[...window._selectedVerts||[]]; heMeshRef.current.circularize(sel); rebuildMeshGeometry(); setStatus("Circularize applied"); } return; }
+    if (fn === "target_weld")      { if(heMeshRef.current){ const sel=[...selectedVerts]; if(sel.length>=2){ heMeshRef.current.targetWeld(sel[0],sel[1]); rebuildMeshGeometry(); setStatus("Target Weld applied"); }} return; }
+    if (fn === "chamfer_vertex")   { if(heMeshRef.current){ const sel=[...selectedVerts]; sel.forEach(id=>heMeshRef.current.chamferVertex(id,0.1)); rebuildMeshGeometry(); setStatus("Chamfer applied"); } return; }
+    if (fn === "average_vertex")   { if(heMeshRef.current){ const sel=[...selectedVerts]; heMeshRef.current.averageVertices(sel,0.5,2); rebuildMeshGeometry(); setStatus("Vertices averaged"); } return; }
+    if (fn === "circularize")      { if(heMeshRef.current){ const sel=[...selectedVerts]; heMeshRef.current.circularize(sel); rebuildMeshGeometry(); setStatus("Circularize applied"); } return; }
     if (fn === "reorder_verts")    { if(heMeshRef.current){ const n=heMeshRef.current.reorderVertices(); setStatus(`Reordered ${n} vertices`); } return; }
-    if (fn === "connect_comps")    { if(heMeshRef.current){ const sel=[...window._selectedVerts||[]]; if(sel.length>=2){ heMeshRef.current.connectComponents(sel[0],sel[1]); rebuildMeshGeometry(); setStatus("Components connected"); }} return; }
-    if (fn === "extrude")             { setActiveTool("extrude"); setStatus("Extrude — select faces first"); return; }
+    if (fn === "connect_comps")    { if(heMeshRef.current){ const sel=[...selectedVerts]; if(sel.length>=2){ heMeshRef.current.connectComponents(sel[0],sel[1]); rebuildMeshGeometry(); setStatus("Components connected"); }} return; }
+    if (fn === "extrude") {
+      if (heMeshRef.current && selectedFaces.size > 0) {
+        pushHistory();
+        const faceIds = [...selectedFaces];
+        heMeshRef.current.extrudeFaces(faceIds, 0.3);
+        rebuildMeshGeometry();
+        setStatus(`Extruded ${faceIds.length} face(s)`);
+        return;
+      }
+    }
+    if (fn === "_extrude_legacy")             { setActiveTool("extrude"); setStatus("Extrude — select faces first"); return; }
     if (fn === "loop_cut")            { setActiveTool("loop_cut"); applyLoopCut(); return; }
     if (fn === "knife")               { setActiveTool("knife"); setEditMode("edit"); setStatus("Knife — click points, Enter to cut"); return; }
     if (fn === "edge_slide")          { startEdgeSlide(); return; }
-    if (fn === "bevel")               { setStatus("Bevel — Ctrl+B in viewport"); return; }
-    if (fn === "inset")               { setStatus("Inset — I in viewport"); return; }
+    if (fn === "bevel") {
+      if (heMeshRef.current) {
+        pushHistory();
+        heMeshRef.current.bevelEdges(0.1);
+        rebuildMeshGeometry();
+        setStatus("Bevel applied");
+        return;
+      }
+    }
+    if (fn === "_bevel_legacy")               { setStatus("Bevel — Ctrl+B in viewport"); return; }
+    if (fn === "inset") {
+      if (heMeshRef.current && selectedFaces.size > 0) {
+        pushHistory();
+        const faceIds = [...selectedFaces];
+        heMeshRef.current.insetFaces(faceIds, 0.1);
+        rebuildMeshGeometry();
+        setStatus(`Inset ${faceIds.length} face(s)`);
+        return;
+      }
+    }
+    if (fn === "_inset_legacy")               { setStatus("Inset — I in viewport"); return; }
     if (fn === "gizmo_move")          { setGizmoMode("move"); setStatus("Gizmo: Move"); return; }
     if (fn === "gizmo_rotate")        { setGizmoMode("rotate"); setStatus("Gizmo: Rotate"); return; }
     if (fn === "gizmo_scale")         { setGizmoMode("scale"); setStatus("Gizmo: Scale"); return; }
@@ -2652,7 +2733,7 @@ export default function App() {
     // ── Select mode ───────────────────────────────────────────────────────────
     if (fn === "selectMode_vert")     { setSelectMode("vert"); buildVertexOverlay(); setStatus("Vertex select"); return; }
     if (fn === "selectMode_edge")     { setSelectMode("edge"); buildEdgeOverlay(); setStatus("Edge select"); return; }
-    if (fn === "selectMode_face")     { setSelectMode("face"); setStatus("Face select"); return; }
+    if (fn === "selectMode_face")     { setSelectMode("face"); setTimeout(()=>buildFaceOverlay(),50); setStatus("Face select"); return; }
 
     // ── Boolean ───────────────────────────────────────────────────────────────
     if (fn === "bool_union")          { if(meshRef.current&&meshBRef.current){const r=booleanUnion(meshRef.current,meshBRef.current);sceneRef.current?.add(r);setStatus("Boolean Union applied");}else setStatus("Need 2 meshes"); return; }
