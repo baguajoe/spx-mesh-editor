@@ -2633,6 +2633,12 @@ export default function App() {
     if (fn === "grab")                { setActiveTool("grab"); setStatus("Grab — G"); return; }
     if (fn === "rotate")              { setActiveTool("rotate"); setStatus("Rotate — R"); return; }
     if (fn === "scale")               { setActiveTool("scale"); setStatus("Scale — S"); return; }
+    if (fn === "target_weld")      { if(meshRef.current?.userData?.hem){ const sel=[...window._selectedVerts||[]]; if(sel.length>=2){ meshRef.current.userData.hem.targetWeld(sel[0],sel[1]); rebuildMesh(); setStatus("Target Weld applied"); }} return; }
+    if (fn === "chamfer_vertex")   { if(meshRef.current?.userData?.hem){ const sel=[...window._selectedVerts||[]]; sel.forEach(id=>meshRef.current.userData.hem.chamferVertex(id,0.1)); rebuildMesh(); setStatus("Chamfer applied"); } return; }
+    if (fn === "average_vertex")   { if(meshRef.current?.userData?.hem){ const sel=[...window._selectedVerts||[]]; meshRef.current.userData.hem.averageVertices(sel,0.5,2); rebuildMesh(); setStatus("Vertices averaged"); } return; }
+    if (fn === "circularize")      { if(meshRef.current?.userData?.hem){ const sel=[...window._selectedVerts||[]]; meshRef.current.userData.hem.circularize(sel); rebuildMesh(); setStatus("Circularize applied"); } return; }
+    if (fn === "reorder_verts")    { if(meshRef.current?.userData?.hem){ const n=meshRef.current.userData.hem.reorderVertices(); setStatus(`Reordered ${n} vertices`); } return; }
+    if (fn === "connect_comps")    { if(meshRef.current?.userData?.hem){ const sel=[...window._selectedVerts||[]]; if(sel.length>=2){ meshRef.current.userData.hem.connectComponents(sel[0],sel[1]); rebuildMesh(); setStatus("Components connected"); }} return; }
     if (fn === "extrude")             { setActiveTool("extrude"); setStatus("Extrude — select faces first"); return; }
     if (fn === "loop_cut")            { setActiveTool("loop_cut"); applyLoopCut(); return; }
     if (fn === "knife")               { setActiveTool("knife"); setEditMode("edit"); setStatus("Knife — click points, Enter to cut"); return; }
