@@ -100,3 +100,14 @@
 }
 .spx-native-workspace-tabs {
 }
+
+/* Dropdown menu above everything */
+.spx-native-workspace-tabs {
+  overflow: visible !important;
+}
+.spx-native-workspace-tabs > div {
+  position: relative;
+}
+.spx-native-workspace-tabs > div > div {
+  z-index: 9999 !important;
+}
