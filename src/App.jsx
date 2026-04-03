@@ -1248,14 +1248,15 @@ export default function App() {
     try {
       const envMap = createProceduralHDRI(renderer);
       scene.environment = envMap;
+      scene.background = envMap;
       scene.environmentIntensity = 0.8;
     } catch(e) { console.warn('IBL setup failed:', e); }
     scene.add(new THREE.GridHelper(10, 20, COLORS.border, COLORS.border));
 
     // subtle center marker like Blender origin / cursor
-    const centerRingGeo = new THREE.RingGeometry(0.05, 0.08, 24);
+    const centerRingGeo = new THREE.RingGeometry(0.06, 0.11, 32);
     const centerRingMat = new THREE.MeshBasicMaterial({
-      color: 0xff6a00,
+      color: 0xff6600,
       side: THREE.DoubleSide,
       transparent: true,
       opacity: 0.9,
