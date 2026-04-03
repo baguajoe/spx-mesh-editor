@@ -3370,8 +3370,8 @@ export default function App() {
     if (fn === "cam_shake")           { if(typeof window.applyCameraShake==="function"&&cameraRef.current){window.applyCameraShake(cameraRef.current);setStatus("Camera shake applied");} return; }
 
     // ── Path tracer ───────────────────────────────────────────────────────────
-    if (fn === "pt_start")            { setShowPathTracerPanel(true); setStatus("Path tracer starting..."); return; }
-    if (fn === "pt_stop")             { setShowPathTracerPanel(false); setStatus("Path tracer stopped"); return; }
+    if (fn === "pt_start")            { setFilmPTOpen(true); setStatus("Path tracer starting..."); return; }
+    if (fn === "pt_stop")             { setFilmPTOpen(false); setStatus("Path tracer stopped"); return; }
     if (fn === "pt_export")           { takeSnapshot(); return; }
 
     // ── Post FX ───────────────────────────────────────────────────────────────
