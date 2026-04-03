@@ -3,23 +3,23 @@ import * as THREE from "three";
 // ── Material preset library ───────────────────────────────────────────────────
 export const MATERIAL_PRESETS = {
   // Metals
-  chrome:      { color:"#c0c0c0", roughness:0.05, metalness:1.0, label:"Chrome" },
+  chrome:      { color:"#c0c0c0", roughness:0.05, metalness:1.0, clearcoat:1.0, clearcoatRoughness:0.05, label:"Chrome" },
   gold:        { color:"#ffd700", roughness:0.1,  metalness:1.0, label:"Gold" },
   copper:      { color:"#b87333", roughness:0.2,  metalness:0.9, label:"Copper" },
   iron:        { color:"#888888", roughness:0.6,  metalness:0.8, label:"Iron" },
   brushedMetal:{ color:"#aaaaaa", roughness:0.4,  metalness:0.9, label:"Brushed Metal" },
   // Stone
-  marble:      { color:"#f0f0f0", roughness:0.2,  metalness:0.0, label:"Marble" },
+  marble:      { color:"#f0f0f0", roughness:0.2,  metalness:0.0, clearcoat:0.8, clearcoatRoughness:0.1, label:"Marble" },
   granite:     { color:"#888060", roughness:0.7,  metalness:0.0, label:"Granite" },
   concrete:    { color:"#888888", roughness:0.9,  metalness:0.0, label:"Concrete" },
   slate:       { color:"#445566", roughness:0.8,  metalness:0.0, label:"Slate" },
   // Organic
-  skin:        { color:"#ffcc99", roughness:0.7,  metalness:0.0, label:"Skin" },
+  skin:        { color:"#ffcc99", roughness:0.7,  metalness:0.0, sheen:0.4, label:"Skin" },
   wood:        { color:"#8b4513", roughness:0.8,  metalness:0.0, label:"Wood" },
   leather:     { color:"#4a2f1a", roughness:0.6,  metalness:0.0, label:"Leather" },
   rubber:      { color:"#222222", roughness:0.9,  metalness:0.0, label:"Rubber" },
   // Glass/Plastic
-  glass:       { color:"#aaccff", roughness:0.0,  metalness:0.0, transparent:true, opacity:0.3, label:"Glass" },
+  glass:       { color:"#aaccff", roughness:0.0,  metalness:0.0, transmission:1.0, ior:1.5, thickness:0.5, transparent:true, opacity:1.0, label:"Glass" },
   plastic:     { color:"#ff4444", roughness:0.3,  metalness:0.0, label:"Plastic" },
   ceramic:     { color:"#ffffff", roughness:0.1,  metalness:0.0, label:"Ceramic" },
   // Special
@@ -27,7 +27,7 @@ export const MATERIAL_PRESETS = {
   emissiveOrange:{ color:"#FF6600", roughness:0.5, metalness:0.0, emissive:"#FF6600", emissiveIntensity:0.5, label:"Emissive Orange" },
   holographic: { color:"#88ffff", roughness:0.0,  metalness:1.0, label:"Holographic" },
   lava:        { color:"#ff4400", roughness:0.8,  metalness:0.0, emissive:"#ff2200", emissiveIntensity:0.8, label:"Lava" },
-  ice:         { color:"#aaddff", roughness:0.0,  metalness:0.0, transparent:true, opacity:0.7, label:"Ice" },
+  ice:         { color:"#aaddff", roughness:0.05, metalness:0.0, transmission:0.9, ior:1.31, thickness:1.0, transparent:true, opacity:1.0, label:"Ice" },
   clay2:       { color:"#cc8866", roughness:0.9,  metalness:0.0, label:"Clay" },
 };
 
@@ -36,7 +36,7 @@ export function applyPreset(mesh, presetKey) {
   const preset = MATERIAL_PRESETS[presetKey];
   if (!preset || !mesh) return;
 
-  const mat = new THREE.MeshStandardMaterial({
+  const mat = new THREE.MeshPhysicalMaterial({
     color:             new THREE.Color(preset.color),
     roughness:         preset.roughness,
     metalness:         preset.metalness,
