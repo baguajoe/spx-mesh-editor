@@ -151,7 +151,7 @@ input, select { font-family: inherit; }
   display: flex; align-items: stretch; height: var(--tabs-h);
   background: var(--d1); border-bottom: 1px solid var(--b2);
   padding: 0 4px; gap: 1px; overflow-x: auto;
-  scrollbar-width: none; z-index: 1002;
+  scrollbar-width: none; z-index: 90;
 }
 .spx-workspaces::-webkit-scrollbar { display: none; }
 
@@ -1248,7 +1248,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px s
 
 
 /* Tab row — always on top */
-.spx-native-workspace-tabs { z-index: 1000 !important; }
+.spx-native-workspace-tabs { z-index: 1000 !important; position: relative; background: var(--d1); border-bottom: 1px solid var(--b2); display: flex; align-items: center; padding: 0 4px; height: 32px; }
 .workspace-tools-strip      { z-index: 999  !important; }
 .spx-menubar                { z-index: 1001 !important; }
 
