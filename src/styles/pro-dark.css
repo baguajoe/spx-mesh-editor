@@ -114,7 +114,7 @@ input, select { font-family: inherit; }
 .menu-btn {
   display: flex; align-items: center; padding: 0 9px;
   font-size: 11px; font-weight: 400; color: var(--t1);
-  background: transparent; border: none; cursor: pointer;
+  background: transparent; border: none; color: #e0e0e0 !important; cursor: pointer;
   white-space: nowrap; transition: color 60ms, background 60ms;
 }
 .menu-btn:hover, .menu-btn--open { color: var(--t0); background: var(--d5); }
@@ -129,7 +129,7 @@ input, select { font-family: inherit; }
 .menu-drop-item {
   display: flex; align-items: center; justify-content: space-between;
   width: 100%; padding: 5px 12px; font-size: 11px;
-  color: var(--t1); background: transparent; border: none;
+  color: var(--t1); background: transparent; border: none; color: #e0e0e0 !important;
   cursor: pointer; text-align: left; gap: 16px;
   transition: background 50ms, color 50ms;
 }
@@ -159,7 +159,7 @@ input, select { font-family: inherit; }
   display: flex; align-items: center; padding: 0 13px;
   font-family: var(--mono); font-size: 9px; font-weight: 500;
   letter-spacing: 0.12em; text-transform: uppercase; color: var(--t1);
-  background: transparent; border: none;
+  background: transparent; border: none; color: #e0e0e0 !important;
   border-bottom: 2px solid transparent; margin-bottom: -1px;
   cursor: pointer; white-space: nowrap;
   transition: color 80ms, border-color 80ms, background 80ms;
@@ -291,7 +291,7 @@ input, select { font-family: inherit; }
 /* tool rows */
 .mep-tool-row {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 6px 10px; background: transparent; border: none;
+  padding: 6px 10px; background: transparent; border: none; color: #e0e0e0 !important;
   border-bottom: 1px solid var(--b0); color: var(--t1); cursor: pointer;
   transition: background 60ms, color 60ms; text-align: left;
 }
@@ -413,14 +413,14 @@ input, select { font-family: inherit; }
 .outliner-row:hover .outliner-actions { opacity: 1; }
 
 .outliner-vis {
-  font-size: 9px; color: var(--t3); background: transparent; border: none;
+  font-size: 9px; color: var(--t3); background: transparent; border: none; color: #e0e0e0 !important;
   padding: 0 3px; cursor: pointer; transition: color 60ms; line-height: 1;
 }
 .outliner-vis:hover { color: var(--t0); }
 .outliner-vis--hidden { color: var(--t4); }
 
 .outliner-del {
-  font-size: 9px; color: var(--t4); background: transparent; border: none;
+  font-size: 9px; color: var(--t4); background: transparent; border: none; color: #e0e0e0 !important;
   padding: 0 3px; cursor: pointer; transition: color 60ms; line-height: 1;
 }
 .outliner-del:hover { color: #c0392b; }
@@ -710,7 +710,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px s
 .spnl-layer-row:last-child { border-bottom: none; }
 .spnl-layer-row:hover { background: var(--d4); }
 .spnl-layer-row--active { background: var(--ac-dim); }
-.spnl-layer-vis { font-size: 9px; color: var(--t3); background: transparent; border: none; cursor: pointer; width: 14px; flex-shrink: 0; }
+.spnl-layer-vis { font-size: 9px; color: var(--t3); background: transparent; border: none; color: #e0e0e0 !important; cursor: pointer; width: 14px; flex-shrink: 0; }
 .spnl-layer-name { font-size: 9px; color: var(--t1); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .spnl-layer-blend { font-size: 8px; background: var(--d5); border: none; color: var(--t3); padding: 1px 2px; width: 52px; flex-shrink: 0; }
 .spnl-layer-opacity { width: 40px; flex-shrink: 0; height: 2px; accent-color: var(--ac); }
@@ -731,7 +731,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px s
 .spnl-nla-track { border-bottom: 1px solid var(--b1); }
 .spnl-nla-track:last-child { border-bottom: none; }
 .spnl-nla-track-header { display: flex; align-items: center; gap: 6px; padding: 4px 6px; background: var(--d3); }
-.spnl-nla-mute { font-size: 10px; color: var(--ax-y); background: transparent; border: none; cursor: pointer; width: 14px; }
+.spnl-nla-mute { font-size: 10px; color: var(--ax-y); background: transparent; border: none; color: #e0e0e0 !important; cursor: pointer; width: 14px; }
 .spnl-nla-track-name { font-size: 9px; color: var(--t1); flex: 1; }
 .spnl-nla-strip-area { height: 20px; position: relative; background: var(--d2); }
 .spnl-nla-strip { position: absolute; top: 2px; bottom: 2px; background: var(--ac-dim); border: 1px solid var(--ac); border-radius: var(--r0); min-width: 4px; overflow: hidden; }
