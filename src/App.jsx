@@ -20,6 +20,11 @@ import FilmAssetLibrary from "./components/panels/FilmAssetLibrary.jsx";
 import FilmMaterialPanel from "./components/panels/FilmMaterialPanel.jsx";
 import FilmSculptPanel from "./components/panels/FilmSculptPanel.jsx";
 import FilmCameraPanel from "./components/panels/FilmCameraPanel.jsx";
+import NodeMaterialEditor from "./components/panels/NodeMaterialEditor.jsx";
+import ClothSimPanel from "./components/panels/ClothSimPanel.jsx";
+import DisplacementPanel from "./components/panels/DisplacementPanel.jsx";
+import MocapRetargetPanel from "./components/panels/MocapRetargetPanel.jsx";
+import CinematicLightingPanel from "./components/panels/CinematicLightingPanel.jsx";
 import FilmVolumetricsPanel from "./components/panels/FilmVolumetricsPanel.jsx";
 import FilmPathTracerPanel from "./components/panels/FilmPathTracerPanel.jsx";
 import RotoscopePanel from "./components/panels/RotoscopePanel.jsx";
@@ -2896,6 +2901,11 @@ export default function App() {
   const [filmMaterialOpen, setFilmMaterialOpen] = useState(false);
   const [filmSculptOpen, setFilmSculptOpen] = useState(false);
   const [filmCameraOpen, setFilmCameraOpen] = useState(false);
+  const [nodeEditorOpen, setNodeEditorOpen] = useState(false);
+  const [clothSimOpen, setClothSimOpen] = useState(false);
+  const [displacementOpen, setDisplacementOpen] = useState(false);
+  const [mocapRetargetOpen, setMocapRetargetOpen] = useState(false);
+  const [cinLightOpen, setCinLightOpen] = useState(false);
   const [filmVolOpen, setFilmVolOpen] = useState(false);
   const [filmPTOpen, setFilmPTOpen] = useState(false);
   const [rotoOpen, setRotoOpen] = useState(false);
@@ -3370,6 +3380,26 @@ export default function App() {
         <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("rigging_suite")}>
           <span className="spx-native-workspace-tab-label">Rigging</span>
           <span className="spx-native-workspace-tab-hint">Shift+R</span></button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => setNodeEditorOpen(v=>!v)}>
+          <span className="spx-native-workspace-tab-label">🎨 Node Mat</span>
+          <span className="spx-native-workspace-tab-hint">Shift+N</span>
+        </button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => setClothSimOpen(v=>!v)}>
+          <span className="spx-native-workspace-tab-label">🧵 Cloth</span>
+          <span className="spx-native-workspace-tab-hint">Shift+C</span>
+        </button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => setDisplacementOpen(v=>!v)}>
+          <span className="spx-native-workspace-tab-label">⛰ Displace</span>
+          <span className="spx-native-workspace-tab-hint">Shift+D</span>
+        </button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => setMocapRetargetOpen(v=>!v)}>
+          <span className="spx-native-workspace-tab-label">🦴 Retarget</span>
+          <span className="spx-native-workspace-tab-hint">Shift+B</span>
+        </button>
+        <button type="button" className="spx-native-workspace-tab" onClick={() => setCinLightOpen(v=>!v)}>
+          <span className="spx-native-workspace-tab-label">💡 Cin Light</span>
+          <span className="spx-native-workspace-tab-hint">Shift+L</span>
+        </button>
         <button type="button" className="spx-native-workspace-tab" onClick={() => setFilmCameraOpen(v=>!v)}>
           <span className="spx-native-workspace-tab-label">🎬 Camera</span>
           <span className="spx-native-workspace-tab-hint">Shift+C</span>
