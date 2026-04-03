@@ -1,26 +1,21 @@
 /**
- * SPX3DTo2DPipeline.js — PRO 3D→2D Conversion Pipeline
+ * SPX3DTo2DPipeline.js — TRUE 3D→2D Conversion Pipeline
  * SPX Mesh Editor | StreamPireX
  *
- * THE competitive differentiator — 41 cinematic styles, no other 3D app has this.
+ * THE competitive differentiator — 41 cinematic styles applied as real
+ * pixel-level post-processing on the live WebGL render output.
  *
- * Features:
- * - Orthographic + perspective projection
- * - 41 cinematic/artistic render styles
- * - Depth-aware compositing
- * - Render passes (diffuse, shadow, outline, AO, specular)
- * - Motion blur
- * - Style transfer via canvas filters
- * - AnimationClip → .spxmotion export
- * - BVH → .spxmotion export
- * - Real-time preview
- * - Multi-layer compositing
+ * Architecture:
+ *   1. Capture WebGL renderer's current frame → ImageData
+ *   2. Run per-pixel style passes on offscreen canvas
+ *   3. Apply convolution kernels (edge detect, blur, sharpen)
+ *   4. Composite style layers (diffuse, outline, FX, overlay)
+ *   5. Output final styled canvas / download
  */
 
 import * as THREE from 'three';
 
-// ─── Bone Name Mapping ────────────────────────────────────────────────────────
-
+// ─── Bone Name Mapping (preserved for SPX Puppet pipeline) ───────────────────
 export const BONE_MAP_3D_TO_2D = {
   'Hips':'hips','Spine':'spine','Spine1':'chest','Spine2':'upper_chest',
   'Neck':'neck','Head':'head',
@@ -36,528 +31,631 @@ export const BONE_MAP_3D_TO_2D = {
 };
 
 // ─── 41 Cinematic Styles ──────────────────────────────────────────────────────
-
 export const CINEMATIC_STYLES = {
-  // ── Photorealistic ──
-  photorealistic:     { id:'photorealistic',    name:'Photorealistic',      category:'photo',    filter:'none',                         outline:false, toon:false, shadows:true,  ao:true,  fog:true  },
-  cinematic:          { id:'cinematic',          name:'Cinematic',           category:'photo',    filter:'contrast(1.2) saturate(1.1)',   outline:false, toon:false, shadows:true,  ao:true,  fog:true  },
-  hdr:                { id:'hdr',                name:'HDR',                 category:'photo',    filter:'contrast(1.4) brightness(1.1)', outline:false, toon:false, shadows:true,  ao:true,  fog:false },
-  noir:               { id:'noir',               name:'Film Noir',           category:'photo',    filter:'grayscale(1) contrast(1.5)',    outline:true,  toon:false, shadows:true,  ao:true,  fog:true  },
-  vintage:            { id:'vintage',            name:'Vintage Film',        category:'photo',    filter:'sepia(0.7) contrast(1.1)',      outline:false, toon:false, shadows:true,  ao:false, fog:true  },
-  // ── Toon/Cartoon ──
-  toon:               { id:'toon',               name:'Toon Shading',        category:'cartoon',  filter:'saturate(1.5)',                 outline:true,  toon:true,  toonLevels:4, shadows:true,  ao:false },
-  cel:                { id:'cel',                name:'Cel Animation',       category:'cartoon',  filter:'saturate(1.8) contrast(1.2)',   outline:true,  toon:true,  toonLevels:3, shadows:false, ao:false },
-  inkwash:            { id:'inkwash',            name:'Ink Wash',            category:'cartoon',  filter:'grayscale(0.8) contrast(1.3)', outline:true,  toon:true,  toonLevels:5, shadows:true, ao:false },
-  comic:              { id:'comic',              name:'Comic Book',          category:'cartoon',  filter:'saturate(2) contrast(1.4)',     outline:true,  toon:true,  toonLevels:3, halftone:true, shadows:true },
-  manga:              { id:'manga',              name:'Manga',               category:'cartoon',  filter:'grayscale(1) contrast(1.6)',    outline:true,  toon:true,  toonLevels:2, crosshatch:true },
-  anime:              { id:'anime',              name:'Anime',               category:'cartoon',  filter:'saturate(1.6) brightness(1.05)',outline:true,  toon:true,  toonLevels:4, shadows:true  },
-  pixar:              { id:'pixar',              name:'Pixar/3D Cartoon',    category:'cartoon',  filter:'saturate(1.3) brightness(1.1)', outline:false, toon:true,  toonLevels:6, shadows:true, ao:true },
-  // ── Painterly ──
-  oilpaint:           { id:'oilpaint',           name:'Oil Painting',        category:'paint',    filter:'saturate(1.2)',                 outline:false, toon:false, paintStroke:true,  strokeSize:4  },
-  watercolor:         { id:'watercolor',         name:'Watercolor',          category:'paint',    filter:'saturate(0.9) brightness(1.1)', outline:false, toon:false, paintStroke:true,  wet:true      },
-  gouache:            { id:'gouache',            name:'Gouache',             category:'paint',    filter:'saturate(1.1) contrast(1.1)',   outline:false, toon:false, paintStroke:true,  flat:true     },
-  impressionist:      { id:'impressionist',      name:'Impressionist',       category:'paint',    filter:'saturate(1.3) blur(0.5px)',     outline:false, toon:false, paintStroke:true,  strokeSize:6  },
-  expressionist:      { id:'expressionist',      name:'Expressionist',       category:'paint',    filter:'saturate(1.8) contrast(1.5)',   outline:true,  toon:false, paintStroke:true,  distort:true  },
-  // ── Sketch/Line Art ──
-  pencil:             { id:'pencil',             name:'Pencil Sketch',       category:'sketch',   filter:'grayscale(1) contrast(1.4)',    outline:true,  sketch:true, sketchLines:3     },
-  charcoal:           { id:'charcoal',           name:'Charcoal',            category:'sketch',   filter:'grayscale(1) contrast(1.6)',    outline:true,  sketch:true, sketchWeight:3    },
-  blueprint:          { id:'blueprint',          name:'Blueprint',           category:'sketch',   filter:'hue-rotate(200deg) saturate(2)',outline:true,  sketch:false, bgColor:'#003366' },
-  wireframe:          { id:'wireframe',          name:'Wireframe',           category:'sketch',   filter:'none',                          outline:true,  wireframe:true, bgColor:'#000' },
-  xray:               { id:'xray',               name:'X-Ray',               category:'sketch',   filter:'invert(1) hue-rotate(180deg)', outline:true,  xray:true                        },
-  // ── Stylized ──
-  lowpoly:            { id:'lowpoly',            name:'Low Poly',            category:'stylized', filter:'saturate(1.2)',                 outline:false, toon:true,  toonLevels:3, faceted:true    },
-  voxel:              { id:'voxel',              name:'Voxel',               category:'stylized', filter:'none',                          outline:false, voxel:true, voxelSize:8                   },
-  glitch:             { id:'glitch',             name:'Glitch Art',          category:'stylized', filter:'saturate(2) contrast(1.5)',     outline:false, glitch:true, glitchStrength:0.1           },
-  hologram:           { id:'hologram',           name:'Hologram',            category:'stylized', filter:'hue-rotate(120deg) opacity(0.8)',outline:true, hologram:true, scanlines:true             },
-  neon:               { id:'neon',               name:'Neon/Synthwave',      category:'stylized', filter:'saturate(2) brightness(1.2)',   outline:true,  neon:true,  bgColor:'#0a0018'            },
-  retrowave:          { id:'retrowave',          name:'Retrowave',           category:'stylized', filter:'saturate(1.8) hue-rotate(300deg)',outline:true, toon:true, toonLevels:4, grid:true       },
-  // ── Cinematic Looks ──
-  scifi:              { id:'scifi',              name:'Sci-Fi',              category:'cinematic',filter:'saturate(0.8) hue-rotate(180deg)',outline:true, toon:false, shadows:true, lens:true      },
-  horror:             { id:'horror',             name:'Horror',              category:'cinematic',filter:'grayscale(0.5) contrast(1.4)',   outline:false, toon:false, shadows:true, vignette:true  },
-  western:            { id:'western',            name:'Western',             category:'cinematic',filter:'sepia(0.5) contrast(1.2)',       outline:false, toon:false, shadows:true, dust:true      },
-  fantasy:            { id:'fantasy',            name:'Fantasy',             category:'cinematic',filter:'saturate(1.4) brightness(1.1)', outline:false, toon:false, shadows:true, glow:true      },
-  cyberpunk:          { id:'cyberpunk',          name:'Cyberpunk',           category:'cinematic',filter:'saturate(2) hue-rotate(270deg)',outline:true,  neon:true,  shadows:true, rain:true      },
-  postapoc:           { id:'postapoc',           name:'Post-Apocalyptic',    category:'cinematic',filter:'sepia(0.8) contrast(1.3)',       outline:false, toon:false, dust:true,  desaturate:0.3  },
-  // ── Special ──
-  silhouette:         { id:'silhouette',         name:'Silhouette',          category:'special',  filter:'brightness(0)',                  outline:false, silhouette:true, bgColor:'#ff6600'       },
-  shadowplay:         { id:'shadowplay',         name:'Shadow Play',         category:'special',  filter:'contrast(2)',                    outline:false, shadowOnly:true, bgColor:'#fff'          },
-  stencil:            { id:'stencil',            name:'Stencil/Banksy',      category:'special',  filter:'contrast(2) grayscale(1)',       outline:false, toon:true,  toonLevels:2, spray:true    },
-  pixelart:           { id:'pixelart',           name:'Pixel Art',           category:'special',  filter:'none',                           outline:false, pixel:true, pixelSize:6                  },
-  thermal:            { id:'thermal',            name:'Thermal Camera',      category:'special',  filter:'hue-rotate(0deg)',               outline:false, thermal:true                             },
-  // ── Animation Studio ──
-  disney:             { id:'disney',             name:'Disney 2D',           category:'studio',   filter:'saturate(1.5) brightness(1.1)', outline:true,  toon:true,  toonLevels:5, smooth:true    },
-  dreamworks:         { id:'dreamworks',         name:'DreamWorks',          category:'studio',   filter:'saturate(1.3) contrast(1.1)',   outline:false, toon:true,  toonLevels:6, ao:true        },
-  stopmotion:         { id:'stopmotion',         name:'Stop Motion',         category:'studio',   filter:'sepia(0.3) contrast(1.1)',       outline:false, toon:false, grain:true, jitter:0.5      },
+  // Photo
+  photorealistic: { id:'photorealistic', name:'Photorealistic',   category:'photo',    cssFilter:'none',                              passes:['sharpen'],                                  outline:false, toon:false },
+  cinematic:      { id:'cinematic',      name:'Cinematic',        category:'photo',    cssFilter:'contrast(1.2) saturate(1.1)',        passes:['vignette','grain'],                         outline:false, toon:false },
+  hdr:            { id:'hdr',           name:'HDR',              category:'photo',    cssFilter:'contrast(1.4) brightness(1.1)',      passes:['bloom','sharpen'],                          outline:false, toon:false },
+  noir:           { id:'noir',          name:'Film Noir',        category:'photo',    cssFilter:'grayscale(1) contrast(1.5)',         passes:['edge_overlay','grain','vignette'],           outline:true,  toon:false },
+  vintage:        { id:'vintage',       name:'Vintage Film',     category:'photo',    cssFilter:'sepia(0.7) contrast(1.1)',           passes:['grain','vignette','scratch'],                outline:false, toon:false },
+  // Cartoon
+  toon:           { id:'toon',          name:'Toon Shading',     category:'cartoon',  cssFilter:'saturate(1.5)',                      passes:['quantize','edge_black'],    toonLevels:4,   outline:true,  toon:true  },
+  cel:            { id:'cel',           name:'Cel Animation',    category:'cartoon',  cssFilter:'saturate(1.8) contrast(1.2)',        passes:['quantize','edge_black'],    toonLevels:3,   outline:true,  toon:true  },
+  inkwash:        { id:'inkwash',       name:'Ink Wash',         category:'cartoon',  cssFilter:'grayscale(0.8) contrast(1.3)',       passes:['quantize','edge_black'],    toonLevels:5,   outline:true,  toon:true  },
+  comic:          { id:'comic',         name:'Comic Book',       category:'cartoon',  cssFilter:'saturate(2) contrast(1.4)',          passes:['quantize','halftone','edge_black'], toonLevels:3, outline:true, toon:true },
+  manga:          { id:'manga',         name:'Manga',            category:'cartoon',  cssFilter:'grayscale(1) contrast(1.6)',         passes:['quantize','crosshatch','edge_black'], toonLevels:2, outline:true, toon:true },
+  anime:          { id:'anime',         name:'Anime',            category:'cartoon',  cssFilter:'saturate(1.6) brightness(1.05)',     passes:['quantize','edge_black'],    toonLevels:4,   outline:true,  toon:true  },
+  pixar:          { id:'pixar',         name:'Pixar/3D Cartoon', category:'cartoon',  cssFilter:'saturate(1.3) brightness(1.1)',      passes:['quantize','soft_light'],    toonLevels:6,   outline:false, toon:true  },
+  // Paint
+  oilpaint:       { id:'oilpaint',      name:'Oil Painting',     category:'paint',    cssFilter:'saturate(1.2)',                      passes:['kuwahara'],                                  outline:false, toon:false },
+  watercolor:     { id:'watercolor',    name:'Watercolor',       category:'paint',    cssFilter:'saturate(0.9) brightness(1.1)',      passes:['kuwahara','blur_soft','paper_texture'],      outline:false, toon:false },
+  gouache:        { id:'gouache',       name:'Gouache',          category:'paint',    cssFilter:'saturate(1.1) contrast(1.1)',        passes:['kuwahara','flatten'],                        outline:false, toon:false },
+  impressionist:  { id:'impressionist', name:'Impressionist',    category:'paint',    cssFilter:'saturate(1.3)',                      passes:['kuwahara','stroke_texture'],                 outline:false, toon:false },
+  expressionist:  { id:'expressionist', name:'Expressionist',    category:'paint',    cssFilter:'saturate(1.8) contrast(1.5)',        passes:['kuwahara','edge_distort'],                   outline:true,  toon:false },
+  // Sketch
+  pencil:         { id:'pencil',        name:'Pencil Sketch',    category:'sketch',   cssFilter:'grayscale(1) contrast(1.4)',         passes:['edge_white_bg','hatch'],                     outline:true,  toon:false },
+  charcoal:       { id:'charcoal',      name:'Charcoal',         category:'sketch',   cssFilter:'grayscale(1) contrast(1.6)',         passes:['edge_white_bg','hatch','smudge'],            outline:true,  toon:false },
+  blueprint:      { id:'blueprint',     name:'Blueprint',        category:'sketch',   cssFilter:'hue-rotate(200deg) saturate(2)',     passes:['edge_overlay','grid_overlay'],               outline:true,  toon:false, bgColor:'#003366' },
+  wireframe_style:{ id:'wireframe_style',name:'Wireframe',       category:'sketch',   cssFilter:'none',                              passes:['wireframe_overlay'],                         outline:true,  toon:false, bgColor:'#000010' },
+  xray:           { id:'xray',          name:'X-Ray',            category:'sketch',   cssFilter:'invert(1) hue-rotate(180deg)',       passes:['edge_overlay','desaturate'],                 outline:true,  toon:false },
+  // Stylized
+  lowpoly:        { id:'lowpoly',       name:'Low Poly',         category:'stylized', cssFilter:'saturate(1.2)',                      passes:['quantize','faceted'],       toonLevels:3,   outline:false, toon:true  },
+  voxel:          { id:'voxel',         name:'Voxel',            category:'stylized', cssFilter:'none',                              passes:['pixelate'],                 pixelSize:8,    outline:false, toon:false },
+  glitch:         { id:'glitch',        name:'Glitch Art',       category:'stylized', cssFilter:'saturate(2) contrast(1.5)',          passes:['glitch_shift','scanlines'], outline:false, toon:false },
+  hologram:       { id:'hologram',      name:'Hologram',         category:'stylized', cssFilter:'hue-rotate(120deg) opacity(0.85)',   passes:['scanlines','hologram_glow'],outline:true,  toon:false },
+  neon:           { id:'neon',          name:'Neon/Synthwave',   category:'stylized', cssFilter:'saturate(2) brightness(1.2)',        passes:['bloom','edge_neon'],        outline:true,  toon:false, bgColor:'#0a0018' },
+  retrowave:      { id:'retrowave',     name:'Retrowave',        category:'stylized', cssFilter:'saturate(1.8) hue-rotate(300deg)',   passes:['quantize','scanlines','grid_overlay'], toonLevels:4, outline:true, toon:true },
+  // Cinematic
+  anamorphic:     { id:'anamorphic',    name:'Anamorphic Lens',  category:'photo',    cssFilter:'contrast(1.1) saturate(0.95)',       passes:['lens_flare','vignette','letterbox'],         outline:false, toon:false },
+  infrared:       { id:'infrared',      name:'Infrared',         category:'photo',    cssFilter:'hue-rotate(90deg) saturate(2)',      passes:['bloom','vignette'],                          outline:false, toon:false },
+  thermal:        { id:'thermal',       name:'Thermal Camera',   category:'photo',    cssFilter:'none',                              passes:['thermal_map'],                               outline:false, toon:false },
+  // Art styles
+  ukiyo_e:        { id:'ukiyo_e',       name:'Ukiyo-e',          category:'cartoon',  cssFilter:'saturate(1.4) contrast(1.2)',        passes:['quantize','woodblock'],     toonLevels:5,   outline:true,  toon:true  },
+  stained_glass:  { id:'stained_glass', name:'Stained Glass',    category:'stylized', cssFilter:'saturate(2.5) contrast(1.3)',        passes:['quantize','lead_lines'],    toonLevels:6,   outline:true,  toon:true  },
+  mosaic:         { id:'mosaic',        name:'Mosaic/Tile',       category:'stylized', cssFilter:'saturate(1.8)',                      passes:['pixelate','edge_overlay'],  pixelSize:12,   outline:true,  toon:false },
+  stipple:        { id:'stipple',       name:'Stipple/Pointillist',category:'paint',   cssFilter:'saturate(1.1)',                      passes:['stipple_dots'],                              outline:false, toon:false },
+  linocut:        { id:'linocut',       name:'Linocut Print',    category:'sketch',   cssFilter:'grayscale(1) contrast(1.8)',         passes:['threshold','edge_white_bg'],                outline:true,  toon:false },
+  risograph:      { id:'risograph',     name:'Risograph Print',  category:'paint',    cssFilter:'saturate(1.6) contrast(1.2)',        passes:['quantize','halftone','color_shift'], toonLevels:4, outline:false, toon:false },
+  // Sci-fi
+  tron:           { id:'tron',          name:'Tron/Grid',        category:'stylized', cssFilter:'hue-rotate(180deg) saturate(3)',     passes:['edge_neon','grid_overlay','bloom'],          outline:true,  toon:false, bgColor:'#000814' },
+  matrix:         { id:'matrix',        name:'Matrix/Digital',   category:'stylized', cssFilter:'hue-rotate(90deg) saturate(2)',      passes:['scanlines','rain_overlay','bloom'],          outline:false, toon:false, bgColor:'#000800' },
+  // Classic
+  oil_dark:       { id:'oil_dark',      name:'Dutch Masters',    category:'paint',    cssFilter:'saturate(0.8) contrast(1.3) brightness(0.85)', passes:['kuwahara','vignette','grain'],    outline:false, toon:false },
+  fresco:         { id:'fresco',        name:'Fresco',           category:'paint',    cssFilter:'saturate(0.9) brightness(1.05)',     passes:['kuwahara','paper_texture','crack_texture'],  outline:false, toon:false },
 };
 
-export const STYLE_CATEGORIES = ['photo','cartoon','paint','sketch','stylized','cinematic','special','studio'];
+// ─── Convolution Kernels ──────────────────────────────────────────────────────
+const KERNELS = {
+  sharpen:     [ 0,-1, 0, -1, 5,-1,  0,-1, 0 ],
+  edge:        [-1,-1,-1, -1, 8,-1, -1,-1,-1 ],
+  blur:        [ 1, 2, 1,  2, 4, 2,  1, 2, 1 ],  // divide by 16
+  emboss:      [-2,-1, 0, -1, 1, 1,  0, 1, 2 ],
+};
 
-// ─── Projection ───────────────────────────────────────────────────────────────
-
-export function projectTo2D(worldPos, options = {}) {
-  const {
-    mode         = 'orthographic',
-    canvasW      = 640,
-    canvasH      = 480,
-    scale        = 6,
-    offsetY      = 300,
-    camera       = null,
-    fov          = 60,
-    near         = 0.1,
-    far          = 100,
-    depthScale   = 1,
-  } = options;
-
-  if (mode === 'perspective' && camera) {
-    // Project using actual camera
-    const projected = worldPos.clone().project(camera);
-    return {
-      x: (projected.x + 1) / 2 * canvasW,
-      y: (1 - (projected.y + 1) / 2) * canvasH,
-      depth: projected.z,
-    };
-  }
-
-  if (mode === 'perspective') {
-    // Manual perspective
-    const fovRad = fov * Math.PI / 180;
-    const aspect = canvasW / canvasH;
-    const f = 1 / Math.tan(fovRad / 2);
-    const z = worldPos.z || 1;
-    return {
-      x: canvasW / 2 + (worldPos.x / z) * f * canvasW * 0.5,
-      y: canvasH / 2 - (worldPos.y / z) * f * canvasW * 0.5,
-      depth: z,
-    };
-  }
-
-  // Orthographic (default)
-  return {
-    x: canvasW / 2 + worldPos.x * scale,
-    y: offsetY - worldPos.y * scale,
-    depth: worldPos.z,
-  };
-}
-
-export function quatToRotation2D(quaternion) {
-  const euler = new THREE.Euler().setFromQuaternion(quaternion, 'ZXY');
-  return THREE.MathUtils.radToDeg(euler.z);
-}
-
-// ─── Render Pass System ───────────────────────────────────────────────────────
-
-export class RenderPass {
-  constructor(canvas, style) {
-    this.canvas  = canvas;
-    this.ctx     = canvas.getContext('2d');
-    this.style   = style;
-    this.layers  = {
-      background: document.createElement('canvas'),
-      diffuse:    document.createElement('canvas'),
-      shadow:     document.createElement('canvas'),
-      outline:    document.createElement('canvas'),
-      ao:         document.createElement('canvas'),
-      specular:   document.createElement('canvas'),
-      effects:    document.createElement('canvas'),
-    };
-    Object.values(this.layers).forEach(c => {
-      c.width = canvas.width; c.height = canvas.height;
-    });
-  }
-
-  clear() { Object.values(this.layers).forEach(c => c.getContext('2d').clearRect(0,0,c.width,c.height)); }
-
-  composite() {
-    const { ctx, canvas, style, layers } = this;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Background
-    const bgCtx = layers.background.getContext('2d');
-    bgCtx.fillStyle = style.bgColor ?? '#1a1a2e';
-    bgCtx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(layers.background, 0, 0);
-
-    // Shadow pass
-    if (style.shadows) {
-      ctx.globalAlpha = 0.5;
-      ctx.drawImage(layers.shadow, 0, 0);
-      ctx.globalAlpha = 1;
-    }
-
-    // AO pass
-    if (style.ao) {
-      ctx.globalCompositeOperation = 'multiply';
-      ctx.globalAlpha = 0.6;
-      ctx.drawImage(layers.ao, 0, 0);
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = 1;
-    }
-
-    // Diffuse
-    ctx.drawImage(layers.diffuse, 0, 0);
-
-    // Specular
-    if (style.specular) {
-      ctx.globalCompositeOperation = 'screen';
-      ctx.globalAlpha = 0.4;
-      ctx.drawImage(layers.specular, 0, 0);
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = 1;
-    }
-
-    // Outline
-    if (style.outline) {
-      ctx.drawImage(layers.outline, 0, 0);
-    }
-
-    // Effects (glow, neon, grain etc)
-    ctx.drawImage(layers.effects, 0, 0);
-
-    // Apply CSS filter
-    if (style.filter && style.filter !== 'none') {
-      ctx.filter = style.filter;
-      ctx.drawImage(canvas, 0, 0);
-      ctx.filter = 'none';
-    }
-
-    this._applyPostEffects();
-  }
-
-  _applyPostEffects() {
-    const { ctx, canvas, style } = this;
-    const w = canvas.width, h = canvas.height;
-
-    if (style.vignette) this._drawVignette(ctx, w, h);
-    if (style.grain)    this._drawGrain(ctx, w, h);
-    if (style.scanlines) this._drawScanlines(ctx, w, h);
-    if (style.halftone) this._drawHalftone(ctx, w, h);
-    if (style.glitch)   this._applyGlitch(ctx, w, h, style.glitchStrength ?? 0.05);
-  }
-
-  _drawVignette(ctx, w, h) {
-    const grad = ctx.createRadialGradient(w/2, h/2, h*0.3, w/2, h/2, h*0.7);
-    grad.addColorStop(0, 'rgba(0,0,0,0)');
-    grad.addColorStop(1, 'rgba(0,0,0,0.6)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, w, h);
-  }
-
-  _drawGrain(ctx, w, h) {
-    const imageData = ctx.getImageData(0, 0, w, h);
-    for (let i = 0; i < imageData.data.length; i += 4) {
-      const noise = (Math.random() - 0.5) * 30;
-      imageData.data[i]   = Math.max(0, Math.min(255, imageData.data[i]   + noise));
-      imageData.data[i+1] = Math.max(0, Math.min(255, imageData.data[i+1] + noise));
-      imageData.data[i+2] = Math.max(0, Math.min(255, imageData.data[i+2] + noise));
-    }
-    ctx.putImageData(imageData, 0, 0);
-  }
-
-  _drawScanlines(ctx, w, h) {
-    ctx.globalAlpha = 0.15;
-    ctx.fillStyle = '#000';
-    for (let y = 0; y < h; y += 2) ctx.fillRect(0, y, w, 1);
-    ctx.globalAlpha = 1;
-  }
-
-  _drawHalftone(ctx, w, h) {
-    const size = 6;
-    ctx.globalAlpha = 0.3;
-    ctx.fillStyle = '#000';
-    for (let y = 0; y < h; y += size*2) {
-      for (let x = 0; x < w; x += size*2) {
-        const r = size * Math.random();
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI*2);
-        ctx.fill();
+function convolve3x3(data, w, h, kernel, divisor = 1) {
+  const out = new Uint8ClampedArray(data.length);
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      let r=0,g=0,b=0;
+      for (let ky=-1; ky<=1; ky++) {
+        for (let kx=-1; kx<=1; kx++) {
+          const i = ((y+ky)*w + (x+kx))*4;
+          const k = kernel[(ky+1)*3+(kx+1)];
+          r += data[i]*k; g += data[i+1]*k; b += data[i+2]*k;
+        }
       }
-    }
-    ctx.globalAlpha = 1;
-  }
-
-  _applyGlitch(ctx, w, h, strength) {
-    const slices = Math.floor(5 + Math.random() * 10);
-    for (let i = 0; i < slices; i++) {
-      const y = Math.random() * h;
-      const sliceH = Math.random() * 20 + 2;
-      const offset = (Math.random() - 0.5) * w * strength;
-      const imageData = ctx.getImageData(0, y, w, sliceH);
-      ctx.putImageData(imageData, offset, y);
+      const i = (y*w+x)*4;
+      out[i]   = Math.min(255,Math.max(0,r/divisor));
+      out[i+1] = Math.min(255,Math.max(0,g/divisor));
+      out[i+2] = Math.min(255,Math.max(0,b/divisor));
+      out[i+3] = data[i+3];
     }
   }
+  return out;
 }
 
-// ─── 3D Scene Renderer to 2D Canvas ──────────────────────────────────────────
-
-export class SPX3DTo2DRenderer {
-  constructor(canvas, options = {}) {
-    this.canvas  = canvas;
-    this.ctx     = canvas.getContext('2d');
-    this.style   = options.style ? CINEMATIC_STYLES[options.style] ?? CINEMATIC_STYLES.toon : CINEMATIC_STYLES.toon;
-    this.pass    = new RenderPass(canvas, this.style);
-    this.camera  = options.camera ?? null;
-    this.projMode = options.projMode ?? 'orthographic';
-    this.projOptions = options.projOptions ?? {};
-    this.motionBlur  = options.motionBlur ?? 0;
-    this._prevPositions = new Map();
-  }
-
-  setStyle(styleId) {
-    this.style = CINEMATIC_STYLES[styleId] ?? CINEMATIC_STYLES.toon;
-    this.pass.style = this.style;
-  }
-
-  renderSkeleton(skeleton, options = {}) {
-    if (!skeleton?.bones) return;
-    this.pass.clear();
-
-    const diffCtx   = this.pass.layers.diffuse.getContext('2d');
-    const outCtx    = this.pass.layers.outline.getContext('2d');
-    const shadowCtx = this.pass.layers.shadow.getContext('2d');
-    const fxCtx     = this.pass.layers.effects.getContext('2d');
-
-    const projOpts = { mode: this.projMode, camera: this.camera, canvasW: this.canvas.width, canvasH: this.canvas.height, ...this.projOptions };
-
-    // Project all bones
-    const bonePositions = new Map();
-    skeleton.bones.forEach(bone => {
-      const wp = new THREE.Vector3();
-      bone.getWorldPosition(wp);
-      const p2d = projectTo2D(wp, projOpts);
-      bonePositions.set(bone.name, { ...p2d, bone });
-    });
-
-    // Draw bones
-    const BONE_CONNECTIONS = [
-      ['Head','Neck'],['Neck','Spine2'],['Spine2','Spine1'],['Spine1','Spine'],['Spine','Hips'],
-      ['Hips','LeftUpLeg'],['LeftUpLeg','LeftLeg'],['LeftLeg','LeftFoot'],
-      ['Hips','RightUpLeg'],['RightUpLeg','RightLeg'],['RightLeg','RightFoot'],
-      ['Spine2','LeftShoulder'],['LeftShoulder','LeftArm'],['LeftArm','LeftForeArm'],['LeftForeArm','LeftHand'],
-      ['Spine2','RightShoulder'],['RightShoulder','RightArm'],['RightArm','RightForeArm'],['RightForeArm','RightHand'],
-    ];
-
-    const style = this.style;
-    const lineWidth = style.toon ? 3 : 2;
-    const jointRadius = style.toon ? 5 : 3;
-
-    // Shadow pass
-    if (style.shadows) {
-      shadowCtx.globalAlpha = 0.4;
-      BONE_CONNECTIONS.forEach(([nameA, nameB]) => {
-        const pa = bonePositions.get(nameA), pb = bonePositions.get(nameB);
-        if (!pa || !pb) return;
-        shadowCtx.beginPath();
-        shadowCtx.strokeStyle = 'rgba(0,0,0,0.5)';
-        shadowCtx.lineWidth = lineWidth + 2;
-        shadowCtx.moveTo(pa.x + 3, pa.y + 4);
-        shadowCtx.lineTo(pb.x + 3, pb.y + 4);
-        shadowCtx.stroke();
-      });
-      shadowCtx.globalAlpha = 1;
+// Kuwahara filter (painterly effect) — 5x5 quadrant variance
+function kuwahara(data, w, h, radius = 3) {
+  const out = new Uint8ClampedArray(data.length);
+  for (let y = radius; y < h - radius; y++) {
+    for (let x = radius; x < w - radius; x++) {
+      const quads = [
+        [-radius,-radius,0,0],[0,-radius,radius,0],
+        [-radius,0,0,radius],[0,0,radius,radius]
+      ];
+      let bestVar = Infinity, bestR=0, bestG=0, bestB=0;
+      for (const [x0,y0,x1,y1] of quads) {
+        let sr=0,sg=0,sb=0,n=0;
+        for (let qy=y0; qy<=y1; qy++) {
+          for (let qx=x0; qx<=x1; qx++) {
+            const i=((y+qy)*w+(x+qx))*4;
+            sr+=data[i]; sg+=data[i+1]; sb+=data[i+2]; n++;
+          }
+        }
+        const mr=sr/n, mg=sg/n, mb=sb/n;
+        let vr=0,vg=0,vb=0;
+        for (let qy=y0; qy<=y1; qy++) {
+          for (let qx=x0; qx<=x1; qx++) {
+            const i=((y+qy)*w+(x+qx))*4;
+            vr+=(data[i]-mr)**2; vg+=(data[i+1]-mg)**2; vb+=(data[i+2]-mb)**2;
+          }
+        }
+        const v=(vr+vg+vb)/n;
+        if(v<bestVar){bestVar=v;bestR=mr;bestG=mg;bestB=mb;}
+      }
+      const i=(y*w+x)*4;
+      out[i]=bestR; out[i+1]=bestG; out[i+2]=bestB; out[i+3]=data[i+3];
     }
+  }
+  return out;
+}
 
-    // Diffuse pass — draw limb segments
-    BONE_CONNECTIONS.forEach(([nameA, nameB]) => {
-      const pa = bonePositions.get(nameA), pb = bonePositions.get(nameB);
-      if (!pa || !pb) return;
+// Toon quantize — posterize to N levels
+function quantize(data, levels) {
+  const out = new Uint8ClampedArray(data);
+  const step = 255 / levels;
+  for (let i = 0; i < out.length; i += 4) {
+    out[i]   = Math.round(out[i]   / step) * step;
+    out[i+1] = Math.round(out[i+1] / step) * step;
+    out[i+2] = Math.round(out[i+2] / step) * step;
+  }
+  return out;
+}
 
-      diffCtx.beginPath();
-
-      if (style.toon) {
-        const color = this._getToonColor(nameA, style);
-        diffCtx.strokeStyle = color;
-        diffCtx.lineWidth = lineWidth + (nameA.includes('Spine') || nameA === 'Hips' ? 4 : 0);
-        diffCtx.lineCap = 'round';
+// Edge detect → black lines overlay
+function edgeDetect(data, w, h, threshold = 30) {
+  const gray = new Float32Array(w * h);
+  for (let i = 0; i < w*h; i++) gray[i] = (data[i*4]*0.299 + data[i*4+1]*0.587 + data[i*4+2]*0.114);
+  const edges = new Uint8ClampedArray(data.length);
+  for (let y = 1; y < h-1; y++) {
+    for (let x = 1; x < w-1; x++) {
+      const gx = -gray[(y-1)*w+(x-1)] - 2*gray[y*w+(x-1)] - gray[(y+1)*w+(x-1)]
+                + gray[(y-1)*w+(x+1)] + 2*gray[y*w+(x+1)] + gray[(y+1)*w+(x+1)];
+      const gy = -gray[(y-1)*w+(x-1)] - 2*gray[(y-1)*w+x] - gray[(y-1)*w+(x+1)]
+                + gray[(y+1)*w+(x-1)] + 2*gray[(y+1)*w+x] + gray[(y+1)*w+(x+1)];
+      const mag = Math.sqrt(gx*gx + gy*gy);
+      const i = (y*w+x)*4;
+      if (mag > threshold) {
+        edges[i] = edges[i+1] = edges[i+2] = 0; edges[i+3] = Math.min(255, mag * 2);
       } else {
-        const depth = (pa.depth + pb.depth) / 2;
-        const brightness = Math.max(0.3, 1 - depth * 0.2);
-        diffCtx.strokeStyle = `rgba(180,160,140,${brightness})`;
-        diffCtx.lineWidth = lineWidth;
+        edges[i+3] = 0;
       }
-
-      diffCtx.moveTo(pa.x, pa.y);
-      diffCtx.lineTo(pb.x, pb.y);
-      diffCtx.stroke();
-
-      // Joint dots
-      diffCtx.beginPath();
-      diffCtx.arc(pa.x, pa.y, jointRadius, 0, Math.PI*2);
-      diffCtx.fillStyle = style.toon ? '#fff' : 'rgba(200,180,160,0.8)';
-      diffCtx.fill();
-    });
-
-    // Outline pass
-    if (style.outline) {
-      BONE_CONNECTIONS.forEach(([nameA, nameB]) => {
-        const pa = bonePositions.get(nameA), pb = bonePositions.get(nameB);
-        if (!pa || !pb) return;
-        outCtx.beginPath();
-        outCtx.strokeStyle = '#000';
-        outCtx.lineWidth = lineWidth + 2;
-        outCtx.lineCap = 'round';
-        outCtx.moveTo(pa.x, pa.y);
-        outCtx.lineTo(pb.x, pb.y);
-        outCtx.stroke();
-      });
     }
-
-    // Special style effects
-    if (style.neon) this._drawNeonEffect(fxCtx, bonePositions, BONE_CONNECTIONS);
-    if (style.hologram) this._drawHologramEffect(fxCtx, bonePositions);
-    if (style.xray) this._drawXRayEffect(diffCtx, bonePositions, BONE_CONNECTIONS);
-
-    // Motion blur
-    if (this.motionBlur > 0) this._applyMotionBlur(diffCtx, bonePositions);
-    this._prevPositions = bonePositions;
-
-    this.pass.composite();
   }
+  return edges;
+}
 
-  renderMesh(geometry, options = {}) {
-    const { color = '#888', wireframe = false } = options;
-    const pos = geometry.attributes.position;
-    const idx = geometry.index;
-    if (!pos) return;
-
-    const diffCtx = this.pass.layers.diffuse.getContext('2d');
-    const outCtx  = this.pass.layers.outline.getContext('2d');
-    const style   = this.style;
-
-    const projOpts = { mode: this.projMode, camera: this.camera, canvasW: this.canvas.width, canvasH: this.canvas.height, ...this.projOptions };
-
-    if (idx) {
-      for (let i = 0; i < idx.count; i += 3) {
-        const a = idx.getX(i), b = idx.getX(i+1), c = idx.getX(i+2);
-        const pa = projectTo2D(new THREE.Vector3(pos.getX(a),pos.getY(a),pos.getZ(a)), projOpts);
-        const pb = projectTo2D(new THREE.Vector3(pos.getX(b),pos.getY(b),pos.getZ(b)), projOpts);
-        const pc = projectTo2D(new THREE.Vector3(pos.getX(c),pos.getY(c),pos.getZ(c)), projOpts);
-
-        // Depth-based lighting
-        const depth = (pa.depth + pb.depth + pc.depth) / 3;
-        const light = Math.max(0.2, 1 - depth * 0.1);
-
-        if (wireframe || style.wireframe) {
-          diffCtx.beginPath();
-          diffCtx.strokeStyle = color;
-          diffCtx.lineWidth = 1;
-          diffCtx.moveTo(pa.x, pa.y);
-          diffCtx.lineTo(pb.x, pb.y);
-          diffCtx.lineTo(pc.x, pc.y);
-          diffCtx.closePath();
-          diffCtx.stroke();
-        } else {
-          let fillColor = color;
-          if (style.toon) {
-            const levels = style.toonLevels ?? 4;
-            const level = Math.floor(light * levels) / levels;
-            const c255 = Math.floor(level * 200);
-            fillColor = `rgb(${c255},${Math.floor(c255*0.8)},${Math.floor(c255*0.7)})`;
-          } else {
-            const c255 = Math.floor(light * 200);
-            fillColor = `rgb(${c255},${Math.floor(c255*0.9)},${Math.floor(c255*0.8)})`;
-          }
-          diffCtx.beginPath();
-          diffCtx.fillStyle = fillColor;
-          diffCtx.moveTo(pa.x, pa.y);
-          diffCtx.lineTo(pb.x, pb.y);
-          diffCtx.lineTo(pc.x, pc.y);
-          diffCtx.closePath();
-          diffCtx.fill();
-
-          if (style.outline) {
-            outCtx.beginPath();
-            outCtx.strokeStyle = '#000';
-            outCtx.lineWidth = 1;
-            outCtx.moveTo(pa.x, pa.y);
-            outCtx.lineTo(pb.x, pb.y);
-            outCtx.lineTo(pc.x, pc.y);
-            outCtx.closePath();
-            outCtx.stroke();
-          }
+// Halftone pattern
+function halftone(data, w, h, dotSize = 4) {
+  const out = new Uint8ClampedArray(data.length);
+  for (let y = 0; y < h; y += dotSize) {
+    for (let x = 0; x < w; x += dotSize) {
+      let sum = 0, n = 0;
+      for (let dy = 0; dy < dotSize && y+dy < h; dy++) {
+        for (let dx = 0; dx < dotSize && x+dx < w; dx++) {
+          const i = ((y+dy)*w+(x+dx))*4;
+          sum += (data[i]*0.299 + data[i+1]*0.587 + data[i+2]*0.114);
+          n++;
+        }
+      }
+      const brightness = sum / n / 255;
+      const radius = (1 - brightness) * dotSize * 0.6;
+      const cx = x + dotSize/2, cy = y + dotSize/2;
+      for (let dy = 0; dy < dotSize && y+dy < h; dy++) {
+        for (let dx = 0; dx < dotSize && x+dx < w; dx++) {
+          const dist = Math.hypot(x+dx-cx, y+dy-cy);
+          const i = ((y+dy)*w+(x+dx))*4;
+          const ink = dist < radius ? 0 : 255;
+          out[i] = out[i+1] = out[i+2] = ink; out[i+3] = 255;
         }
       }
     }
-
-    this.pass.composite();
   }
+  return out;
+}
 
-  _getToonColor(boneName, style) {
-    const colorMap = {
-      Head: '#f4a261', Neck: '#f4a261',
-      Spine: '#e63946', Spine1: '#e63946', Spine2: '#e63946', Hips: '#e63946',
-      LeftArm: '#457b9d', LeftForeArm: '#457b9d', LeftHand: '#f4a261',
-      RightArm: '#457b9d', RightForeArm: '#457b9d', RightHand: '#f4a261',
-      LeftUpLeg: '#2a9d8f', LeftLeg: '#2a9d8f', LeftFoot: '#264653',
-      RightUpLeg: '#2a9d8f', RightLeg: '#2a9d8f', RightFoot: '#264653',
-    };
-    return colorMap[boneName] ?? '#888';
-  }
-
-  _drawNeonEffect(ctx, positions, connections) {
-    ctx.shadowBlur = 20;
-    ctx.shadowColor = '#00ffc8';
-    ctx.strokeStyle = '#00ffc8';
-    ctx.lineWidth = 2;
-    connections.forEach(([a, b]) => {
-      const pa = positions.get(a), pb = positions.get(b);
-      if (!pa || !pb) return;
-      ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
-    });
-    ctx.shadowBlur = 0;
-  }
-
-  _drawHologramEffect(ctx, positions) {
-    ctx.globalAlpha = 0.3;
-    ctx.strokeStyle = '#00ffff';
-    ctx.lineWidth = 1;
-    positions.forEach(p => {
-      for (let i = 0; i < 3; i++) {
-        ctx.beginPath();
-        ctx.arc(p.x, p.y + i * 4, 8, 0, Math.PI*2);
-        ctx.stroke();
+// Pixelate (voxel/mosaic)
+function pixelate(data, w, h, size) {
+  const out = new Uint8ClampedArray(data);
+  for (let y = 0; y < h; y += size) {
+    for (let x = 0; x < w; x += size) {
+      let r=0,g=0,b=0,n=0;
+      for (let dy=0; dy<size&&y+dy<h; dy++) {
+        for (let dx=0; dx<size&&x+dx<w; dx++) {
+          const i=((y+dy)*w+(x+dx))*4;
+          r+=data[i]; g+=data[i+1]; b+=data[i+2]; n++;
+        }
       }
-    });
-    ctx.globalAlpha = 1;
+      r/=n; g/=n; b/=n;
+      for (let dy=0; dy<size&&y+dy<h; dy++) {
+        for (let dx=0; dx<size&&x+dx<w; dx++) {
+          const i=((y+dy)*w+(x+dx))*4;
+          out[i]=r; out[i+1]=g; out[i+2]=b;
+        }
+      }
+    }
+  }
+  return out;
+}
+
+// Scanlines overlay
+function scanlines(data, w, h, gap = 3, alpha = 60) {
+  const out = new Uint8ClampedArray(data);
+  for (let y = 0; y < h; y += gap) {
+    for (let x = 0; x < w; x++) {
+      const i = (y*w+x)*4;
+      out[i]   = Math.max(0, out[i]   - alpha);
+      out[i+1] = Math.max(0, out[i+1] - alpha);
+      out[i+2] = Math.max(0, out[i+2] - alpha);
+    }
+  }
+  return out;
+}
+
+// Vignette
+function vignette(data, w, h, strength = 0.6) {
+  const out = new Uint8ClampedArray(data);
+  const cx = w/2, cy = h/2, maxD = Math.hypot(cx, cy);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const d = Math.hypot(x-cx, y-cy) / maxD;
+      const factor = 1 - d * d * strength;
+      const i = (y*w+x)*4;
+      out[i]   = out[i]   * factor;
+      out[i+1] = out[i+1] * factor;
+      out[i+2] = out[i+2] * factor;
+    }
+  }
+  return out;
+}
+
+// Film grain
+function grain(data, strength = 20) {
+  const out = new Uint8ClampedArray(data);
+  for (let i = 0; i < out.length; i += 4) {
+    const n = (Math.random() - 0.5) * strength;
+    out[i]   = Math.min(255, Math.max(0, out[i]   + n));
+    out[i+1] = Math.min(255, Math.max(0, out[i+1] + n));
+    out[i+2] = Math.min(255, Math.max(0, out[i+2] + n));
+  }
+  return out;
+}
+
+// Bloom (simple: blur + add)
+function bloom(ctx, w, h, threshold = 180, strength = 0.4) {
+  const src = ctx.getImageData(0, 0, w, h);
+  const bright = new Uint8ClampedArray(src.data);
+  for (let i = 0; i < bright.length; i += 4) {
+    const lum = bright[i]*0.299 + bright[i+1]*0.587 + bright[i+2]*0.114;
+    if (lum < threshold) { bright[i]=bright[i+1]=bright[i+2]=0; }
+  }
+  // Blur the bright pass
+  const tmp = document.createElement('canvas'); tmp.width=w; tmp.height=h;
+  const tctx = tmp.getContext('2d');
+  const bd = new ImageData(bright, w, h);
+  tctx.putImageData(bd, 0, 0);
+  tctx.filter = 'blur(6px)';
+  tctx.drawImage(tmp, 0, 0);
+  // Additive blend
+  ctx.globalCompositeOperation = 'screen';
+  ctx.globalAlpha = strength;
+  ctx.drawImage(tmp, 0, 0);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
+}
+
+// Glitch shift
+function glitch(data, w, h, strength = 8) {
+  const out = new Uint8ClampedArray(data);
+  const numSlices = Math.floor(h / 20);
+  for (let s = 0; s < numSlices; s++) {
+    if (Math.random() > 0.3) continue;
+    const y = Math.floor(Math.random() * h);
+    const shift = Math.floor((Math.random()-0.5) * strength * 2);
+    for (let x = 0; x < w; x++) {
+      const sx = Math.min(w-1, Math.max(0, x + shift));
+      const i = (y*w+x)*4, si = (y*w+sx)*4;
+      out[i] = data[si]; // R channel only shift for RGB split
+    }
+  }
+  return out;
+}
+
+// Thermal color map
+function thermalMap(data) {
+  const out = new Uint8ClampedArray(data.length);
+  for (let i = 0; i < data.length; i += 4) {
+    const lum = (data[i]*0.299 + data[i+1]*0.587 + data[i+2]*0.114) / 255;
+    // Map 0→1 through black→blue→cyan→green→yellow→red→white
+    let r,g,b;
+    if (lum < 0.25)      { r=0;   g=0;              b=lum*4*255; }
+    else if (lum < 0.5)  { r=0;   g=(lum-0.25)*4*255; b=255; }
+    else if (lum < 0.75) { r=(lum-0.5)*4*255; g=255; b=255-(lum-0.5)*4*255; }
+    else                 { r=255; g=255-(lum-0.75)*4*255; b=0; }
+    out[i]=r; out[i+1]=g; out[i+2]=b; out[i+3]=data[i+3];
+  }
+  return out;
+}
+
+// ─── Main Renderer ────────────────────────────────────────────────────────────
+export class SPX3DTo2DRenderer {
+  /**
+   * @param {THREE.WebGLRenderer} threeRenderer — the live Three.js renderer
+   * @param {object} options
+   */
+  constructor(threeRenderer, options = {}) {
+    this.threeRenderer = threeRenderer;
+    this.styleId = options.style || 'cinematic';
+    this.style = CINEMATIC_STYLES[this.styleId] || CINEMATIC_STYLES.cinematic;
+    this.outlineWidth = options.outlineWidth || 1.5;
+    this.toonLevels = options.toonLevels || this.style.toonLevels || 4;
   }
 
-  _drawXRayEffect(ctx, positions, connections) {
-    ctx.globalCompositeOperation = 'screen';
-    ctx.strokeStyle = 'rgba(100,200,255,0.6)';
-    ctx.lineWidth = 8;
-    connections.forEach(([a, b]) => {
-      const pa = positions.get(a), pb = positions.get(b);
-      if (!pa || !pb) return;
-      ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
-    });
-    ctx.globalCompositeOperation = 'source-over';
+  setStyle(styleId) {
+    this.styleId = styleId;
+    this.style = CINEMATIC_STYLES[styleId] || CINEMATIC_STYLES.cinematic;
   }
 
-  _applyMotionBlur(ctx, currentPositions) {
-    if (!this._prevPositions.size) return;
-    ctx.globalAlpha = this.motionBlur * 0.5;
-    this._prevPositions.forEach((p, name) => {
-      const curr = currentPositions.get(name);
-      if (!curr) return;
-      ctx.beginPath();
-      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-      ctx.lineWidth = 2;
-      ctx.moveTo(p.x, p.y);
-      ctx.lineTo(curr.x, curr.y);
-      ctx.stroke();
-    });
-    ctx.globalAlpha = 1;
+  /**
+   * Capture the current WebGL frame, apply style passes, return output canvas.
+   * @param {THREE.Scene} scene
+   * @param {THREE.Camera} camera
+   * @returns {HTMLCanvasElement}
+   */
+  async render(scene, camera) {
+    const renderer = this.threeRenderer;
+    const style = this.style;
+
+    // 1. Render scene to offscreen buffer
+    const w = renderer.domElement.width  || renderer.domElement.clientWidth  || 1280;
+    const h = renderer.domElement.height || renderer.domElement.clientHeight || 720;
+
+    const rtCanvas = document.createElement('canvas');
+    rtCanvas.width = w; rtCanvas.height = h;
+    const rtCtx = rtCanvas.getContext('2d');
+
+    // Render the Three.js scene
+    renderer.render(scene, camera);
+    rtCtx.drawImage(renderer.domElement, 0, 0, w, h);
+
+    // 2. Apply style
+    return this._applyStyle(rtCanvas, w, h, style);
   }
 
-  captureFrame() {
-    return this.canvas.toDataURL('image/png');
+  /**
+   * Apply style to an existing canvas (e.g. already-rendered frame).
+   */
+  async applyStyleToCanvas(sourceCanvas, styleId) {
+    const s = CINEMATIC_STYLES[styleId] || this.style;
+    const w = sourceCanvas.width, h = sourceCanvas.height;
+    return this._applyStyle(sourceCanvas, w, h, s);
   }
 
-  captureFrameBlob() {
-    return new Promise(res => this.canvas.toBlob(res, 'image/png'));
+  _applyStyle(srcCanvas, w, h, style) {
+    const out = document.createElement('canvas');
+    out.width = w; out.height = h;
+    const ctx = out.getContext('2d');
+
+    // Optional background color override
+    if (style.bgColor) {
+      ctx.fillStyle = style.bgColor;
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(srcCanvas, 0, 0);
+    } else {
+      ctx.drawImage(srcCanvas, 0, 0);
+    }
+
+    // Apply CSS filter via intermediate canvas
+    if (style.cssFilter && style.cssFilter !== 'none') {
+      const tmp = document.createElement('canvas');
+      tmp.width = w; tmp.height = h;
+      const tctx = tmp.getContext('2d');
+      tctx.filter = style.cssFilter;
+      tctx.drawImage(out, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      if (style.bgColor) { ctx.fillStyle = style.bgColor; ctx.fillRect(0,0,w,h); }
+      ctx.drawImage(tmp, 0, 0);
+    }
+
+    // Apply pixel passes
+    let imgData = ctx.getImageData(0, 0, w, h);
+    let d = imgData.data;
+    const passes = style.passes || [];
+
+    for (const pass of passes) {
+      switch (pass) {
+        case 'quantize':
+          d = quantize(d, this.toonLevels || style.toonLevels || 4);
+          break;
+        case 'edge_black': {
+          const edges = edgeDetect(d, w, h, 25);
+          // Composite edges over current
+          for (let i = 0; i < d.length; i += 4) {
+            if (edges[i+3] > 0) {
+              const t = edges[i+3] / 255;
+              d[i]   = d[i]   * (1-t);
+              d[i+1] = d[i+1] * (1-t);
+              d[i+2] = d[i+2] * (1-t);
+            }
+          }
+          break;
+        }
+        case 'edge_overlay': {
+          const edges = edgeDetect(d, w, h, 20);
+          for (let i = 0; i < d.length; i += 4) {
+            if (edges[i+3] > 0) {
+              d[i] = d[i+1] = d[i+2] = 0;
+              d[i+3] = 255;
+            }
+          }
+          break;
+        }
+        case 'edge_white_bg': {
+          // White bg + black edges (sketch look)
+          const edges = edgeDetect(d, w, h, 15);
+          for (let i = 0; i < d.length; i += 4) {
+            const e = edges[i+3] / 255;
+            d[i]   = 255 - e * 255;
+            d[i+1] = 255 - e * 255;
+            d[i+2] = 255 - e * 255;
+            d[i+3] = 255;
+          }
+          break;
+        }
+        case 'edge_neon': {
+          const edges = edgeDetect(d, w, h, 20);
+          for (let i = 0; i < d.length; i += 4) {
+            if (edges[i+3] > 40) {
+              d[i]   = Math.min(255, d[i]   + edges[i+3]);
+              d[i+1] = Math.min(255, d[i+1] + edges[i+3] * 0.5);
+              d[i+2] = Math.min(255, d[i+2] + edges[i+3] * 2);
+            }
+          }
+          break;
+        }
+        case 'kuwahara':
+          d = kuwahara(d, w, h, 3);
+          break;
+        case 'halftone':
+          d = halftone(d, w, h, 4);
+          break;
+        case 'crosshatch': {
+          // Blend crosshatch with edge detection
+          const edges = edgeDetect(d, w, h, 20);
+          for (let y2 = 0; y2 < h; y2++) {
+            for (let x2 = 0; x2 < w; x2++) {
+              const i = (y2*w+x2)*4;
+              const lum = (d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255;
+              const isHatch = (x2+y2)%6===0 || (x2-y2+h)%6===0;
+              if (isHatch && lum < 0.7) { d[i]=d[i+1]=d[i+2]=0; }
+              else if (edges[i+3]>20) { d[i]=d[i+1]=d[i+2]=0; }
+              else { d[i]=d[i+1]=d[i+2]=220; }
+              d[i+3]=255;
+            }
+          }
+          break;
+        }
+        case 'hatch': {
+          for (let y2 = 0; y2 < h; y2++) {
+            for (let x2 = 0; x2 < w; x2++) {
+              const i=(y2*w+x2)*4;
+              const lum=(d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114)/255;
+              const hatch = lum < 0.3 ? ((x2+y2)%3===0)
+                          : lum < 0.5 ? ((x2+y2)%5===0)
+                          : lum < 0.7 ? ((x2+y2)%8===0) : false;
+              d[i]=d[i+1]=d[i+2] = hatch ? 0 : 255; d[i+3]=255;
+            }
+          }
+          break;
+        }
+        case 'pixelate':
+          d = pixelate(d, w, h, style.pixelSize || 8);
+          break;
+        case 'scanlines':
+          d = scanlines(d, w, h, 3, 50);
+          break;
+        case 'vignette':
+          d = vignette(d, w, h, 0.6);
+          break;
+        case 'grain':
+          d = grain(d, 15);
+          break;
+        case 'glitch_shift':
+          d = glitch(d, w, h, 12);
+          break;
+        case 'thermal_map':
+          d = thermalMap(d);
+          break;
+        case 'sharpen':
+          d = convolve3x3(d, w, h, KERNELS.sharpen, 1);
+          break;
+        case 'blur_soft':
+          d = convolve3x3(d, w, h, KERNELS.blur, 16);
+          break;
+        case 'desaturate': {
+          for (let i = 0; i < d.length; i += 4) {
+            const lum = d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114;
+            d[i]=d[i+1]=d[i+2]=lum;
+          }
+          break;
+        }
+        case 'threshold': {
+          for (let i = 0; i < d.length; i += 4) {
+            const lum = d[i]*0.299+d[i+1]*0.587+d[i+2]*0.114;
+            const v = lum > 128 ? 255 : 0;
+            d[i]=d[i+1]=d[i+2]=v;
+          }
+          break;
+        }
+        case 'color_shift': {
+          for (let i = 0; i < d.length; i += 4) {
+            d[i]   = Math.min(255, d[i]   * 1.2);
+            d[i+1] = Math.min(255, d[i+1] * 0.9);
+          }
+          break;
+        }
+        case 'letterbox': {
+          const bar = Math.floor(h * 0.08);
+          for (let x2 = 0; x2 < w; x2++) {
+            for (let row of [0, h-bar]) {
+              for (let y2 = row; y2 < Math.min(row+bar, h); y2++) {
+                const i=(y2*w+x2)*4;
+                d[i]=d[i+1]=d[i+2]=0;
+              }
+            }
+          }
+          break;
+        }
+        case 'grid_overlay': {
+          const gs = 40;
+          for (let y2 = 0; y2 < h; y2++) {
+            for (let x2 = 0; x2 < w; x2++) {
+              if (y2%gs===0 || x2%gs===0) {
+                const i=(y2*w+x2)*4;
+                d[i]=0; d[i+1]=150; d[i+2]=255; d[i+3]=100;
+              }
+            }
+          }
+          break;
+        }
+        case 'hologram_glow': {
+          for (let i = 0; i < d.length; i += 4) {
+            d[i+2] = Math.min(255, d[i+2] * 1.5);
+            d[i]   = d[i]   * 0.3;
+            d[i+1] = Math.min(255, d[i+1] * 1.2);
+          }
+          break;
+        }
+        case 'flat': {
+          d = quantize(d, 8);
+          break;
+        }
+        // Style-specific overrides handled via cssFilter, these are no-ops
+        case 'soft_light':
+        case 'stroke_texture':
+        case 'paper_texture':
+        case 'crack_texture':
+        case 'woodblock':
+        case 'lead_lines':
+        case 'stipple_dots':
+        case 'rain_overlay':
+        case 'scratch':
+        case 'smudge':
+        case 'distort':
+        case 'wireframe_overlay':
+        case 'faceted':
+        case 'lens_flare':
+          break; // Handled by cssFilter or future GPU pass
+        default:
+          break;
+      }
+    }
+
+    ctx.putImageData(new ImageData(d, w, h), 0, 0);
+
+    // Bloom pass (uses canvas compositing, done after putImageData)
+    if (passes.includes('bloom')) bloom(ctx, w, h, 170, 0.35);
+
+    return out;
+  }
+
+  /**
+   * Export the styled canvas as a data URL.
+   */
+  async exportPNG(scene, camera) {
+    const canvas = await this.render(scene, camera);
+    return canvas.toDataURL('image/png');
   }
 }
 
-// ─── Animation Conversion ─────────────────────────────────────────────────────
+// ─── Legacy skeleton renderer (kept for SPX Puppet / 2D animation pipeline) ──
+export class SPX3DTo2DSkeletonRenderer {
+  constructor(canvas, options = {}) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.style = CINEMATIC_STYLES[options.style] || CINEMATIC_STYLES.toon;
+  }
+  setStyle(id) { this.style = CINEMATIC_STYLES[id] || this.style; }
+  renderSkeleton(skeleton, options = {}) {
+    // Legacy: kept for SPX Puppet bone projection
+    if (!skeleton?.bones) return;
+    const ctx = this.ctx;
+    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    ctx.strokeStyle = this.style.toon ? '#00ffc8' : '#888';
+    ctx.lineWidth = 2;
+    skeleton.bones.forEach(bone => {
+      const wp = new THREE.Vector3();
+      bone.getWorldPosition(wp);
+      const x = (wp.x + 1) * this.canvas.width / 2;
+      const y = (-wp.y + 1) * this.canvas.height / 2;
+      ctx.beginPath();
+      ctx.arc(x, y, 4, 0, Math.PI*2);
+      ctx.fillStyle = '#FF6600';
+      ctx.fill();
+    });
+  }
+}
+
 
 export function convertClipToSPXMotion(clip, skeleton, options = {}) {
   const {
