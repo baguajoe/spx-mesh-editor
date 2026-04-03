@@ -37,14 +37,14 @@ function Badges({items,active,onSelect}) {
 }
 
 const PRESETS = {
-  'Sports Car':  {bodyLength:0.55,bodyHeight:0.32,bodyWidth:0.55,wheelSize:0.45,spoiler:true, groundClearance:0.12,primaryColor:'#cc2200',wheelCount:4},
-  'SUV':         {bodyLength:0.70,bodyHeight:0.60,bodyWidth:0.65,wheelSize:0.55,spoiler:false,groundClearance:0.35,primaryColor:'#1a3a5a',wheelCount:4},
-  'Pickup Truck':{bodyLength:0.85,bodyHeight:0.55,bodyWidth:0.65,wheelSize:0.60,spoiler:false,groundClearance:0.40,primaryColor:'#3a3a2a',wheelCount:4},
-  'Motorcycle':  {bodyLength:0.45,bodyHeight:0.50,bodyWidth:0.25,wheelSize:0.40,spoiler:false,groundClearance:0.20,primaryColor:'#111111',wheelCount:2},
-  'Muscle Car':  {bodyLength:0.65,bodyHeight:0.38,bodyWidth:0.60,wheelSize:0.50,spoiler:true, groundClearance:0.16,primaryColor:'#222244',wheelCount:4},
-  'Semi Truck':  {bodyLength:1.00,bodyHeight:0.80,bodyWidth:0.70,wheelSize:0.65,spoiler:false,groundClearance:0.45,primaryColor:'#aa2211',wheelCount:18},
-  'Supercar':    {bodyLength:0.58,bodyHeight:0.26,bodyWidth:0.58,wheelSize:0.48,spoiler:true, groundClearance:0.09,primaryColor:'#f0c000',wheelCount:4},
-  'Off-Road':    {bodyLength:0.72,bodyHeight:0.65,bodyWidth:0.68,wheelSize:0.65,spoiler:false,groundClearance:0.50,primaryColor:'#3a4a2a',wheelCount:4},
+  'Sports Car':  {bodyLength:0.45,bodyHeight:0.22,bodyWidth:0.52,wheelSize:0.42,spoiler:true, groundClearance:0.08,primaryColor:'#cc2200',wheelCount:4},
+  'SUV':         {bodyLength:0.80,bodyHeight:0.72,bodyWidth:0.72,wheelSize:0.62,spoiler:false,groundClearance:0.42,primaryColor:'#1a3a5a',wheelCount:4},
+  'Pickup Truck':{bodyLength:0.95,bodyHeight:0.58,bodyWidth:0.68,wheelSize:0.65,spoiler:false,groundClearance:0.45,primaryColor:'#3a3a2a',wheelCount:4},
+  'Motorcycle':  {bodyLength:0.38,bodyHeight:0.55,bodyWidth:0.18,wheelSize:0.45,spoiler:false,groundClearance:0.22,primaryColor:'#111111',wheelCount:2},
+  'Muscle Car':  {bodyLength:0.70,bodyHeight:0.30,bodyWidth:0.62,wheelSize:0.52,spoiler:true, groundClearance:0.12,primaryColor:'#222244',wheelCount:4},
+  'Semi Truck':  {bodyLength:1.20,bodyHeight:0.90,bodyWidth:0.75,wheelSize:0.70,spoiler:false,groundClearance:0.50,primaryColor:'#aa2211',wheelCount:18},
+  'Supercar':    {bodyLength:0.50,bodyHeight:0.18,bodyWidth:0.56,wheelSize:0.46,spoiler:true, groundClearance:0.06,primaryColor:'#f0c000',wheelCount:4},
+  'Off-Road':    {bodyLength:0.78,bodyHeight:0.78,bodyWidth:0.75,wheelSize:0.78,spoiler:false,groundClearance:0.62,primaryColor:'#3a4a2a',wheelCount:4},
 };
 
 function buildVehicle(scene, p, meshesRef) {
