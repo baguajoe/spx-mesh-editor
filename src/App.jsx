@@ -255,7 +255,7 @@ function SpxTabGroup({ label, color, tabs }) {
   return (
     <div ref={ref} style={{position:'relative',flexShrink:0}}>
       <button className='spx-native-workspace-tab'
-        onClick={() => setOpen(prev => prev === false ? true : false)}
+        onClick={(e) => { e.stopPropagation(); setOpen(o => o ? false : true); }}
         style={{borderBottom:open?'2px solid '+color:'2px solid transparent'}}>
         <span className='spx-native-workspace-tab-label' style={{color:open?color:undefined}}>{label}</span>
         <span style={{fontSize:7,marginLeft:3,color:open?color:'#8b949e'}}>{open?'▲':'▼'}</span>
@@ -3391,7 +3391,7 @@ export default function App() {
         🧍 {activeModelUrl ? activeModelUrl.split("/").pop().replace(".glb","") : "Model"}
       </button>
 
-      <div className="spx-native-workspace-tabs" style={{left:0,justifyContent:"center"}}>
+      <div className="spx-native-workspace-tabs" style={{left:0,justifyContent:"center",display:"flex",alignItems:"center"}}>
         <SpxTabGroup label="SURFACE" color="#00ffc8" tabs={[
           {label:"UV",         fn:()=>openWorkspaceTool("uv")},
           {label:"Materials",  fn:()=>openWorkspaceTool("materials_textures")},
@@ -3440,7 +3440,7 @@ export default function App() {
           {label:"VR Preview", fn:()=>openWorkspaceTool("vr_preview")},
         ]}/>
         <button type="button" className="spx-native-workspace-tab" onClick={()=>setShowPerformancePanel(v=>!v)} style={{marginLeft:"auto",flexShrink:0}}>
-          <span className="spx-native-workspace-tab-label">PERF</span>
+          <span className="spx-native-workspace-tab-label">Performance</span>
         </button>
       </div>
 
