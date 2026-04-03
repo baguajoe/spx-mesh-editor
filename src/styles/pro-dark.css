@@ -1279,3 +1279,13 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px s
 .spx-right { overflow-y: auto; }
 .spx-left  { overflow-y: auto; }
 
+
+/* ── Right panel scroll padding — clears timeline ───────────────────────── */
+.spx-right {
+  padding-bottom: 8px;
+}
+
+/* ── Bottom panel height reduction ──────────────────────────────────────── */
+:root {
+  --bottom-h: 120px;
+}
