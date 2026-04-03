@@ -6,7 +6,7 @@ import {
 } from "../../mesh/VFXSystem.js";
 import {
   createGPUParticleSystem, emitGPUParticles, stepGPUParticles,
-  createForceField, FORCE_FIELD_TYPES, getGPUParticleStats,
+  createForceField, FORCE_FIELD_TYPES, burstEmit, getGPUParticleStats,
 } from "../../mesh/GPUParticles.js";
 
 const C = {
