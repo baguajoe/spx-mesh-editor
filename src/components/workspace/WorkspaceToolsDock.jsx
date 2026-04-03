@@ -10,17 +10,14 @@ function fireShortcut(key, shift = true) {
 }
 
 const TOOLS = [
-  { id: "uv", label: "UV", kind: "shortcut", key: "u", hint: "Shift+U" },
-  { id: "materials", label: "Materials", kind: "shortcut", key: "m", hint: "Shift+M" },
-  { id: "paint", label: "Paint", kind: "shortcut", key: "p", hint: "Shift+P" },
-  { id: "clothing", label: "Clothing", kind: "shortcut", key: "g", hint: "Shift+G" },
-  { id: "pattern", label: "Pattern", kind: "shortcut", key: "d", hint: "Shift+D" },
-  { id: "hair", label: "Hair", kind: "shortcut", key: "h", hint: "Shift+H" },
-  { id: "hair_adv", label: "Hair+", kind: "shortcut", key: "j", hint: "Shift+J" },
-  { id: "hair_fx", label: "Hair FX", kind: "shortcut", key: "k", hint: "Shift+K" },
-  { id: "autorig", label: "Auto Rig", kind: "shortcut", key: "r", hint: "Shift+R" },
-  { id: "advanced_rig", label: "Adv Rig", kind: "shortcut", key: "y", hint: "Shift+Y" },
-  { id: "render", label: "Render", kind: "workspace", mode: "rendering", hint: "Render WS" },
+  { id: "uv",          label: "UV",       kind: "shortcut",  key: "u", hint: "Shift+U" },
+  { id: "materials",   label: "Surface",  kind: "shortcut",  key: "m", hint: "Shift+M" },
+  { id: "paint",       label: "Paint",    kind: "shortcut",  key: "p", hint: "Shift+P" },
+  { id: "clothing",    label: "Clothing", kind: "shortcut",  key: "g", hint: "Shift+G" },
+  { id: "pattern",     label: "Pattern",  kind: "shortcut",  key: "d", hint: "Shift+D" },
+  { id: "hair_suite",  label: "Hair",     kind: "hair_suite",          hint: "Hair Suite" },
+  { id: "autorig",     label: "Auto Rig", kind: "shortcut",  key: "r", hint: "Shift+R" },
+  { id: "advanced_rig",label: "Adv Rig",  kind: "shortcut",  key: "y", hint: "Shift+Y" },
 ];
 
 export default function WorkspaceToolsDock() {
@@ -31,6 +28,14 @@ export default function WorkspaceToolsDock() {
 
     if (tool.kind === "shortcut") {
       fireShortcut(tool.key, true);
+      return;
+    }
+
+    if (tool.kind === "hair_suite") {
+      // Open all three hair panels via keyboard shortcuts
+      fireShortcut("h", true);
+      setTimeout(() => fireShortcut("j", true), 50);
+      setTimeout(() => fireShortcut("k", true), 100);
       return;
     }
 
