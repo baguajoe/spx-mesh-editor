@@ -1289,5 +1289,5 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px s
 
 /* ── Bottom panel height reduction ──────────────────────────────────────── */
 :root {
-  --bottom-h: 120px;
+  --bottom-h: 90px;
 }

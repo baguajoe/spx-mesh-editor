@@ -1248,7 +1248,6 @@ export default function App() {
     try {
       const envMap = createProceduralHDRI(renderer);
       scene.environment = envMap;
-      scene.background = envMap;
       scene.environmentIntensity = 0.8;
     } catch(e) { console.warn('IBL setup failed:', e); }
     scene.add(new THREE.GridHelper(10, 20, COLORS.border, COLORS.border));
