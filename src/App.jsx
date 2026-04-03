@@ -1097,6 +1097,22 @@ export default function App() {
   useEffect(() => { sculptFalloffRef.current = sculptFalloff; }, [sculptFalloff]);
   useEffect(() => { sculptSymXRef.current = sculptSymX; }, [sculptSymX]);
   useEffect(() => { editModeRef.current = editMode; }, [editMode]);
+
+  // Force canvas resize when workspace changes
+  useEffect(() => {
+    setTimeout(() => {
+      const renderer = rendererRef.current;
+      const canvas = canvasRef.current;
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      if (w > 0 && h > 0) {
+        renderer.setSize(w, h, false);
+        if (cameraRef.current) {
+          cameraRef.current.aspect = w / h;
+          cameraRef.current.updateProjectionMatrix();
+        }
+      }
+    }, 100);
+  }, [activeWorkspace]);
   useEffect(() => { selectModeRef.current = selectMode; }, [selectMode]);
 
   // ── Playback loop ─────────────────────────────────────────────────────────
