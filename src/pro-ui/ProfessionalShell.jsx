@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { WORKSPACES } from "./workspaceMap";
+import WorkspaceToolsDock from "../components/workspace/WorkspaceToolsDock";
 
 // ── Menu definitions ─────────────────────────────────────────────────────────
 const MENU_ITEMS = {
@@ -253,6 +254,7 @@ export default function ProfessionalShell({
         ))}
       </div>
 
+      <WorkspaceToolsDock />
       {/* Main 3-col */}
       <div className="spx-main">
         <aside className="spx-left">{leftPanel}</aside>
