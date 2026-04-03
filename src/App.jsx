@@ -1,4 +1,5 @@
 import NodeCompositorPanel from './components/mesh/NodeCompositorPanel';
+import CustomSkinBuilderPanel from './components/panels/CustomSkinBuilderPanel';
 import SPX3DTo2DPanel from './components/pipeline/SPX3DTo2DPanel';
 import { WORKSPACES, DEFAULT_WORKSPACE } from "./pro-ui/workspaceMap";
 import CityGeneratorPanel from './components/panels/CityGeneratorPanel';
@@ -2870,6 +2871,52 @@ export default function App() {
       }
       return;
     }
+    if (fn === "apic_fluid_start") {
+      import("./mesh/WebGPURenderer.js").then(async ({ WebGPURenderer }) => {
+        const gpu = new WebGPURenderer();
+        await gpu.init();
+        if (gpu.fallback) {
+          setStatus("WebGPU not available — using CPU FLIP instead");
+          return;
+        }
+        const N = 10000, G = 32;
+        const pipeline = await gpu.createAPICFluidPipeline(N, G);
+        if (!pipeline) { setStatus("APIC pipeline failed"); return; }
+        // Create GPU buffers
+        const particleData = new Float32Array(N * 20); // pos(4)+vel(4)+C(9)+pad(3)
+        for (let i=0; i<N; i++) {
+          const base = i*20;
+          particleData[base]   = 0.2+Math.random()*0.6;
+          particleData[base+1] = 0.4+Math.random()*0.5;
+          particleData[base+2] = 0.2+Math.random()*0.6;
+          particleData[base+3] = 1.0; // mass
+          particleData[base+7] = 0.0; // phase=alive
+        }
+        const particleBuf = gpu.device.createBuffer({ size: particleData.byteLength,
+          usage: GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC|GPUBufferUsage.COPY_DST });
+        gpu.device.queue.writeBuffer(particleBuf, 0, particleData);
+        const gridBuf = gpu.device.createBuffer({
+          size: G*G*G*32,
+          usage: GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC|GPUBufferUsage.COPY_DST });
+        window._apicGPU = gpu;
+        window._apicPipeline = pipeline;
+        window._apicParticleBuf = particleBuf;
+        window._apicGridBuf = gridBuf;
+        let frame = 0;
+        const sim = setInterval(async () => {
+          await gpu.stepAPICFluid(pipeline, particleBuf, gridBuf, 1/60, 0.05);
+          if (++frame > 600) clearInterval(sim);
+        }, 16);
+        window._apicSim = sim;
+        setStatus("APIC GPU fluid running ("+N+" particles, WebGPU compute)");
+      });
+      return;
+    }
+    if (fn === "apic_fluid_stop") {
+      if (window._apicSim) { clearInterval(window._apicSim); window._apicSim=null; }
+      setStatus("APIC fluid stopped");
+      return;
+    }
     if (fn === "fluid_film_start") {
       import("./mesh/FLIPFluidSolver.js").then(({ FLIPFluidSolver, stepFilmFluid }) => {
         const solver = new FLIPFluidSolver({
@@ -3492,6 +3539,7 @@ export default function App() {
   const [lipColor, setLipColor] = useState('#cc4444');
   const [eyeColor, setEyeColor] = useState('#4a7c9e');
   const [customSkin, setCustomSkin] = useState({...DEFAULT_CUSTOM_SKIN});
+  const [customSkinPanelOpen, setCustomSkinPanelOpen] = useState(false);
   const [displacementType, setDisplacementType] = useState('perlin');
   const [clearcoatVal, setClearcoatVal] = useState(1.0);
   const [clearcoatRoughVal, setClearcoatRoughVal] = useState(0.1);
@@ -3999,6 +4047,12 @@ export default function App() {
 
 
 
+      <CustomSkinBuilderPanel
+        open={customSkinPanelOpen}
+        onClose={() => setCustomSkinPanelOpen(false)}
+        onApply={(params) => { setCustomSkin(params); if(meshRef.current && typeof buildCustomSkin==='function'){ buildCustomSkin(meshRef.current, params); setStatus('Custom skin applied'); } }}
+        onDownload={(params) => { setCustomSkin(params); if(typeof generateFullSkinTextures==='function'){ const t=generateFullSkinTextures({size:params.textureSize,poreScale:params.poreScale,wrinkleStrength:params.wrinkleStrength,age:params.age,region:params.region}); ['color','roughness','normal','ao'].forEach(k=>{const a=document.createElement('a');a.href=t[k].toDataURL('image/png');a.download='spx_custom_'+k+'.png';a.click();}); setStatus('Custom textures downloaded'); }}}
+      />
       <NodeCompositorPanel
         open={compositorOpen}
         onClose={() => setCompositorOpen(false)}
