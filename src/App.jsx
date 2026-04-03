@@ -239,6 +239,34 @@ const COLORS = {
   textDim: "#888",
 };
 
+function SpxTabGroup({ label, color, tabs }) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+  return (
+    <div ref={ref} style={{position:'relative',flexShrink:0}}>
+        style={{borderBottom:open?'2px solid '+color:'2px solid transparent'}}>
+        <span className='spx-native-workspace-tab-label' style={{color:open?color:undefined}}>{label}</span>
+        <span style={{fontSize:7,marginLeft:3,color:open?color:'#8b949e'}}>{open?'▲':'▼'}</span>
+      </button>
+      {open && (
+        <div style={{position:'absolute',top:'100%',left:0,zIndex:2000,background:'#0d1117',border:'1px solid #21262d',borderTop:'2px solid '+color,borderRadius:'0 0 6px 6px',minWidth:150,boxShadow:'0 8px 24px rgba(0,0,0,0.8)',padding:'4px 0'}}>
+          {tabs.map(t => (
+            <div key={t.label} onClick={() => { t.fn(); setOpen(false); }}
+              style={{padding:'6px 14px',cursor:'pointer',fontSize:10,color:'#8b949e',fontFamily:'JetBrains Mono,monospace',fontWeight:600,letterSpacing:0.3,whiteSpace:'nowrap'}}
+              onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.05)';e.currentTarget.style.color=color;}}
+              onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='#8b949e';}}
+            >{t.label}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   // --- AUTO-SAVE LOGIC ---
   useEffect(() => {
