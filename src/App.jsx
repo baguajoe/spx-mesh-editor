@@ -465,6 +465,7 @@ export default function App() {
     else if (toolId === "creature_gen") setCreatureGenOpen?.(true);
     else if (toolId === "prop_gen") setPropGenOpen?.(true);
     else if (toolId === "mocap") setMocapWorkspaceOpen?.(true);
+    else if (toolId === "3d_to_2d") setStyle3DTo2DOpen(true);
   };
 
 
@@ -483,6 +484,7 @@ export default function App() {
 
 
   const [autoRigOpen, setAutoRigOpen] = useState(false);
+  const [style3DTo2DOpen, setStyle3DTo2DOpen] = useState(false);
 
   useEffect(() => {
     const onAutoRigKey = (e) => {
@@ -3443,6 +3445,13 @@ export default function App() {
 
 
 
+      <SPX3DTo2DPanel
+        open={style3DTo2DOpen}
+        onClose={() => setStyle3DTo2DOpen(false)}
+        sceneRef={sceneRef}
+        rendererRef={rendererRef}
+        cameraRef={cameraRef}
+      />
       <AutoRigPanel
         open={autoRigOpen}
         onClose={() => setAutoRigOpen(false)}
