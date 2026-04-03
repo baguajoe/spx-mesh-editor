@@ -3416,8 +3416,8 @@ export default function App() {
         ]}/>
         <SpxTabGroup label="FX" color="#ff6644" tabs={[
           {label:"Cloth",      fn:()=>setClothSimOpen(v=>!v)},
-          {label:"Fluid",      fn:()=>openWorkspaceTool("fluid")},
-          {label:"Weather",    fn:()=>openWorkspaceTool("weather")},
+          {label:"Fluid",      fn:()=>setFluidPanelOpen(v=>!v)},
+          {label:"Weather",    fn:()=>setWeatherPanelOpen(v=>!v)},
           {label:"Destruction",fn:()=>openWorkspaceTool("destruction")},
           {label:"Physics",    fn:()=>openWorkspaceTool("physics_sim")},
         ]}/>
