@@ -3425,7 +3425,6 @@ export default function App() {
           {label:"Environment",fn:()=>openWorkspaceTool("env_gen")},
           {label:"Terrain",    fn:()=>openWorkspaceTool("terrain")},
           {label:"City Gen",   fn:()=>setCityGenOpen(v=>!v)},
-          {label:"Building",   fn:()=>setCityGenOpen(v=>!v)},
           {label:"Foliage",    fn:()=>openWorkspaceTool("foliage_gen")},
           {label:"Crowd",      fn:()=>setCrowdPanelOpen(v=>!v)},
         ]}/>
@@ -3433,11 +3432,7 @@ export default function App() {
           {label:"Face",       fn:()=>openWorkspaceTool("face_gen")},
           {label:"Vehicle",    fn:()=>openWorkspaceTool("vehicle_gen")},
           {label:"Creature",   fn:()=>openWorkspaceTool("creature_gen")},
-          {label:"Prop",       fn:()=>openWorkspaceTool("prop_gen")},
-          {label:"Assets",     fn:()=>openWorkspaceTool("asset_lib")},
-          {label:"Nodes",      fn:()=>openWorkspaceTool("node_mod")},
           {label:"Pro Mesh",   fn:()=>openWorkspaceTool("pro_mesh")},
-          {label:"VR Preview", fn:()=>openWorkspaceTool("vr_preview")},
         ]}/>
         <button type="button" className="spx-native-workspace-tab" onClick={()=>setShowPerformancePanel(v=>!v)} style={{marginLeft:"auto",flexShrink:0}}>
           <span className="spx-native-workspace-tab-label">Performance</span>
