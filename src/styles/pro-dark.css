@@ -168,7 +168,7 @@ input, select { font-family: inherit; }
 .spx-workspace.active { color: var(--ac-text); border-bottom-color: var(--ac); background: var(--d3); }
 
 /* ── Main 3-column ───────────────────────────────────────────────────────── */
-.spx-main { margin-top: 66px;
+.spx-main { margin-top: 30px;
   display: grid;
   grid-template-columns: var(--left-w) 36px 1fr var(--right-w);
   overflow: hidden; min-height: 0;
@@ -1248,7 +1248,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 1px s
 
 
 /* Tab row — always on top */
-.spx-native-workspace-tabs { z-index: 999 !important; position: fixed; top: calc(var(--mbar-h) + var(--tabs-h) + var(--tabs-h)); left: 0; right: 0; background: var(--d1); border-bottom: 1px solid var(--b2); display: flex; align-items: center; padding: 0 4px; height: 30px; }
+.spx-native-workspace-tabs { z-index: 999 !important; position: fixed; top: 64px; left: 0; right: 0; background: var(--d1); border-bottom: 1px solid var(--b2); display: flex; align-items: center; padding: 0 4px; height: 30px; }
 .workspace-tools-strip      { z-index: 999  !important; }
 .spx-menubar                { z-index: 1001 !important; }
 
