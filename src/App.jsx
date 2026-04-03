@@ -18,6 +18,9 @@ import { initFilmComposer, createProceduralHDRI, upgradeMaterialsToPhysical } fr
 import FilmPostPanel from "./components/panels/FilmPostPanel.jsx";
 import FilmAssetLibrary from "./components/panels/FilmAssetLibrary.jsx";
 import FilmMaterialPanel from "./components/panels/FilmMaterialPanel.jsx";
+import FilmSculptPanel from "./components/panels/FilmSculptPanel.jsx";
+import FilmSubdivPanel from "./components/panels/FilmSubdivPanel.jsx";
+import FilmRenderPipeline from "./components/panels/FilmRenderPipeline.jsx";
 import ProfessionalShell from "./pro-ui/ProfessionalShell";
 import FeatureIndexPanel from "./pro-ui/FeatureIndexPanel";
 import WORKSPACE_FEATURES from "./pro-ui/workspaceMap";
@@ -2886,6 +2889,9 @@ export default function App() {
   const [filmPostOpen, setFilmPostOpen] = useState(true);
   const [filmLibraryOpen, setFilmLibraryOpen] = useState(false);
   const [filmMaterialOpen, setFilmMaterialOpen] = useState(false);
+  const [filmSculptOpen, setFilmSculptOpen] = useState(false);
+  const [filmSubdivOpen, setFilmSubdivOpen] = useState(false);
+  const [filmRenderOpen, setFilmRenderOpen] = useState(false);
   const [toneExposure, setToneExposure] = useState(1.0);
   const [videoFps, setVideoFps] = useState(24);
   const [videoStartFrame, setVideoStartFrame] = useState(0);
