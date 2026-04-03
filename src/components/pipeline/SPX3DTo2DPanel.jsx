@@ -194,8 +194,20 @@ export default function SPX3DTo2DPanel({ open, onClose, sceneRef, rendererRef, c
         </div>
 
         {/* Preview canvas */}
-        <canvas ref={canvasRef} style={S.preview} width={320} height={180} />
 
+        {/* Import */}
+        <div style={{ marginBottom:8 }}>
+          <label style={{ ...S.btnO, display:"inline-block", cursor:"pointer", marginBottom:6 }}>
+            ↑ Load GLB
+            <input type="file" accept=".glb,.gltf" style={{ display:"none" }}
+              onChange={e => {
+                const file = e.target.files[0]; if (!file) return;
+                window.dispatchEvent(new CustomEvent("spx:importGLB", { detail: { url: URL.createObjectURL(file), name: file.name } }));
+                setStatus("✓ Loaded: " + file.name);
+              }} />
+          </label>
+        </div>
+        <canvas ref={canvasRef} style={S.preview} width={320} height={180} />
         {/* Actions */}
         <div style={{ display:"flex", flexWrap:"wrap", alignItems:"center" }}>
           <button style={S.btn} onClick={handleRender} disabled={rendering}>
