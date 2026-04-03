@@ -19,6 +19,7 @@ import FilmPostPanel from "./components/panels/FilmPostPanel.jsx";
 import FilmAssetLibrary from "./components/panels/FilmAssetLibrary.jsx";
 import FilmMaterialPanel from "./components/panels/FilmMaterialPanel.jsx";
 import FilmSculptPanel from "./components/panels/FilmSculptPanel.jsx";
+import RotoscopePanel from "./components/panels/RotoscopePanel.jsx";
 import FilmSubdivPanel from "./components/panels/FilmSubdivPanel.jsx";
 import FilmRenderPipeline from "./components/panels/FilmRenderPipeline.jsx";
 import ProfessionalShell from "./pro-ui/ProfessionalShell";
@@ -2890,6 +2891,7 @@ export default function App() {
   const [filmLibraryOpen, setFilmLibraryOpen] = useState(false);
   const [filmMaterialOpen, setFilmMaterialOpen] = useState(false);
   const [filmSculptOpen, setFilmSculptOpen] = useState(false);
+  const [rotoOpen, setRotoOpen] = useState(false);
   const [filmSubdivOpen, setFilmSubdivOpen] = useState(false);
   const [filmRenderOpen, setFilmRenderOpen] = useState(false);
   const [toneExposure, setToneExposure] = useState(1.0);
