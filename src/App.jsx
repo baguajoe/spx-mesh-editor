@@ -239,6 +239,36 @@ const COLORS = {
   textDim: "#888",
 };
 
+function SpxTabGroup({ label, color, tabs }) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+  return (
+    <div ref={ref} style={{position:'relative',flexShrink:0}}>
+      <button className="spx-native-workspace-tab" onClick={() => setOpen(v => !v)}
+        style={{borderBottom:open?`2px solid ${color}`:'2px solid transparent',color:open?color:undefined}}>
+        <span className="spx-native-workspace-tab-label" style={{color:open?color:undefined}}>{label}</span>
+        <span style={{fontSize:7,marginLeft:3,color:open?color:'#8b949e'}}>{open?'▲':'▼'}</span>
+      </button>
+      {open && (
+        <div style={{position:'absolute',top:'100%',left:0,zIndex:2000,background:'#0d1117',border:'1px solid #21262d',borderTop:`2px solid ${color}`,borderRadius:'0 0 6px 6px',minWidth:150,boxShadow:'0 8px 24px rgba(0,0,0,0.8)',padding:'4px 0'}}>
+          {tabs.map(t => (
+            <div key={t.label} onClick={() => { t.fn(); setOpen(false); }}
+              style={{padding:'6px 14px',cursor:'pointer',fontSize:10,color:'#8b949e',fontFamily:'JetBrains Mono,monospace',fontWeight:600,letterSpacing:0.3,whiteSpace:'nowrap'}}
+              onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.05)';e.currentTarget.style.color=color;}}
+              onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='#8b949e';}}
+            >{t.label}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   // --- AUTO-SAVE LOGIC ---
   useEffect(() => {
@@ -3296,190 +3326,60 @@ export default function App() {
       <TexturePaintPanel
         open={paintPanelOpen}
         onClose={() => setPaintPanelOpen(false)}
-        meshRef={meshRef}
-      />
+        meshRef      <div className="spx-native-workspace-tabs" style={{left:0}}>
+        <SpxTabGroup label="SURFACE" color="#00ffc8" tabs={[
+          {label:'UV',          fn:()=>openWorkspaceTool('uv')},
+          {label:'Materials',   fn:()=>openWorkspaceTool('materials_textures')},
+          {label:'Node Mat',    fn:()=>setNodeEditorOpen(v=>!v)},
+          {label:'Clothing',    fn:()=>openWorkspaceTool('clothing_pattern')},
+          {label:'Hair',        fn:()=>openWorkspaceTool('hair_suite')},
+          {label:'Displace',    fn:()=>setDisplacementOpen(v=>!v)},
+        ]}/>
+        <SpxTabGroup label="RIG & ANIM" color="#ff88ff" tabs={[
+          {label:'Rigging',     fn:()=>openWorkspaceTool('rigging_suite')},
+          {label:'MoCap',       fn:()=>openWorkspaceTool('mocap')},
+          {label:'Retarget',    fn:()=>setMocapRetargetOpen(v=>!v)},
+          {label:'Gamepad',     fn:()=>openWorkspaceTool('gamepad')},
+        ]}/>
+        <SpxTabGroup label="RENDER" color="#ffdd44" tabs={[
+          {label:'Cin Lighting',fn:()=>setCinLightOpen(v=>!v)},
+          {label:'Lighting',    fn:()=>setLightingCameraPanelOpen(v=>!v)},
+          {label:'Camera',      fn:()=>setFilmCameraOpen(v=>!v)},
+          {label:'Volume',      fn:()=>setFilmVolOpen(v=>!v)},
+          {label:'Path Trace',  fn:()=>setFilmPTOpen(v=>!v)},
+          {label:'Post FX',     fn:()=>setFilmPostOpen(v=>!v)},
+        ]}/>
+        <SpxTabGroup label="FX & SIM" color="#ff6644" tabs={[
+          {label:'Cloth',       fn:()=>setClothSimOpen(v=>!v)},
+          {label:'Fluid',       fn:()=>openWorkspaceTool('fluid')},
+          {label:'Weather',     fn:()=>openWorkspaceTool('weather')},
+          {label:'Destruction', fn:()=>openWorkspaceTool('destruction')},
+          {label:'Physics',     fn:()=>openWorkspaceTool('physics')},
+        ]}/>
+        <SpxTabGroup label="WORLD" color="#44aaff" tabs={[
+          {label:'Environment', fn:()=>openWorkspaceTool('environment')},
+          {label:'Terrain',     fn:()=>openWorkspaceTool('terrain')},
+          {label:'City Gen',    fn:()=>openWorkspaceTool('city_gen')},
+          {label:'Building',    fn:()=>openWorkspaceTool('building')},
+          {label:'Foliage',     fn:()=>openWorkspaceTool('foliage')},
+          {label:'Crowd',       fn:()=>openWorkspaceTool('crowd')},
+        ]}/>
+        <SpxTabGroup label="GENERATE" color="#FF6600" tabs={[
+          {label:'Face',        fn:()=>openWorkspaceTool('face')},
+          {label:'Vehicle',     fn:()=>openWorkspaceTool('vehicle')},
+          {label:'Creature',    fn:()=>openWorkspaceTool('creature')},
+          {label:'Prop',        fn:()=>openWorkspaceTool('prop_gen')},
+          {label:'Assets',      fn:()=>openWorkspaceTool('assets')},
+          {label:'Nodes',       fn:()=>openWorkspaceTool('nodes')},
+          {label:'Pro Mesh',    fn:()=>openWorkspaceTool('pro_mesh')},
+          {label:'VR Preview',  fn:()=>openWorkspaceTool('vr_preview')},
+        ]}/>
+        <button type="button" className="spx-native-workspace-tab" onClick={()=>setShowPerformancePanel(v=>!v)} style={{marginLeft:'auto',flexShrink:0,fontSize:9}}>
+          <span className="spx-native-workspace-tab-label">PERF</span>
+        </button>
+      </div>
 
-      <ClothingPanel
-        open={clothingPanelOpen}
-        onClose={() => setClothingPanelOpen(false)}
-        sceneRef={sceneRef}
-        setStatus={setStatus}
-      />
-      <FabricPanel
-        open={fabricPanelOpen}
-        clothStateRef={sceneRef}
-        setStatus={setStatus}
-        panels={[]}
-      />
-
-      <PatternEditorPanel
-        open={patternPanelOpen}
-        onClose={() => setPatternPanelOpen(false)}
-        sceneRef={sceneRef}
-        setStatus={setStatus}
-      />
-
-      <HairPanel
-        open={hairPanelOpen}
-        onClose={() => setHairPanelOpen(false)}
-        sceneRef={sceneRef}
-        setStatus={setStatus}
-      />
-
-      <HairAdvancedPanel
-        open={hairAdvancedOpen}
-        onClose={() => setHairAdvancedOpen(false)}
-        sceneRef={sceneRef}
-        setStatus={setStatus}
-      />
-
-      <HairFXPanel
-        open={hairFXOpen}
-        onClose={() => setHairFXOpen(false)}
-        sceneRef={sceneRef}
-        setStatus={setStatus}
-      />
-      {/* Model picker trigger button */}
-      <button
-        onClick={() => { setModelPickerContext("general"); setShowModelPicker(v => !v); }}
-        title="Switch character model"
-        style={{
-          position:"fixed", bottom:44, left:8, zIndex:100,
-          background: showModelPicker ? "#00ffc822" : "#0a0a14",
-          border:`1px solid ${showModelPicker ? "#00ffc8" : "#1a2a3a"}`,
-          borderRadius:6, color: showModelPicker ? "#00ffc8" : "#5a7088",
-          padding:"5px 10px", fontSize:10, cursor:"pointer",
-          fontFamily:"JetBrains Mono,monospace", display:"flex", gap:5, alignItems:"center",
-        }}>
-        🧍 {activeModelUrl ? activeModelUrl.split("/").pop().replace(".glb","") : "Model"}
-      </button>
-
-      <div className="spx-native-workspace-tabs" style={{left: showPerformancePanel ? 330 : 220}}>
-        <div className="spx-tab-separator" title="Character &amp; Surface"/>
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("uv")}>
-          <span className="spx-native-workspace-tab-label">UV</span>
-          <span className="spx-native-workspace-tab-hint">Shift+U</span>
-        </button>
-
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("materials_textures")}>
-          <span className="spx-native-workspace-tab-label">Materials & Textures</span>
-          <span className="spx-native-workspace-tab-hint">Shift+M</span>
-        </button>
-
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("clothing_pattern")}>
-          <span className="spx-native-workspace-tab-label">Clothing & Pattern</span>
-          <span className="spx-native-workspace-tab-hint">Shift+G</span>
-        </button>
-
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("hair_suite")}>
-          <span className="spx-native-workspace-tab-label">Hair</span>
-          <span className="spx-native-workspace-tab-hint">Shift+H</span>
-        </button>
-
-        <div className="spx-tab-separator" title="Rigging &amp; Animation"/>
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("rigging_suite")}>
-          <span className="spx-native-workspace-tab-label">Rigging</span>
-          <span className="spx-native-workspace-tab-hint">Shift+R</span></button>
-        <button type="button" className="spx-native-workspace-tab" onClick={() => setNodeEditorOpen(v=>!v)}>
-          <span className="spx-native-workspace-tab-label">🎨 Node Mat</span>
-          <span className="spx-native-workspace-tab-hint">Shift+N</span>
-        </button>
-        <button type="button" className="spx-native-workspace-tab" onClick={() => setClothSimOpen(v=>!v)}>
-          <span className="spx-native-workspace-tab-label">🧵 Cloth</span>
-          <span className="spx-native-workspace-tab-hint">Shift+C</span>
-        </button>
-        <button type="button" className="spx-native-workspace-tab" onClick={() => setDisplacementOpen(v=>!v)}>
-          <span className="spx-native-workspace-tab-label">⛰ Displace</span>
-          <span className="spx-native-workspace-tab-hint">Shift+D</span>
-        </button>
-        <button type="button" className="spx-native-workspace-tab" onClick={() => setMocapRetargetOpen(v=>!v)}>
-          <span className="spx-native-workspace-tab-label">🦴 Retarget</span>
-          <span className="spx-native-workspace-tab-hint">Shift+B</span>
-        </button>
-        <button type="button" className="spx-native-workspace-tab" onClick={() => setCinLightOpen(v=>!v)}>
-          <span className="spx-native-workspace-tab-label">💡 Cin Light</span>
-          <span className="spx-native-workspace-tab-hint">Shift+L</span>
-        </button>
-        <button type="button" className="spx-native-workspace-tab" onClick={() => setFilmCameraOpen(v=>!v)}>
-          <span className="spx-native-workspace-tab-label">🎬 Camera</span>
-          <span className="spx-native-workspace-tab-hint">Shift+C</span>
-        </button>
-        <button type="button" className="spx-native-workspace-tab" onClick={() => setFilmVolOpen(v=>!v)}>
-          <span className="spx-native-workspace-tab-label">🌫 Volume</span>
-          <span className="spx-native-workspace-tab-hint">Shift+V</span>
-        </button>
-        <button type="button" className="spx-native-workspace-tab" onClick={() => setFilmPTOpen(v=>!v)}>
-          <span className="spx-native-workspace-tab-label">✨ Path Trace</span>
-          <span className="spx-native-workspace-tab-hint">Shift+T</span>
-        </button>
-        <button type="button" className="spx-native-workspace-tab" onClick={() => setLightingCameraPanelOpen(v=>!v)}>
-          <span className="spx-native-workspace-tab-label">💡 Lighting</span>
-          <span className="spx-native-workspace-tab-hint">Shift+L</span>
-        </button>
-
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("mocap")}>
-          <span className="spx-native-workspace-tab-label">MoCap</span>
-          <span className="spx-native-workspace-tab-hint">Live + Video</span>
-        </button>
-
-        <button type="button" className="spx-native-workspace-tab" onClick={() => setShowPerformancePanel(v => !v)}>
-          <span className="spx-native-workspace-tab-label">SPX Performance</span>
-          <span className="spx-native-workspace-tab-hint">P</span>
-        </button>
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("gamepad")}>
-          <span className="spx-native-workspace-tab-label">🎮 Gamepad</span>
-          <span className="spx-native-workspace-tab-hint">Animate</span>
-        </button>
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("pro_mesh")}>
-          <span className="spx-native-workspace-tab-label">✂ Pro Mesh</span>
-          <span className="spx-native-workspace-tab-hint">Shift+P</span>
-        </button>
-        {/* ── VFX Tabs ── */}
-        <div className="spx-tab-separator" title="VFX"/>
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("fluid")}>
-          <span className="spx-native-workspace-tab-label">💧 Fluid</span>
-          <span className="spx-native-workspace-tab-hint">Shift+F</span>
-        </button>
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("weather")}>
-          <span className="spx-native-workspace-tab-label">🌧 Weather</span>
-          <span className="spx-native-workspace-tab-hint">Shift+W</span>
-        </button>
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("destruction")}>
-          <span className="spx-native-workspace-tab-label">💥 Destruction</span>
-          <span className="spx-native-workspace-tab-hint">Shift+D</span>
-        </button>
-        {/* ── World / Generator Tabs ── */}
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("env_gen")}>
-          <span className="spx-native-workspace-tab-label">🌲 Environment</span>
-          <span className="spx-native-workspace-tab-hint">World</span>
-        </button>
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("city_gen")}>
-          <span className="spx-native-workspace-tab-label">🏙️ City Gen</span>
-          <span className="spx-native-workspace-tab-hint">World</span>
-        </button>
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("building")}>
-          <span className="spx-native-workspace-tab-label">🏗️ Building</span>
-          <span className="spx-native-workspace-tab-hint">World</span>
-        </button>
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("physics_sim")}>
-          <span className="spx-native-workspace-tab-label">⚙️ Physics</span>
-          <span className="spx-native-workspace-tab-hint">World</span>
-        </button>
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("asset_lib")}>
-          <span className="spx-native-workspace-tab-label">📦 Assets</span>
-          <span className="spx-native-workspace-tab-hint">World</span>
-        </button>
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("node_mod")}>
-          <span className="spx-native-workspace-tab-label">🔗 Nodes</span>
-          <span className="spx-native-workspace-tab-hint">World</span>
-        </button>
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("vr_preview")}>
-          <span className="spx-native-workspace-tab-label">🥽 VR Preview</span>
-          <span className="spx-native-workspace-tab-hint">World</span>
-        </button>
-        <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("crowd_gen")}>
-          <span className="spx-native-workspace-tab-label">👥 Crowd</span>
-          <span className="spx-native-workspace-tab-hint">World</span>
+      ssName="spx-native-workspace-tab-hint">World</span>
         </button>
         <button type="button" className="spx-native-workspace-tab" onClick={() => openWorkspaceTool("terrain")}>
           <span className="spx-native-workspace-tab-label">🏔️ Terrain</span>
