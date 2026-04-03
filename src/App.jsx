@@ -3044,6 +3044,84 @@ export default function App() {
     // ── Materials ─────────────────────────────────────────────────────────────
     if (fn === "mat_pbr")             { if(typeof window.createPBRMaterial==="function"&&meshRef.current){meshRef.current.material=window.createPBRMaterial();setStatus("PBR applied");} return; }
     if (fn === "mat_sss")             { if(typeof window.createSSSMaterial==="function"&&meshRef.current){meshRef.current.material=window.createSSSMaterial(sssPreset);setStatus("SSS applied");} return; }
+    if (fn === "skin_film_quality") {
+      if (meshRef.current) {
+        setStatus("Applying film-quality Jimenez SSS skin...");
+        setTimeout(async () => {
+          // 1. Generate 4K textures
+          const textures = generateFilmQualitySkinTextures({size:2048,tone:skinTone,region:skinRegion,age:skinAge,oiliness:skinOiliness});
+          // 2. Generate multi-res normal map
+          const multiNorm = generateMultiResNormals({size:2048,tone:skinTone,age:skinAge});
+          // 3. Apply Jimenez SSS shader
+          applyJimenezSkin(meshRef.current, {tone:skinTone,roughness:0.7,clearcoat:skinOiliness*2,sssStrength:0.55});
+          // 4. Set texture uniforms on shader material
+          if (meshRef.current.material?.uniforms && window.THREE) {
+            meshRef.current.material.uniforms.tColor.value    = new window.THREE.CanvasTexture(textures.color);
+            meshRef.current.material.uniforms.tRoughness.value= new window.THREE.CanvasTexture(textures.roughness);
+            meshRef.current.material.uniforms.tNormal.value   = new window.THREE.CanvasTexture(multiNorm);
+          }
+          // 5. Init LTC area lights
+          await initLTCAreaLights(rendererRef.current);
+          // 6. Wire SSAO
+          if (rendererRef.current?._composer) {
+            await wireSSAOToComposer(rendererRef.current, sceneRef.current, cameraRef.current, rendererRef.current._composer);
+          }
+          // 7. Setup 3-point skin lighting
+          await setupSkinLighting(sceneRef.current, rendererRef.current);
+          setStatus(`✓ Film-quality skin applied (Jimenez SSS + ${skinTone} tone + SSAO + LTC lights + 2K textures)`);
+        }, 50);
+      }
+      return;
+    }
+    if (fn === "skin_multires_normal") {
+      if (meshRef.current && window.THREE) {
+        setStatus("Generating multi-resolution normal map (2K)...");
+        setTimeout(() => {
+          const normCanvas = generateMultiResNormals({size:2048,tone:skinTone,age:skinAge});
+          if (meshRef.current.material) {
+            const tex = new window.THREE.CanvasTexture(normCanvas);
+            if (meshRef.current.material.uniforms?.tNormal) {
+              meshRef.current.material.uniforms.tNormal.value = tex;
+            } else {
+              meshRef.current.material.normalMap = tex;
+              meshRef.current.material.needsUpdate = true;
+            }
+          }
+          const a=document.createElement('a'); a.href=normCanvas.toDataURL('image/png');
+          a.download=`spx_multires_normal_${skinTone}_age${skinAge}.png`; a.click();
+          setStatus("Multi-res normal map applied + downloaded (macro+meso+micro)");
+        }, 50);
+      }
+      return;
+    }
+    if (fn === "skin_4k_textures") {
+      if (meshRef.current) {
+        setStatus("Generating 4K skin textures (slow ~3s)...");
+        setTimeout(() => {
+          const textures = generateFilmQualitySkinTextures({size:4096,tone:skinTone,region:skinRegion,age:skinAge});
+          applyFullSkinTextures(meshRef.current, textures);
+          ['color','roughness','normal','ao'].forEach(k => {
+            const a=document.createElement('a'); a.href=textures[k].toDataURL('image/png');
+            a.download=`spx_4k_skin_${k}_${skinTone}.png`; a.click();
+          });
+          setStatus("✓ 4K skin textures applied + downloaded");
+        }, 100);
+      }
+      return;
+    }
+    if (fn === "wire_ssao") {
+      if (rendererRef.current?._composer) {
+        wireSSAOToComposer(rendererRef.current, sceneRef.current, cameraRef.current, rendererRef.current._composer)
+          .then(pass => setStatus(pass ? "✓ SSAO wired to render pipeline" : "SSAO wire failed"));
+      } else {
+        setStatus("No EffectComposer found — renderer may not be initialized");
+      }
+      return;
+    }
+    if (fn === "init_ltc_lights") {
+      initLTCAreaLights(rendererRef.current).then(ok => setStatus(ok ? "✓ LTC area lights initialized" : "LTC init failed"));
+      return;
+    }
     if (fn === "skin_apply")        { if(meshRef.current){ applyRealisticSkin(meshRef.current,{tone:skinTone,region:skinRegion,oiliness:skinOiliness}); setStatus(`Skin: ${skinTone} / ${skinRegion}`); } return; }
     if (fn === "skin_gen_textures") {
       if(meshRef.current && window.THREE) {
