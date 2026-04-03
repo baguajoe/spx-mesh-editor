@@ -3427,7 +3427,7 @@ export default function App() {
           {label:"City Gen",   fn:()=>setCityGenOpen(v=>!v)},
           {label:"Building",   fn:()=>setCityGenOpen(v=>!v)},
           {label:"Foliage",    fn:()=>openWorkspaceTool("foliage_gen")},
-          {label:"Crowd",      fn:()=>openWorkspaceTool("crowd_gen")},
+          {label:"Crowd",      fn:()=>setCrowdPanelOpen(v=>!v)},
         ]}/>
         <SpxTabGroup label="GEN" color="#FF6600" tabs={[
           {label:"Face",       fn:()=>openWorkspaceTool("face_gen")},
