@@ -3276,7 +3276,7 @@ export default function App() {
           </div>
           {/* Viewport label */}
           <div style={{
-            position:"absolute", top:8, left:8,
+            position:"absolute", top:8, left:"50%", transform:"translateX(-50%)",
             fontSize:10, color:"#888", fontFamily:"monospace",
             pointerEvents:"none", zIndex:10
           }}>
