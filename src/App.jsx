@@ -3591,7 +3591,7 @@ export default function App() {
   const [dispScale, setDispScale] = useState(0.1);
   const [renderPreset, setRenderPreset] = useState("medium");
   const [toneMappingMode, setToneMappingMode] = useState("aces");
-  const [filmPostOpen, setFilmPostOpen] = useState(true);
+  const [filmPostOpen, setFilmPostOpen] = useState(false);
   const [filmLibraryOpen, setFilmLibraryOpen] = useState(false);
   const [filmMaterialOpen, setFilmMaterialOpen] = useState(false);
   const [filmSculptOpen, setFilmSculptOpen] = useState(false);
