@@ -53,7 +53,7 @@ import { createAction, createTrack, createStrip, evaluateNLA, pushDownAction, ba
 import { createStroke, createLayer } from "./mesh/GreasePencil.js";
 import { NODE_TYPES, createNode, createGraph, addNode, connectNodes, evaluateGraph } from "./mesh/GeometryNodes.js";
 import { createSpline } from "./mesh/CurveSystem.js";
-import { applyPreset, applyEdgeWear, applyCavityDirt, MATERIAL_PRESETS } from "./mesh/SmartMaterials.js";
+import { applyPreset, applyEdgeWear, applyCavityDirt, MATERIAL_PRESETS, DEFAULT_CUSTOM_SKIN } from "./mesh/SmartMaterials.js";
 import { createPaintTexture, createPaintCanvas, applyPaintTexture, paintAtUV, fillCanvas, createLayerStack, addLayer, flattenLayers } from "./mesh/TexturePainter.js";
 import { bakeAO, bakeNormalMap, bakeCurvature, bakeAllMaps, downloadBakedMap } from "./mesh/TextureBaker.js";
 import { createLight, createThreePointLighting, applyTemperature, createVolumericFog, removeFog, applyHDRI, addLightHelper, HDRI_PRESETS } from "./mesh/LightSystem.js";
