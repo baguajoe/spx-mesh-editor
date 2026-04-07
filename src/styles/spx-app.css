@@ -1,0 +1,343 @@
+/* ═══════════════════════════════════════════════════════
+   SPX Mesh Editor — spx-app.css
+   All inline styles extracted from App.jsx return()
+   #06060f bg · #00ffc8 teal · #FF6600 orange
+   Font: JetBrains Mono
+═══════════════════════════════════════════════════════ */
+
+/* ── Viewport canvas ──────────────────────────────── */
+.mesh-editor-canvas {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255,255,255,0.03), transparent 28%),
+    linear-gradient(180deg, #11151b 0%, #0c1016 100%);
+  border-right: 1px solid #2a313b;
+}
+.mesh-editor-canvas canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ── Viewport stats ───────────────────────────────── */
+.vp-stats {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  background: rgba(0,0,0,0.5);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-family: monospace;
+  pointer-events: none;
+  z-index: 100;
+}
+.vp-stats--ok  { color: #00ffc8; }
+.vp-stats--low { color: #ff4444; }
+
+/* ── Orientation gizmo ────────────────────────────── */
+.vp-orientation-gizmo {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 64px;
+  height: 64px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* ── Viewport label ───────────────────────────────── */
+.vp-label {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: #888;
+  font-family: monospace;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* ── Box select rubber-band ───────────────────────── */
+.vp-box-select {
+  position: absolute;
+  border: 1px solid #ff6600;
+  background: rgba(255,102,0,0.08);
+  pointer-events: none;
+}
+
+/* ── Right panel ──────────────────────────────────── */
+.right-panel-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.right-sub-panel {
+  flex: 1;
+  overflow: auto;
+  border-top: 1px solid #202020;
+}
+
+/* ── Performance overlay ──────────────────────────── */
+.perf-panel-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 320px;
+  height: 100%;
+  z-index: 30;
+  background: #0d1117;
+  border-right: 1px solid #21262d;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Model picker button ──────────────────────────── */
+.model-picker-btn {
+  position: fixed;
+  bottom: 44px;
+  left: 8px;
+  z-index: 100;
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 10px;
+  cursor: pointer;
+  font-family: "JetBrains Mono", monospace;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.model-picker-btn--closed {
+  background: #0a0a14;
+  border: 1px solid #1a2a3a;
+  color: #5a7088;
+}
+.model-picker-btn--open {
+  background: rgba(0,255,200,0.13);
+  border: 1px solid #00ffc8;
+  color: #00ffc8;
+}
+
+/* ── Model picker popup ───────────────────────────── */
+.model-picker-popup {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  background: #0a0a14;
+  border: 1px solid #1a2a3a;
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.8);
+  font-family: "JetBrains Mono", monospace;
+}
+.model-picker-popup__label {
+  font-size: 10px;
+  color: #5a7088;
+  margin-right: 4px;
+}
+.model-picker-btn-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.model-picker-btn-item--active {
+  border: 1px solid #00ffc8;
+  background: rgba(0,255,200,0.13);
+  color: #00ffc8;
+}
+.model-picker-btn-item--inactive {
+  border: 1px solid #1a2a3a;
+  background: #070f1a;
+  color: #ccc;
+}
+.model-picker-btn-item--mine {
+  border: 1px solid #FF6600;
+  background: rgba(255,102,0,0.07);
+  color: #FF6600;
+}
+.model-picker-btn-item__emoji { font-size: 22px; }
+.model-picker-btn-item__name  { font-size: 10px; font-weight: 700; }
+.model-picker-btn-item__desc  { font-size: 8px; color: #5a7088; }
+.model-picker-upload-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid #1a2a3a;
+  background: #070f1a;
+  color: #ccc;
+  font-family: inherit;
+}
+.model-picker-close-btn {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: #5a7088;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 2px 6px;
+}
+.sr-only { display: none; }
+
+/* ── Workspace tabs bar ───────────────────────────── */
+.spx-native-workspace-tabs {
+  left: 0;
+  justify-content: center;
+  display: flex;
+  align-items: center;
+}
+.workspace-tabs-perf-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* ── SpxTabGroup ──────────────────────────────────── */
+.spx-tab-group-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.spx-tab-group-arrow {
+  font-size: 7px;
+  margin-left: 3px;
+}
+.spx-tab-group-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 2000;
+  background: #0d1117;
+  border: 1px solid #21262d;
+  border-radius: 0 0 6px 6px;
+  min-width: 150px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.8);
+  padding: 4px 0;
+}
+.spx-tab-group-item {
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 10px;
+  color: #8b949e;
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.spx-tab-group-item:hover { background: rgba(255,255,255,0.05); }
+
+/* ── Float panels ─────────────────────────────────── */
+.float-panel-right-md {
+  position: fixed; top: 0; right: 0;
+  width: 340px; height: 100vh;
+  z-index: 60; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.float-panel-right-lg {
+  position: fixed; top: 0; right: 0;
+  width: 360px; height: 100vh;
+  z-index: 60; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.float-panel-right-xl {
+  position: fixed; top: 0; right: 0;
+  width: 380px; height: 100vh;
+  z-index: 60; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.float-panel-gamepad {
+  position: fixed; top: 0; right: 0;
+  width: 360px; height: 100vh;
+  z-index: 65; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.float-panel-film-camera { position: fixed; left: 16px;  top: 60px; z-index: 1200; }
+.float-panel-film-vol    { position: fixed; left: 280px; top: 60px; z-index: 1200; }
+.float-panel-film-pt     { position: fixed; left: 540px; top: 60px; z-index: 1200; }
+.float-panel-cin-light   { position: fixed; right: 16px; top: 60px; z-index: 1200; }
+
+.float-panel-collab {
+  position: fixed; top: 60px; right: 0;
+  width: 360px; height: calc(100vh - 60px);
+  z-index: 50; background: #0d1117;
+  border-left: 1px solid #21262d;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.float-panel-grease {
+  position: fixed; top: 148px; right: 0;
+  width: 320px; height: calc(100vh - 148px);
+  z-index: 55; background: #0d1117;
+  border-left: 1px solid #21262d;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.float-panel-gen {
+  position: fixed; top: 148px; right: 0;
+  width: 320px; height: calc(100vh - 148px);
+  z-index: 55; background: #0d1117;
+  border-left: 1px solid #21262d;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.float-panel-gen__header {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid #21262d;
+  background: #161b22;
+}
+.float-panel-gen__title {
+  color: #00ffc8; font-weight: 700;
+  font-size: 12px; font-family: "JetBrains Mono", monospace;
+}
+.float-panel-gen__close {
+  background: none; border: none;
+  color: #8b949e; cursor: pointer;
+  font-size: 16px; line-height: 1;
+}
+.float-panel-gen__body { flex: 1; overflow-y: auto; padding: 8px; }
+
+/* ── Full-screen overlays ─────────────────────────── */
+.fullscreen-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 80; background: #06060f;
+  display: flex; flex-direction: column;
+}
+.fullscreen-overlay__bar {
+  display: flex; align-items: center;
+  padding: 6px 12px;
+  background: #0a0a14;
+  border-bottom: 1px solid #1a2a3a;
+  gap: 8px;
+}
+.fullscreen-overlay__title {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px; font-weight: 700;
+}
+.fullscreen-overlay__title--teal   { color: #00ffc8; }
+.fullscreen-overlay__title--orange { color: #FF6600; }
+.fullscreen-overlay__title--purple { color: #aa44ff; }
+.fullscreen-overlay__title--green  { color: #44bb77; }
+.fullscreen-overlay__close {
+  margin-left: auto; background: none;
+  border: 1px solid #1a2a3a; border-radius: 3px;
+  color: #5a7088; cursor: pointer;
+  padding: 3px 10px;
+  font-family: "JetBrains Mono", monospace; font-size: 10px;
+}
+.fullscreen-overlay__body { flex: 1; overflow: hidden; }
+.promesh-bar-sub { font-size: 9px; color: #5a7088; }

@@ -190,7 +190,6 @@ import "./styles/render-workspace.css";
 import { createDefaultRigGuides, mirrorGuidePoint, guidesToRigSettings } from "./mesh/rig/AutoRigGuides.js";
 import MocapWorkspace from "./workspaces/mocap/MocapWorkspace.jsx";
 import "./styles/mocap-workspace.css";
-import "./styles/spx-app.css";
 import {
   applyCheckerToMesh,
   unwrapBoxProjection,
@@ -258,21 +257,21 @@ function SpxTabGroup({ label, color, tabs }) {
     return () => document.removeEventListener('mousedown', h);
   }, []);
   return (
-    <div ref={ref} className="spx-tab-group-wrap">
+    <div ref={ref} style={{position:'relative',flexShrink:0}}>
       <button className='spx-native-workspace-tab'
         onClick={(e) => { e.stopPropagation(); setOpen(o => o ? false : true); }}
-        style={{borderBottom: open ? `2px solid ${color}` : '2px solid transparent'}}>
-        <span className="spx-native-workspace-tab-label" style={{color: open ? color : undefined}}>{label}</span>
-        <span className="spx-tab-group-arrow" style={{color: open ? color : "#8b949e"}}>{open ? "▲" : "▼"}</span>
+        style={{borderBottom:open?'2px solid '+color:'2px solid transparent'}}>
+        <span className='spx-native-workspace-tab-label' style={{color:open?color:undefined}}>{label}</span>
+        <span style={{fontSize:7,marginLeft:3,color:open?color:'#8b949e'}}>{open?'▲':'▼'}</span>
       </button>
       {open === true && (
-        <div className="spx-tab-group-menu" style={{borderTop: `2px solid ${color}`}}>
+        <div style={{position:'absolute',top:'100%',left:0,zIndex:2000,background:'#0d1117',border:'1px solid #21262d',borderTop:'2px solid '+color,borderRadius:'0 0 6px 6px',minWidth:150,boxShadow:'0 8px 24px rgba(0,0,0,0.8)',padding:'4px 0'}}>
           {tabs.map(t => (
             <div key={t.label}
               onClick={() => { t.fn(); setOpen(false); }}
-              className="spx-tab-group-item"
-              onMouseEnter={e => { e.currentTarget.style.color = color; }}
-              onMouseLeave={e => { e.currentTarget.style.color = '#8b949e'; }}
+              style={{padding:'6px 14px',cursor:'pointer',fontSize:10,color:'#8b949e',fontFamily:'JetBrains Mono,monospace',fontWeight:600,whiteSpace:'nowrap'}}
+              onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.05)';e.currentTarget.style.color=color;}}
+              onMouseLeave={e=>{e.currentTarget.style.background='transparent';e.currentTarget.style.color='#8b949e';}}
             >{t.label}</div>
           ))}
         </div>
@@ -3928,12 +3927,20 @@ export default function App() {
             </div>
 
 <canvas ref={canvasRef} />
-          <div className={`vp-stats ${fps < 30 ? 'vp-stats--low' : 'vp-stats--ok'}`}>
+          <div style={{
+            position: 'absolute', bottom: 10, left: 10, 
+            background: 'rgba(0,0,0,0.5)', padding: '4px 8px', 
+            borderRadius: '4px', color: fps < 30 ? '#ff4444' : '#00ffc8',
+            fontSize: '10px', fontFamily: 'monospace', pointerEvents: 'none', zIndex: 100
+          }}>
             FPS: {fps} | Δ: {polyCount.toLocaleString()}
           </div>
 
           {/* XYZ orientation gizmo — top right corner */}
-          <div className="vp-orientation-gizmo">
+          <div style={{
+            position:"absolute", top:8, right:8,
+            width:64, height:64, pointerEvents:"none", zIndex:10
+          }}>
             <svg viewBox="0 0 64 64" width="64" height="64">
               <line x1="32" y1="32" x2="54" y2="44" stroke="#e44" strokeWidth="2"/>
               <line x1="32" y1="32" x2="32" y2="8"  stroke="#4e4" strokeWidth="2"/>
@@ -3947,16 +3954,27 @@ export default function App() {
             </svg>
           </div>
           {/* Viewport label */}
-          <div className="vp-label">User Perspective</div>
+          <div style={{
+            position:"absolute", top:8, left:"50%", transform:"translateX(-50%)",
+            fontSize:10, color:"#888", fontFamily:"monospace",
+            pointerEvents:"none", zIndex:10
+          }}>
+            User Perspective
+          </div>
           {boxSelect && (
-            <div className="vp-box-select"
-              style={{left: boxSelect.x, top: boxSelect.y, width: boxSelect.w, height: boxSelect.h}}
-            />
+            <div style={{
+              position: "absolute",
+              left: boxSelect.x, top: boxSelect.y,
+              width: boxSelect.w, height: boxSelect.h,
+              border: "1px solid #ff6600",
+              background: "rgba(255,102,0,0.08)",
+              pointerEvents: "none"
+            }} />
           )}
         </div>
       }
       rightPanel={
-        <div className="right-panel-wrap">
+        <div style={{ display:"flex", flexDirection:"column", height:"100%", overflow:"hidden" }}>
           <SceneOutliner
             sceneObjects={sceneObjects}
             activeObjId={activeObjId}
@@ -3966,7 +3984,7 @@ export default function App() {
             onToggleVisible={toggleSceneObjectVisible}
             onAddPrimitive={addPrimitive}
           />
-          <div className="right-sub-panel">
+          <div style={{ flex:1, overflow:"auto", borderTop:"1px solid #202020" }}>
             {showNPanel ? (
               <FeatureIndexPanel
                 activeWorkspace={activeWorkspace}
@@ -3979,7 +3997,7 @@ export default function App() {
               />
             )}
           </div>
-      {showPerformancePanel && (<div className="perf-panel-overlay"><SPXPerformancePanel sceneObjects={sceneObjects} activeObjId={activeObjId} /></div>)}
+      {showPerformancePanel && (<div style={{position:"absolute",top:0,left:0,width:320,height:"100%",zIndex:30,background:"#0d1117",borderRight:"1px solid #21262d",display:"flex",flexDirection:"column",overflow:"hidden"}}><SPXPerformancePanel sceneObjects={sceneObjects} activeObjId={activeObjId} /></div>)}
       <UVEditorPanel
         open={uvPanelOpen}
         onClose={() => setUvPanelOpen(false)}
@@ -4041,11 +4059,18 @@ export default function App() {
       <button
         onClick={() => { setModelPickerContext("general"); setShowModelPicker(v => !v); }}
         title="Switch character model"
-        className={`model-picker-btn ${showModelPicker ? "model-picker-btn--open" : "model-picker-btn--closed"}`}>
+        style={{
+          position:"fixed", bottom:44, left:8, zIndex:100,
+          background: showModelPicker ? "#00ffc822" : "#0a0a14",
+          border:`1px solid ${showModelPicker ? "#00ffc8" : "#1a2a3a"}`,
+          borderRadius:6, color: showModelPicker ? "#00ffc8" : "#5a7088",
+          padding:"5px 10px", fontSize:10, cursor:"pointer",
+          fontFamily:"JetBrains Mono,monospace", display:"flex", gap:5, alignItems:"center",
+        }}>
         🧍 {activeModelUrl ? activeModelUrl.split("/").pop().replace(".glb","") : "Model"}
       </button>
 
-      <div className="spx-native-workspace-tabs">
+      <div className="spx-native-workspace-tabs" style={{left:0,justifyContent:"center",display:"flex",alignItems:"center"}}>
         <SpxTabGroup label="SURFACE" color="#00ffc8" tabs={[
           {label:"UV",         fn:()=>openWorkspaceTool("uv")},
           {label:"Materials",  fn:()=>openWorkspaceTool("materials_textures")},
@@ -4089,7 +4114,7 @@ export default function App() {
           {label:"Pro Mesh",   fn:()=>openWorkspaceTool("pro_mesh")},
           {label:"3D→2D Style", fn:()=>openWorkspaceTool("3d_to_2d")},
         ]}/>
-        <button type="button" className="spx-native-workspace-tab workspace-tabs-perf-btn" onClick={()=>setShowPerformancePanel(v=>!v)}>
+        <button type="button" className="spx-native-workspace-tab" onClick={()=>setShowPerformancePanel(v=>!v)} style={{marginLeft:"auto",flexShrink:0}}>
           <span className="spx-native-workspace-tab-label">Performance</span>
         </button>
       </div>
@@ -4131,26 +4156,44 @@ export default function App() {
 
       {/* ── Model Picker ── */}
       {showModelPicker && (
-        <div className="model-picker-popup">
-          <span className="model-picker-popup__label">MODEL</span>
+        <div style={{
+          position:"fixed", bottom:80, left:"50%", transform:"translateX(-50%)",
+          zIndex:200, background:"#0a0a14", border:"1px solid #1a2a3a",
+          borderRadius:8, padding:"12px 16px", display:"flex", gap:10,
+          alignItems:"center", boxShadow:"0 8px 32px rgba(0,0,0,0.8)",
+          fontFamily:"JetBrains Mono,monospace",
+        }}>
+          <span style={{fontSize:10,color:"#5a7088",marginRight:4}}>MODEL</span>
           {[
             { url:"/models/michelle.glb", label:"Michelle", thumb:"👩", desc:"Female character" },
             { url:"/models/xbot.glb",     label:"X Bot",    thumb:"🤖", desc:"Male Mixamo rig" },
             { url:"/models/ybot.glb",     label:"Y Bot",    thumb:"🦾", desc:"Female Mixamo rig" },
           ].map(m => (
             <button key={m.url} onClick={() => loadModelToScene(m.url, m.label)}
-              className={`model-picker-btn-item ${activeModelUrl === m.url ? "model-picker-btn-item--active" : "model-picker-btn-item--inactive"}`}>
-              <span className="model-picker-btn-item__emoji">{m.thumb}</span>
-              <span className="model-picker-btn-item__name">{m.label}</span>
-              <span className="model-picker-btn-item__desc">{m.desc}</span>
+              style={{
+                display:"flex", flexDirection:"column", alignItems:"center", gap:3,
+                padding:"8px 12px", borderRadius:6, cursor:"pointer",
+                border:`1px solid ${activeModelUrl===m.url?"#00ffc8":"#1a2a3a"}`,
+                background:activeModelUrl===m.url?"#00ffc822":"#070f1a",
+                color:activeModelUrl===m.url?"#00ffc8":"#ccc",
+                fontFamily:"inherit",
+              }}>
+              <span style={{fontSize:22}}>{m.thumb}</span>
+              <span style={{fontSize:10,fontWeight:700}}>{m.label}</span>
+              <span style={{fontSize:8,color:"#5a7088"}}>{m.desc}</span>
             </button>
           ))}
           {/* Upload custom GLB */}
-          <label className="model-picker-upload-label">
-            <span className="model-picker-btn-item__emoji">📂</span>
-            <span className="model-picker-btn-item__name">Upload</span>
-            <span className="model-picker-btn-item__desc">Custom GLB</span>
-            <input type="file" accept=".glb,.gltf" className="sr-only"
+          <label style={{
+            display:"flex", flexDirection:"column", alignItems:"center", gap:3,
+            padding:"8px 12px", borderRadius:6, cursor:"pointer",
+            border:"1px solid #1a2a3a", background:"#070f1a", color:"#ccc",
+            fontFamily:"inherit",
+          }}>
+            <span style={{fontSize:22}}>📂</span>
+            <span style={{fontSize:10,fontWeight:700}}>Upload</span>
+            <span style={{fontSize:8,color:"#5a7088"}}>Custom GLB</span>
+            <input type="file" accept=".glb,.gltf" style={{display:"none"}}
               onChange={e => {
                 const file = e.target.files?.[0];
                 if (!file) return;
@@ -4163,23 +4206,28 @@ export default function App() {
             <button onClick={() => {
               const first = sceneObjects.find(o => o.mesh);
               if (first) { setActiveObjId(first.id); meshRef.current=first.mesh; setActiveModelUrl(null); setShowModelPicker(false); setStatus("Using scene mesh: "+first.name); }
-            }} className="model-picker-btn-item model-picker-btn-item--mine">
-              <span className="model-picker-btn-item__emoji">🎯</span>
-              <span className="model-picker-btn-item__name">Use Mine</span>
-              <span className="model-picker-btn-item__desc">Scene mesh</span>
+            }} style={{
+              display:"flex", flexDirection:"column", alignItems:"center", gap:3,
+              padding:"8px 12px", borderRadius:6, cursor:"pointer",
+              border:"1px solid #FF6600", background:"#FF660011", color:"#FF6600", fontFamily:"inherit",
+            }}>
+              <span style={{fontSize:22}}>🎯</span>
+              <span style={{fontSize:10,fontWeight:700}}>Use Mine</span>
+              <span style={{fontSize:8,color:"#5a7088"}}>Scene mesh</span>
             </button>
           )}
-          <button onClick={() => setShowModelPicker(false)} className="model-picker-close-btn">✕</button>
+          <button onClick={() => setShowModelPicker(false)}
+            style={{alignSelf:"flex-start",background:"none",border:"none",color:"#5a7088",cursor:"pointer",fontSize:16,padding:"2px 6px"}}>✕</button>
         </div>
       )}
 
       {/* Lighting & Camera Panel */}
-      {filmCameraOpen && (<div className="float-panel-film-camera"><FilmCameraPanel cameraRef={cameraRef} rendererRef={rendererRef} sceneRef={sceneRef} open={filmCameraOpen} onClose={()=>setFilmCameraOpen(false)}/></div>)}
-      {filmVolOpen && (<div className="float-panel-film-vol"><FilmVolumetricsPanel sceneRef={sceneRef} open={filmVolOpen} onClose={()=>setFilmVolOpen(false)}/></div>)}
-      {filmPTOpen && (<div className="float-panel-film-pt"><FilmPathTracerPanel rendererRef={rendererRef} sceneRef={sceneRef} cameraRef={cameraRef} open={filmPTOpen} onClose={()=>setFilmPTOpen(false)}/></div>)}
-      {cinLightOpen && (<div className="float-panel-cin-light"><CinematicLightingPanel sceneRef={sceneRef} open={cinLightOpen} onClose={()=>setCinLightOpen(false)}/></div>)}
+      {filmCameraOpen && (<div style={{position:"fixed",left:16,top:60,zIndex:1200}}><FilmCameraPanel cameraRef={cameraRef} rendererRef={rendererRef} sceneRef={sceneRef} open={filmCameraOpen} onClose={()=>setFilmCameraOpen(false)}/></div>)}
+      {filmVolOpen && (<div style={{position:"fixed",left:280,top:60,zIndex:1200}}><FilmVolumetricsPanel sceneRef={sceneRef} open={filmVolOpen} onClose={()=>setFilmVolOpen(false)}/></div>)}
+      {filmPTOpen && (<div style={{position:"fixed",left:540,top:60,zIndex:1200}}><FilmPathTracerPanel rendererRef={rendererRef} sceneRef={sceneRef} cameraRef={cameraRef} open={filmPTOpen} onClose={()=>setFilmPTOpen(false)}/></div>)}
+      {cinLightOpen && (<div style={{position:"fixed",right:16,top:60,zIndex:1200}}><CinematicLightingPanel sceneRef={sceneRef} open={cinLightOpen} onClose={()=>setCinLightOpen(false)}/></div>)}
       {lightingCameraPanelOpen && (
-        <div className="float-panel-right-xl">
+        <div style={{position:"fixed",top:0,right:0,width:380,height:"100vh",zIndex:60,overflow:"hidden",display:"flex",flexDirection:"column"}}>
           <LightingCameraPanel
             sceneRef={sceneRef}
             cameraRef={cameraRef}
@@ -4192,7 +4240,7 @@ export default function App() {
 
       {/* Collaborate Panel */}
       {collaboratePanelOpen && (
-        <div className="float-panel-collab">
+        <div style={{position:"fixed",top:60,right:0,width:360,height:"calc(100vh - 60px)",zIndex:50,background:"#0d1117",borderLeft:"1px solid #21262d",display:"flex",flexDirection:"column",overflow:"hidden"}}>
           <CollaboratePanel
             sceneObjects={sceneObjects}
             onClose={() => setCollaboratePanelOpen(false)}
@@ -4202,7 +4250,7 @@ export default function App() {
 
       {/* Grease Pencil Panel */}
       {greasePencilPanelOpen && (
-        <div className="float-panel-grease">
+        <div style={{position:"fixed",top:148,right:0,width:320,height:"calc(100vh - 148px)",zIndex:55,background:"#0d1117",borderLeft:"1px solid #21262d",display:"flex",flexDirection:"column",overflow:"hidden"}}>
           <GreasePencilPanel
             onApplyFunction={applyFunction}
             onClose={() => setGreasePencilPanelOpen(false)}
@@ -4213,101 +4261,101 @@ export default function App() {
       
       {/* ══ VFX PANELS ══ */}
       {fluidPanelOpen && (
-        <div className="float-panel-right-md">
+        <div style={{position:"fixed",top:0,right:0,width:340,height:"100vh",zIndex:60,overflow:"hidden",display:"flex",flexDirection:"column"}}>
           <FluidPanel open={fluidPanelOpen} onClose={() => setFluidPanelOpen(false)} sceneRef={sceneRef} setStatus={setStatus} />
         </div>
       )}
       {weatherPanelOpen && (
-        <div className="float-panel-right-md">
+        <div style={{position:"fixed",top:0,right:0,width:340,height:"100vh",zIndex:60,overflow:"hidden",display:"flex",flexDirection:"column"}}>
           <WeatherPanel open={weatherPanelOpen} onClose={() => setWeatherPanelOpen(false)} sceneRef={sceneRef} setStatus={setStatus} />
         </div>
       )}
       {destructionPanelOpen && (
-        <div className="float-panel-right-lg">
+        <div style={{position:"fixed",top:0,right:0,width:360,height:"100vh",zIndex:60,overflow:"hidden",display:"flex",flexDirection:"column"}}>
           <DestructionPanel open={destructionPanelOpen} onClose={() => setDestructionPanelOpen(false)} sceneRef={sceneRef} meshRef={meshRef} setStatus={setStatus} onApplyFunction={handleApplyFunction} />
         </div>
       )}
 
       {/* ══ WORLD / GENERATOR PANELS (full-screen overlays with own viewport) ══ */}
       {envGenOpen && (
-        <div className="fullscreen-overlay">
-          <div className="fullscreen-overlay__bar">
-            <span className="fullscreen-overlay__title fullscreen-overlay__title--teal">🌲 ENVIRONMENT GENERATOR</span>
-            <button onClick={() => setEnvGenOpen(false)} className="fullscreen-overlay__close">✕ CLOSE</button>
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:80,background:"#06060f",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",alignItems:"center",padding:"6px 12px",background:"#0a0a14",borderBottom:"1px solid #1a2a3a",gap:8}}>
+            <span style={{color:"#00ffc8",fontFamily:"JetBrains Mono,monospace",fontSize:11,fontWeight:700}}>🌲 ENVIRONMENT GENERATOR</span>
+            <button onClick={() => setEnvGenOpen(false)} style={{marginLeft:"auto",background:"none",border:"1px solid #1a2a3a",borderRadius:3,color:"#5a7088",cursor:"pointer",padding:"3px 10px",fontFamily:"JetBrains Mono,monospace",fontSize:10}}>✕ CLOSE</button>
           </div>
-          <div className="fullscreen-overlay__body"><EnvironmentGenerator /></div>
+          <div style={{flex:1,overflow:"hidden"}}><EnvironmentGenerator /></div>
         </div>
       )}
       {cityGenOpen && (
-        <div className="fullscreen-overlay">
-          <div className="fullscreen-overlay__bar">
-            <span className="fullscreen-overlay__title fullscreen-overlay__title--teal">🏙️ CITY GENERATOR</span>
-            <button onClick={() => setCityGenOpen(false)} className="fullscreen-overlay__close">✕ CLOSE</button>
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:80,background:"#06060f",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",alignItems:"center",padding:"6px 12px",background:"#0a0a14",borderBottom:"1px solid #1a2a3a",gap:8}}>
+            <span style={{color:"#00ffc8",fontFamily:"JetBrains Mono,monospace",fontSize:11,fontWeight:700}}>🏙️ CITY GENERATOR</span>
+            <button onClick={() => setCityGenOpen(false)} style={{marginLeft:"auto",background:"none",border:"1px solid #1a2a3a",borderRadius:3,color:"#5a7088",cursor:"pointer",padding:"3px 10px",fontFamily:"JetBrains Mono,monospace",fontSize:10}}>✕ CLOSE</button>
           </div>
-          <div className="fullscreen-overlay__body"><CityGenerator /></div>
+          <div style={{flex:1,overflow:"hidden"}}><CityGenerator /></div>
         </div>
       )}
       {buildingOpen && (
-        <div className="fullscreen-overlay">
-          <div className="fullscreen-overlay__bar">
-            <span className="fullscreen-overlay__title fullscreen-overlay__title--teal">🏗️ BUILDING SIMULATOR</span>
-            <button onClick={() => setBuildingOpen(false)} className="fullscreen-overlay__close">✕ CLOSE</button>
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:80,background:"#06060f",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",alignItems:"center",padding:"6px 12px",background:"#0a0a14",borderBottom:"1px solid #1a2a3a",gap:8}}>
+            <span style={{color:"#00ffc8",fontFamily:"JetBrains Mono,monospace",fontSize:11,fontWeight:700}}>🏗️ BUILDING SIMULATOR</span>
+            <button onClick={() => setBuildingOpen(false)} style={{marginLeft:"auto",background:"none",border:"1px solid #1a2a3a",borderRadius:3,color:"#5a7088",cursor:"pointer",padding:"3px 10px",fontFamily:"JetBrains Mono,monospace",fontSize:10}}>✕ CLOSE</button>
           </div>
-          <div className="fullscreen-overlay__body"><BuildingSimulator /></div>
+          <div style={{flex:1,overflow:"hidden"}}><BuildingSimulator /></div>
         </div>
       )}
       {physicsOpen && (
-        <div className="fullscreen-overlay">
-          <div className="fullscreen-overlay__bar">
-            <span className="fullscreen-overlay__title fullscreen-overlay__title--orange">⚙️ PHYSICS SIMULATION</span>
-            <button onClick={() => setPhysicsOpen(false)} className="fullscreen-overlay__close">✕ CLOSE</button>
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:80,background:"#06060f",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",alignItems:"center",padding:"6px 12px",background:"#0a0a14",borderBottom:"1px solid #1a2a3a",gap:8}}>
+            <span style={{color:"#FF6600",fontFamily:"JetBrains Mono,monospace",fontSize:11,fontWeight:700}}>⚙️ PHYSICS SIMULATION</span>
+            <button onClick={() => setPhysicsOpen(false)} style={{marginLeft:"auto",background:"none",border:"1px solid #1a2a3a",borderRadius:3,color:"#5a7088",cursor:"pointer",padding:"3px 10px",fontFamily:"JetBrains Mono,monospace",fontSize:10}}>✕ CLOSE</button>
           </div>
-          <div className="fullscreen-overlay__body"><PhysicsSimulation /></div>
+          <div style={{flex:1,overflow:"hidden"}}><PhysicsSimulation /></div>
         </div>
       )}
       {assetLibOpen && (
-        <div className="fullscreen-overlay">
-          <div className="fullscreen-overlay__bar">
-            <span className="fullscreen-overlay__title fullscreen-overlay__title--teal">📦 ASSET LIBRARY</span>
-            <button onClick={() => setAssetLibOpen(false)} className="fullscreen-overlay__close">✕ CLOSE</button>
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:80,background:"#06060f",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",alignItems:"center",padding:"6px 12px",background:"#0a0a14",borderBottom:"1px solid #1a2a3a",gap:8}}>
+            <span style={{color:"#00ffc8",fontFamily:"JetBrains Mono,monospace",fontSize:11,fontWeight:700}}>📦 ASSET LIBRARY</span>
+            <button onClick={() => setAssetLibOpen(false)} style={{marginLeft:"auto",background:"none",border:"1px solid #1a2a3a",borderRadius:3,color:"#5a7088",cursor:"pointer",padding:"3px 10px",fontFamily:"JetBrains Mono,monospace",fontSize:10}}>✕ CLOSE</button>
           </div>
-          <div className="fullscreen-overlay__body"><AssetLibraryPanel /></div>
+          <div style={{flex:1,overflow:"hidden"}}><AssetLibraryPanel /></div>
         </div>
       )}
       {nodeModOpen && (
-        <div className="fullscreen-overlay">
-          <div className="fullscreen-overlay__bar">
-            <span className="fullscreen-overlay__title fullscreen-overlay__title--teal">🔗 NODE MODIFIER SYSTEM</span>
-            <button onClick={() => setNodeModOpen(false)} className="fullscreen-overlay__close">✕ CLOSE</button>
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:80,background:"#06060f",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",alignItems:"center",padding:"6px 12px",background:"#0a0a14",borderBottom:"1px solid #1a2a3a",gap:8}}>
+            <span style={{color:"#00ffc8",fontFamily:"JetBrains Mono,monospace",fontSize:11,fontWeight:700}}>🔗 NODE MODIFIER SYSTEM</span>
+            <button onClick={() => setNodeModOpen(false)} style={{marginLeft:"auto",background:"none",border:"1px solid #1a2a3a",borderRadius:3,color:"#5a7088",cursor:"pointer",padding:"3px 10px",fontFamily:"JetBrains Mono,monospace",fontSize:10}}>✕ CLOSE</button>
           </div>
-          <div className="fullscreen-overlay__body"><NodeModifierSystem /></div>
+          <div style={{flex:1,overflow:"hidden"}}><NodeModifierSystem /></div>
         </div>
       )}
       {vrPreviewOpen && (
-        <div className="fullscreen-overlay">
-          <div className="fullscreen-overlay__bar">
-            <span className="fullscreen-overlay__title fullscreen-overlay__title--purple">🥽 VR PREVIEW</span>
-            <button onClick={() => setVrPreviewOpen(false)} className="fullscreen-overlay__close">✕ CLOSE</button>
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:80,background:"#06060f",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",alignItems:"center",padding:"6px 12px",background:"#0a0a14",borderBottom:"1px solid #1a2a3a",gap:8}}>
+            <span style={{color:"#aa44ff",fontFamily:"JetBrains Mono,monospace",fontSize:11,fontWeight:700}}>🥽 VR PREVIEW</span>
+            <button onClick={() => setVrPreviewOpen(false)} style={{marginLeft:"auto",background:"none",border:"1px solid #1a2a3a",borderRadius:3,color:"#5a7088",cursor:"pointer",padding:"3px 10px",fontFamily:"JetBrains Mono,monospace",fontSize:10}}>✕ CLOSE</button>
           </div>
-          <div className="fullscreen-overlay__body"><VRPreviewMode /></div>
+          <div style={{flex:1,overflow:"hidden"}}><VRPreviewMode /></div>
         </div>
       )}
       {crowdGenOpen && (
-        <div className="fullscreen-overlay">
-          <div className="fullscreen-overlay__bar">
-            <span className="fullscreen-overlay__title fullscreen-overlay__title--teal">👥 CROWD GENERATOR</span>
-            <button onClick={() => setCrowdGenOpen(false)} className="fullscreen-overlay__close">✕ CLOSE</button>
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:80,background:"#06060f",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",alignItems:"center",padding:"6px 12px",background:"#0a0a14",borderBottom:"1px solid #1a2a3a",gap:8}}>
+            <span style={{color:"#00ffc8",fontFamily:"JetBrains Mono,monospace",fontSize:11,fontWeight:700}}>👥 CROWD GENERATOR</span>
+            <button onClick={() => setCrowdGenOpen(false)} style={{marginLeft:"auto",background:"none",border:"1px solid #1a2a3a",borderRadius:3,color:"#5a7088",cursor:"pointer",padding:"3px 10px",fontFamily:"JetBrains Mono,monospace",fontSize:10}}>✕ CLOSE</button>
           </div>
-          <div className="fullscreen-overlay__body"><ProceduralCrowdGenerator /></div>
+          <div style={{flex:1,overflow:"hidden"}}><ProceduralCrowdGenerator /></div>
         </div>
       )}
       {terrainOpen && (
-        <div className="fullscreen-overlay">
-          <div className="fullscreen-overlay__bar">
-            <span className="fullscreen-overlay__title fullscreen-overlay__title--green">🏔️ TERRAIN SCULPTING</span>
-            <button onClick={() => setTerrainOpen(false)} className="fullscreen-overlay__close">✕ CLOSE</button>
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:80,background:"#06060f",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",alignItems:"center",padding:"6px 12px",background:"#0a0a14",borderBottom:"1px solid #1a2a3a",gap:8}}>
+            <span style={{color:"#44bb77",fontFamily:"JetBrains Mono,monospace",fontSize:11,fontWeight:700}}>🏔️ TERRAIN SCULPTING</span>
+            <button onClick={() => setTerrainOpen(false)} style={{marginLeft:"auto",background:"none",border:"1px solid #1a2a3a",borderRadius:3,color:"#5a7088",cursor:"pointer",padding:"3px 10px",fontFamily:"JetBrains Mono,monospace",fontSize:10}}>✕ CLOSE</button>
           </div>
-          <div className="fullscreen-overlay__body"><TerrainSculpting /></div>
+          <div style={{flex:1,overflow:"hidden"}}><TerrainSculpting /></div>
         </div>
       )}
 
@@ -4319,7 +4367,7 @@ export default function App() {
 
       {/* ── Gamepad Animator ── */}
       {gamepadOpen && (
-        <div className="float-panel-gamepad">
+        <div style={{position:"fixed",top:0,right:0,width:360,height:"100vh",zIndex:65,overflow:"hidden",display:"flex",flexDirection:"column"}}>
           <GamepadAnimator
             open={gamepadOpen}
             onClose={() => setGamepadOpen(false)}
@@ -4337,13 +4385,13 @@ export default function App() {
 
       {/* ── Pro Mesh Panel (full-screen) ── */}
       {proMeshOpen && (
-        <div className="fullscreen-overlay">
-          <div className="fullscreen-overlay__bar">
-            <span className="fullscreen-overlay__title fullscreen-overlay__title--teal">✂ PRO MESH EDITOR</span>
-            <span className="promesh-bar-sub">Best-in-class mesh tools</span>
-            <button onClick={() => setProMeshOpen(false)} className="fullscreen-overlay__close">✕ CLOSE</button>
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:80,background:"#06060f",display:"flex",flexDirection:"column"}}>
+          <div style={{display:"flex",alignItems:"center",padding:"6px 12px",background:"#0a0a14",borderBottom:"1px solid #1a2a3a",gap:8,flexShrink:0}}>
+            <span style={{color:"#00ffc8",fontFamily:"JetBrains Mono,monospace",fontSize:11,fontWeight:700}}>✂ PRO MESH EDITOR</span>
+            <span style={{fontSize:9,color:"#5a7088"}}>Best-in-class mesh tools</span>
+            <button onClick={() => setProMeshOpen(false)} style={{marginLeft:"auto",background:"none",border:"1px solid #1a2a3a",borderRadius:3,color:"#5a7088",cursor:"pointer",padding:"3px 10px",fontFamily:"JetBrains Mono,monospace",fontSize:10}}>✕ CLOSE</button>
           </div>
-          <div className="fullscreen-overlay__body">
+          <div style={{flex:1,overflow:"hidden"}}>
             <ProMeshPanel
               open={proMeshOpen}
               onClose={() => setProMeshOpen(false)}
@@ -4363,14 +4411,14 @@ export default function App() {
       />
 
       {(faceGenOpen || foliageGenOpen || vehicleGenOpen || creatureGenOpen || propGenOpen) && (
-        <div className="float-panel-gen">
-          <div className="float-panel-gen__header">
-            <span className="float-panel-gen__title">
+        <div style={{position:"fixed",top:148,right:0,width:320,height:"calc(100vh - 148px)",zIndex:55,background:"#0d1117",borderLeft:"1px solid #21262d",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",borderBottom:"1px solid #21262d",background:"#161b22"}}>
+            <span style={{color:"#00ffc8",fontWeight:700,fontSize:12,fontFamily:"JetBrains Mono,monospace"}}>
               {faceGenOpen?"Face Generator":foliageGenOpen?"Foliage Generator":vehicleGenOpen?"Vehicle Generator":creatureGenOpen?"Creature Generator":"Prop Generator"}
             </span>
-            <button onClick={()=>{setFaceGenOpen(false);setFoliageGenOpen(false);setVehicleGenOpen(false);setCreatureGenOpen(false);setPropGenOpen(false);}} className="float-panel-gen__close">×</button>
+            <button onClick={()=>{setFaceGenOpen(false);setFoliageGenOpen(false);setVehicleGenOpen(false);setCreatureGenOpen(false);setPropGenOpen(false);}} style={{background:"none",border:"none",color:"#8b949e",cursor:"pointer",fontSize:16,lineHeight:1}}>×</button>
           </div>
-          <div className="float-panel-gen__body">
+          <div style={{flex:1,overflowY:"auto",padding:8}}>
             {faceGenOpen && <FaceGeneratorPanel sceneRef={sceneRef} setStatus={setStatus} />}
             {foliageGenOpen && <FoliageGeneratorPanel sceneRef={sceneRef} setStatus={setStatus} />}
             {vehicleGenOpen && <VehicleGeneratorPanel sceneRef={sceneRef} setStatus={setStatus} />}
