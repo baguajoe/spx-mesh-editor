@@ -6,12 +6,8 @@
 export const WORKSPACES_MAP = {
   MODELING:     "Modeling",
   SCULPT:       "Sculpt",
-  RIGGING:      "Rigging",
   ANIMATION:    "Animation",
   SHADING:      "Shading",
-  RENDERING:    "Rendering",
-  VFX:          "VFX",
-  PIPELINE:     "Pipeline",
   PERFORMANCE:  "Performance",
 };
 
