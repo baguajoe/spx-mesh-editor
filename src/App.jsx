@@ -3666,7 +3666,14 @@ export default function App() {
       setActiveWorkspace={setActiveWorkspace}
       onMenuAction={handleApplyFunction}
       leftPanel={
-        activeWorkspace === "Sculpt" ? (
+        activeWorkspace === "Surface" ? (
+          <HairPanel
+            open={true}
+            onClose={() => setHairPanelOpen(false)}
+            sceneRef={sceneRef}
+            setStatus={setStatus}
+          />
+        ) : activeWorkspace === "Sculpt" ? (
           <SculptPanel
             onApplyFunction={handleApplyFunction}
             sculptBrush={sculptBrush} setSculptBrush={setSculptBrush}
@@ -4069,7 +4076,7 @@ export default function App() {
           {label:"Materials",  fn:()=>openWorkspaceTool("materials_textures")},
           {label:"Node Mat",   fn:()=>setNodeEditorOpen(v=>!v)},
           {label:"Clothing",   fn:()=>openWorkspaceTool("clothing_pattern")},
-          {label:"Hair",       fn:()=>openWorkspaceTool("hair_suite")},
+          {label:"Hair",       fn:()=>{ closeAllWorkspacePanels(); setHairPanelOpen(true); setActiveWorkspace('Surface'); }},
           {label:"Displace",   fn:()=>setDisplacementOpen(v=>!v)},
         ]}/>
         <SpxTabGroup label="RIG" color="#ff88ff" tabs={[
